@@ -8,6 +8,12 @@ export interface EditableProductGridProps extends React.HTMLAttributes<HTMLEleme
   sectionPath?: string;
 
   /**
+   * Collection path for products (default: "products").
+   * When set, products are iterated with standard array indexing (e.g. "products[0]").
+   */
+  listPath?: string;
+
+  /**
    * Title of the product grid section.
    */
   title?: string;
@@ -64,6 +70,7 @@ export interface EditableProductGridProps extends React.HTMLAttributes<HTMLEleme
  */
 export function EditableProductGrid({
   sectionPath = 'home',
+  listPath = 'products',
   title = 'Featured Collection',
   subtitle = 'Just Dropped',
   products = [],
@@ -153,11 +160,20 @@ export function EditableProductGrid({
 
       {/* Grid of Products */}
       {filteredProducts.length > 0 ? (
-        <div className={`deneb-product-grid grid ${gridColClasses} gap-6 sm:gap-8`}>
+        <div
+          {...(listPath ? { 'data-preview-list-path': listPath } : {})}
+          className={`deneb-product-grid grid ${gridColClasses} gap-6 sm:gap-8`}
+        >
           {filteredProducts.map((product, idx) => {
-            const itemPath = `${sectionPath}.${cardPrefix}${idx + 1}`;
+            const itemPath = listPath
+              ? `${listPath}[${idx}]`
+              : `${sectionPath}.${cardPrefix}${idx + 1}`;
             return (
-              <div key={product.id || idx} className="relative group">
+              <div
+                key={product.id || idx}
+                data-preview-item-path={itemPath}
+                className="relative group"
+              >
                 <EditableProductCard
                   itemPath={itemPath}
                   product={product}

@@ -123,8 +123,23 @@ export function buildTemplateValidationSiteData(
   return {
     project: {
       id: 'template-validation',
+      slug: 'template-validation',
       title: 'Template Validation',
       status: 'APPROVED',
+    },
+    siteInstance: {
+      id: 'template-validation-instance',
+      slug: 'template-validation',
+      domain: 'template-validation.fivora.site',
+      subdomain: 'template-validation',
+      customDomain: null,
+      liveUrl: 'https://template-validation.fivora.site',
+    },
+    api: {
+      baseUrl: 'https://api.fivora.site',
+      catalogUrl: 'https://api.fivora.site/site-catalog/template-validation/live-data',
+      contactUrl: 'https://api.fivora.site/site-contact',
+      analyticsUrl: 'https://api.fivora.site/site-analytics/page-view',
     },
     shop: {
       businessName: 'Template Validation Shop',
