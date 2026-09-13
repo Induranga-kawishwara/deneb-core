@@ -2278,3 +2278,261 @@ function singularize(label: string) {
 
   return label;
 }
+
+/**
+ * Coerces primitive values to their target schema type (e.g. string "25" -> number 25,
+ * string "true" -> boolean true, number/boolean -> string for text fields).
+ */
+export function coercePrimitiveValue(
+  value: unknown,
+  type: PrimitiveType,
+  defaultValue?: unknown,
+): unknown {
+  if (value === null || value === undefined) {
+    if (defaultValue !== undefined) return defaultValue;
+    return value;
+  }
+
+  if (type === 'number') {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : (defaultValue ?? value);
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed === '') {
+        return defaultValue !== undefined ? defaultValue : null;
+      }
+      const num = Number(trimmed);
+      if (!Number.isNaN(num)) {
+        return num;
+      }
+    }
+    if (defaultValue !== undefined && typeof defaultValue === 'number') {
+      return defaultValue;
+    }
+    return value;
+  }
+
+  if (type === 'boolean') {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim().toLowerCase();
+      if (trimmed === 'true' || trimmed === '1') return true;
+      if (trimmed === 'false' || trimmed === '0') return false;
+      if (trimmed === '') {
+        return defaultValue !== undefined ? defaultValue : false;
+      }
+    }
+    if (typeof value === 'number') {
+      if (value === 1) return true;
+      if (value === 0) return false;
+    }
+    if (defaultValue !== undefined && typeof defaultValue === 'boolean') {
+      return defaultValue;
+    }
+    return Boolean(value);
+  }
+
+  if (
+    type === 'text' ||
+    type === 'textarea' ||
+    type === 'email' ||
+    type === 'tel' ||
+    type === 'url' ||
+    type === 'select' ||
+    type === 'image'
+  ) {
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+  }
+
+  return value;
+}
+
+function coerceNodeValue(
+  value: unknown,
+  node: TemplateEditorSection | TemplateEditorField,
+  defaultVal?: unknown,
+): unknown {
+  if (node.type === 'object') {
+    if (!isPlainObject(value)) return value;
+    const obj = { ...(value as Record<string, unknown>) };
+    const defaultObj = isPlainObject(defaultVal)
+      ? (defaultVal as Record<string, unknown>)
+      : undefined;
+    for (const field of node.fields ?? []) {
+      if (Object.prototype.hasOwnProperty.call(obj, field.key)) {
+        obj[field.key] = coerceNodeValue(
+          obj[field.key],
+          field,
+          defaultObj ? defaultObj[field.key] : undefined,
+        );
+      }
+    }
+    return obj;
+  }
+
+  if (node.type === 'list') {
+    if (!Array.isArray(value)) return value;
+    const defaultArr = Array.isArray(defaultVal) ? defaultVal : undefined;
+    const sampleDefaultItem =
+      defaultArr && defaultArr.length > 0 ? defaultArr[0] : undefined;
+
+    return value.map((item, index) => {
+      const itemDefault =
+        defaultArr && defaultArr[index] !== undefined
+          ? defaultArr[index]
+          : sampleDefaultItem;
+
+      if (node.fields && node.fields.length > 0) {
+        if (!isPlainObject(item)) return item;
+        const itemObj = { ...(item as Record<string, unknown>) };
+        const itemDefaultObj = isPlainObject(itemDefault)
+          ? (itemDefault as Record<string, unknown>)
+          : undefined;
+        for (const field of node.fields) {
+          if (Object.prototype.hasOwnProperty.call(itemObj, field.key)) {
+            itemObj[field.key] = coerceNodeValue(
+              itemObj[field.key],
+              field,
+              itemDefaultObj ? itemDefaultObj[field.key] : undefined,
+            );
+          }
+        }
+        return itemObj;
+      }
+
+      if (node.itemField) {
+        return coercePrimitiveValue(item, node.itemField.type, itemDefault);
+      }
+
+      return item;
+    });
+  }
+
+  return coercePrimitiveValue(
+    value,
+    node.type as PrimitiveType,
+    defaultVal,
+  );
+}
+
+function coerceAtDottedPath(
+  current: Record<string, unknown>,
+  pathParts: string[],
+  section: TemplateEditorSection,
+  defaults?: Record<string, unknown> | null,
+): Record<string, unknown> {
+  const [head, ...rest] = pathParts;
+  if (!head) return current;
+
+  if (rest.length === 0) {
+    if (Object.prototype.hasOwnProperty.call(current, head)) {
+      const defaultVal =
+        defaults && isPlainObject(defaults) ? defaults[head] : undefined;
+      current[head] = coerceNodeValue(current[head], section, defaultVal);
+    }
+    return current;
+  }
+
+  if (isPlainObject(current[head])) {
+    const nextDefaults =
+      defaults && isPlainObject(defaults) && isPlainObject(defaults[head])
+        ? (defaults[head] as Record<string, unknown>)
+        : undefined;
+    current[head] = coerceAtDottedPath(
+      current[head] as Record<string, unknown>,
+      rest,
+      section,
+      nextDefaults,
+    );
+  }
+
+  return current;
+}
+
+function coerceViaDefaults(current: unknown, defaultVal: unknown): unknown {
+  if (defaultVal === null || defaultVal === undefined) {
+    return current;
+  }
+
+  if (typeof defaultVal === 'number') {
+    return coercePrimitiveValue(current, 'number', defaultVal);
+  }
+
+  if (typeof defaultVal === 'boolean') {
+    return coercePrimitiveValue(current, 'boolean', defaultVal);
+  }
+
+  if (typeof defaultVal === 'string') {
+    return coercePrimitiveValue(current, 'text', defaultVal);
+  }
+
+  if (Array.isArray(defaultVal)) {
+    if (!Array.isArray(current)) return current;
+    if (defaultVal.length === 0) return current;
+
+    const sampleItem = defaultVal[0];
+    return current.map((item, idx) => {
+      const defItem =
+        defaultVal[idx] !== undefined ? defaultVal[idx] : sampleItem;
+      return coerceViaDefaults(item, defItem);
+    });
+  }
+
+  if (isPlainObject(defaultVal)) {
+    if (!isPlainObject(current)) return current;
+    const currentObj = { ...(current as Record<string, unknown>) };
+    for (const [k, v] of Object.entries(currentObj)) {
+      if (Object.prototype.hasOwnProperty.call(defaultVal, k)) {
+        currentObj[k] = coerceViaDefaults(
+          v,
+          (defaultVal as Record<string, unknown>)[k],
+        );
+      }
+    }
+    return currentObj;
+  }
+
+  return current;
+}
+
+/**
+ * Coerces website content values to their intended schema/default primitive types
+ * (e.g. numeric strings like "25" to 25, boolean strings like "true" to true).
+ * Ensures consistency between form submission, database storage, and template generation.
+ */
+export function coerceContentTypes(
+  content: Record<string, unknown>,
+  schema?: TemplateEditorSchema | null,
+  defaults?: Record<string, unknown> | null,
+): Record<string, unknown> {
+  if (!content || !isPlainObject(content)) {
+    return content;
+  }
+
+  let result = structuredClone(content);
+
+  // 1. Coerce via schema sections if schema is provided
+  if (schema && Array.isArray(schema.sections) && schema.sections.length > 0) {
+    for (const section of schema.sections) {
+      const pathParts = section.path
+        .split('.')
+        .map((p) => p.trim())
+        .filter(Boolean);
+      if (pathParts.length === 0) continue;
+
+      result = coerceAtDottedPath(result, pathParts, section, defaults);
+    }
+  }
+
+  // 2. Coerce or reinforce via defaults if defaults is provided
+  if (defaults && isPlainObject(defaults)) {
+    result = coerceViaDefaults(result, defaults) as Record<string, unknown>;
+  }
+
+  return result;
+}

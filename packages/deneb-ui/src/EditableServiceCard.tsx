@@ -6,6 +6,7 @@ export interface ServiceItem {
   id?: string | number;
   name?: string;
   title?: string;
+  price?: string | number;
   description?: string;
   imageUrl?: string;
   image?: string;
@@ -38,6 +39,7 @@ export interface EditableServiceCardProps extends React.HTMLAttributes<HTMLEleme
    * Text/content alignment for the card ('left' | 'center' | 'right').
    */
   align?: 'left' | 'center' | 'right';
+  showPrice?: boolean;
 }
 
 /**
@@ -50,6 +52,7 @@ export function EditableServiceCard({
   imageFallback = '/placeholder.svg',
   as: Component = 'article',
   align = 'left',
+  showPrice = true,
   className = '',
   style,
   children,
@@ -57,6 +60,7 @@ export function EditableServiceCard({
 }: EditableServiceCardProps) {
   const name = String(service?.name || service?.title || '');
   const description = String(service?.description || '');
+  const hasPrice = showPrice && service?.price !== undefined && service?.price !== null && String(service.price).trim() !== '';
   const imageUrl = String(service?.imageUrl || service?.image || '');
   const features = Array.isArray(service?.features) ? service.features : [];
 
@@ -101,6 +105,23 @@ export function EditableServiceCard({
           defaultValue={description}
           className="service-card-description"
         />
+
+        {hasPrice && (
+          <div className="service-card-price-wrap" style={{ margin: '0.5rem 0' }}>
+            <EditableText
+              as="span"
+              id={`${itemPath}.price`}
+              data-preview-field-path={`${itemPath}.price`}
+              defaultValue={String(service.price)}
+              className="service-card-price"
+              style={{
+                fontSize: '1.125rem',
+                fontWeight: 700,
+                color: 'var(--brand-color, #2563eb)',
+              }}
+            />
+          </div>
+        )}
 
         {(features.length > 0 || Array.isArray(service?.features)) && (
           <ul
