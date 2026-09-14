@@ -15,13 +15,17 @@ function toCamel(parts) {
     .filter((w, i) => i === 0 || !STOP_WORDS.has(w.toLowerCase()))
     .slice(0, 5);
   if (!cleaned.length) return '';
-  return cleaned
+  const camel = cleaned
     .map((word, i) => {
       const lower = word.toLowerCase();
       if (i === 0) return lower;
       return lower.charAt(0).toUpperCase() + lower.slice(1);
     })
     .join('');
+  if (/^[0-9]/.test(camel)) {
+    return 'item' + camel.charAt(0).toUpperCase() + camel.slice(1);
+  }
+  return camel;
 }
 
 function inferSection(context) {

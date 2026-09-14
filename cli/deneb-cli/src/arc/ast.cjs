@@ -158,10 +158,17 @@ function isJsxTextHeavy(node) {
   return meaningful.length > 0;
 }
 
+const VALID_IDENTIFIER_REGEX = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+
 function optionalMember(parts) {
   let expr = b.identifier(parts[0]);
   for (let i = 1; i < parts.length; i++) {
-    expr = b.optionalMemberExpression(expr, b.identifier(parts[i]), false, true);
+    const part = String(parts[i]);
+    if (VALID_IDENTIFIER_REGEX.test(part)) {
+      expr = b.optionalMemberExpression(expr, b.identifier(part), false, true);
+    } else {
+      expr = b.optionalMemberExpression(expr, b.stringLiteral(part), true, true);
+    }
   }
   return expr;
 }

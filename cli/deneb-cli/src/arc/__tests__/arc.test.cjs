@@ -626,3 +626,78 @@ export { useSiteData, contentText };
   assert.match(out, /export\s*\{[^}]*useSiteData[^}]*\}\s*from\s*['"]@deneb-ui\/ui['"]/);
   assert.doesNotMatch(out, /import\s*\{[^}]*useSiteData/);
 });
+
+test('toCamel and optionalMember safely handle strings starting with numbers without syntax errors', () => {
+  const { toCamel } = require('../field-paths.cjs');
+  const { optionalMember, parseSource } = require('../ast.cjs');
+  const recast = require('recast');
+
+  // toCamel prefixes identifiers starting with a number
+  assert.equal(toCamel(['1800840AURA']), 'item1800840aura');
+  assert.equal(toCamel(['25-Min', 'Express']), 'item25MinExpress');
+
+  // optionalMember safely falls back to computed string literal for non-identifier keys
+  const chain = optionalMember(['siteData', 'content', 'home', '100EncryptedLabel']);
+  const code = recast.print(chain).code;
+  assert.equal(code, 'siteData?.content?.home?.["100EncryptedLabel"]');
+
+  // Verify it parses as valid JS without syntax errors
+  assert.doesNotThrow(() => parseSource(`const x = ${code};`, 'test.tsx'));
+});
+
+test('bindArrayDeclaration transforms module-scope array into DEFAULT_ fallback in client components', () => {
+  const clientCode = `'use client';
+import React from 'react';
+
+const BRANDS = [
+  { name: 'Apple' },
+  { name: 'Samsung' },
+];
+
+export function BrandMarquee() {
+  return (
+    <div>
+      {BRANDS.map((b) => (
+        <div key={b.name} className="brand-item">
+          <span>{b.name}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+`;
+
+  const profile = {
+    root: os.tmpdir(),
+    framework: 'nextjs',
+    router: 'next-app',
+    language: 'typescript',
+    cssSystems: ['tailwind'],
+    hasSrc: true,
+    aliasMap: { '@/*': ['src/*'] },
+  };
+
+  const analysis = analyzeFile({
+    code: clientCode,
+    relativeFile: 'src/components/BrandMarquee.tsx',
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'home',
+    componentMeta: { name: 'BrandMarquee', role: 'about' },
+  });
+  analysis.code = clientCode;
+  analysis.relativeFile = 'src/components/BrandMarquee.tsx';
+
+  const plan = planTransformations({ profile, analyses: [analysis] });
+  const result = applyFilePlan(plan.files[0], profile);
+
+  assert.equal(result.changed, true);
+  // Module-scope array renamed to DEFAULT_BRANDS with literal array preserved
+  assert.match(result.code, /const DEFAULT_BRANDS = \[\s*\{\s*name:\s*['"]Apple['"]\s*\}/);
+  // Inside component body: useSiteData hook followed by dynamic BRANDS binding
+  assert.match(result.code, /const siteData = useSiteData\(\);/);
+  assert.match(result.code, /const BRANDS = siteData\?\.content\?\.home\?\.BRANDS \?\? DEFAULT_BRANDS;/);
+  // Verify AST parses cleanly
+  assert.doesNotThrow(() => parseSource(result.code, 'BrandMarquee.tsx'));
+});
+
