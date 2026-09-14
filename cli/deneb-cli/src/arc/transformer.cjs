@@ -238,7 +238,7 @@ function wrapLiteralTextChildren(node, fieldPath, fallback) {
  * emitted as JSX template literals (`items[${index}].title`) so added and
  * reordered items stay editable, which is what strict mode requires.
  */
-function applyCollectionTransform(ast, transform) {
+function applyCollectionTransform(ast, transform, isClient = false) {
   const listPath = transform.listField;
   const binding = transform.itemParam;
   if (!listPath || !binding) return false;
@@ -290,7 +290,7 @@ function applyCollectionTransform(ast, transform) {
     );
   }
 
-  return bindArrayDeclaration(ast, mapCall, listPath);
+  return bindArrayDeclaration(ast, mapCall, listPath, isClient);
 }
 
 function findMapCall(ast, loc) {
@@ -376,7 +376,40 @@ function findListContainer(mapCallPath) {
   return null;
 }
 
-function bindArrayDeclaration(ast, mapCallPath, listPath) {
+function isModuleLevel(pathNode) {
+  let current = pathNode.parentPath || pathNode.parent;
+  while (current) {
+    const type = current.node?.type;
+    if (
+      type === 'FunctionDeclaration' ||
+      type === 'FunctionExpression' ||
+      type === 'ArrowFunctionExpression'
+    ) {
+      return false;
+    }
+    if (type === 'Program') return true;
+    current = current.parentPath || current.parent;
+  }
+  return true;
+}
+
+function findEnclosingFunction(pathNode) {
+  let current = pathNode.parentPath || pathNode.parent;
+  while (current) {
+    const type = current.node?.type;
+    if (
+      type === 'FunctionDeclaration' ||
+      type === 'FunctionExpression' ||
+      type === 'ArrowFunctionExpression'
+    ) {
+      return current;
+    }
+    current = current.parentPath || current.parent;
+  }
+  return null;
+}
+
+function bindArrayDeclaration(ast, mapCallPath, listPath, isClient = false) {
   const arrayName = mapCallPath.node.callee.object?.name;
   if (!arrayName) return false;
   let bound = false;
@@ -392,6 +425,33 @@ function bindArrayDeclaration(ast, mapCallPath, listPath) {
         this.traverse(pathNode);
         return;
       }
+
+      if (isClient && isModuleLevel(pathNode)) {
+        const defaultName = 'DEFAULT_' + arrayName;
+        node.id.name = defaultName;
+        const fnPath = findEnclosingFunction(mapCallPath);
+        if (fnPath && fnPath.node.body?.type === 'BlockStatement') {
+          const body = fnPath.node.body.body;
+          const already = body.some((stmt) => recast.print(stmt).code.includes(`const ${arrayName} =`));
+          if (!already) {
+            const localDecl = b.variableDeclaration('const', [
+              b.variableDeclarator(
+                b.identifier(arrayName),
+                siteDataListBinding(listPath.split('.'), b.identifier(defaultName))
+              ),
+            ]);
+            const hookIdx = body.findIndex((stmt) => recast.print(stmt).code.includes('useSiteData'));
+            if (hookIdx >= 0) {
+              body.splice(hookIdx + 1, 0, localDecl);
+            } else {
+              body.unshift(localDecl);
+            }
+          }
+        }
+        bound = true;
+        return false;
+      }
+
       node.init = siteDataListBinding(listPath.split('.'), node.init);
       bound = true;
       return false;
@@ -549,7 +609,7 @@ function applyFilePlan(filePlan, profile) {
 
     if (transform.operation === 'collection-conversion') {
       try {
-        if (applyCollectionTransform(ast, transform)) applied++;
+        if (applyCollectionTransform(ast, transform, isClient)) applied++;
         else failures.push({ loc: transform.loc, reason: 'collection-not-bindable' });
       } catch (err) {
         failures.push({ loc: transform.loc, reason: err.message });

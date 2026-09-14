@@ -72,29 +72,98 @@ export default function Page() {
 
 ---
 
-## Canonical Component Aliases
+## Canonical Component Catalog & Aliases
 
-`@deneb-ui/ui` provides both canonical shorthand aliases (shadcn / HeroUI style) and full `Editable*` identifiers:
+`@deneb-ui/ui` provides both canonical shorthand aliases (shadcn / HeroUI style) and full `Editable*` identifiers across all commerce categories:
 
-| Canonical Alias | Full Component Identifier | Description |
+### 1. Foundational & Layout Primitives
+| Canonical Alias | Full Component Identifier | Visual Editing Support | Description |
+| :--- | :--- | :--- | :--- |
+| `Button` | `EditableButton` | `data-preview-field-path`, `style-target` | Visual action button with ripple feedback & glow variants |
+| `Card` | `EditableCard` | `data-preview-item-path`, `style-target` | Obsidian glass container with luminous border hover effects |
+| `Badge` | `EditableBadge` | `data-preview-field-path` | Status tags, indicator pills, and glowing metadata markers |
+| `Heading` | `EditableHeading` | `data-preview-field-path`, `style-target` | Semantic typography heading with instant DOM sync |
+| `Paragraph` | `EditableParagraph` | `data-preview-field-path`, `style-target` | Body text copy linked to Fivora theme tokens |
+| `Text` | `EditableText` | `data-preview-field-path`, `style-target` | Inline editable text primitive with live typing sync |
+| `Quote` | `EditableQuote` | `data-preview-field-path` | Editorial quotation block with left accent line |
+| `Dialog` | `EditableDialog` | `data-preview-static` | Accessible modal dialog with backdrop blur & ESC dismiss |
+| `Grid` | `EditableGrid` | `data-preview-list-path`, `style-target` | Auto-fit responsive grid with `minCardWidth` support |
+| `Box` | `EditableBox` | `data-preview-field-path`, `data-preview-item-path` | Flexible layout container with style token bindings |
+| `Section` | `EditableSection` | `data-preview-style-target` | Full-width page section wrapper with spacing presets |
+| `List` | `EditableList` | `data-preview-list-path`, `data-preview-item-path` | Dynamic collection container with list item paths |
+| `Image` | `EditableImage` | `data-preview-field-path` | Responsive image with aspect ratio preservation & zoom |
+
+### 2. Commerce & Storefront Components
+| Canonical Alias | Full Component Identifier | Visual Editing Support | Description |
+| :--- | :--- | :--- | :--- |
+| `ProductCard` | `EditableProductCard` | `data-preview-field-path`, `data-preview-item-path` | Product card with LKR/currency formatting, badge, & WhatsApp CTA |
+| `ProductGrid` | `EditableProductGrid` | `data-preview-list-path`, `data-preview-item-path` | Catalog grid with quick-view modal hook & filter integration |
+| `ProductDetail` | `EditableProductDetail` | `data-preview-page-key`, `data-preview-field-path` | Full single-product view with gallery, specs, & inquiry actions |
+| `ProductQuickView` | `ProductQuickView` | `data-preview-field-path` | Instant lightbox modal product inspection with quantity counter |
+| `CartDrawer` | `EditableCartDrawer` | `data-preview-list-path`, `data-preview-item-path` | Slide-over cart drawer with 1-click unified WhatsApp order compilation |
+| `FilterSidebar` | `EditableFilterSidebar` | `data-preview-field-path`, `useSiteData` | Faceted catalog filter sidebar (categories, price range, sizes) |
+| `CategoryPills` | `EditableCategoryPills` | `data-preview-field-path`, `useSiteData` | Scrollable horizontal filter pills for instant catalog filtering |
+
+### 3. Hero & Marketing Sections
+| Canonical Alias | Full Component Identifier | Visual Editing Support | Description |
+| :--- | :--- | :--- | :--- |
+| `Hero` | `EditableHeroCentered` | `data-preview-field-path`, `useSiteData` | High-converting centered storefront hero banner with dual CTAs |
+| `HeroSplit` | `EditableHeroSplit` | `data-preview-field-path`, `useSiteData` | Split-layout storefront hero banner with featured image |
+| `AnnouncementBar` | `EditableAnnouncementBar` | `data-preview-field-path`, `data-preview-static` | Top promo strip for flash sales, coupons, & free shipping |
+| `StickyMobileBar` | `StickyMobileBar` | `data-preview-field-path`, `useSiteData` | Sticky bottom navigation bar for high-converting mobile commerce |
+| `TrustBadges` | `TrustBadges` | `data-preview-field-path` | Security and conversion guarantee strip (SSL, delivery, returns) |
+| `CookieConsentBanner` | `CookieConsentBanner` | `data-preview-field-path` | Regulatory cookie consent banner with live policy link |
+
+### 4. Social Proof & Customer Reviews
+| Canonical Alias | Full Component Identifier | Visual Editing Support | Description |
+| :--- | :--- | :--- | :--- |
+| `GoogleFeedback` | `EditableGoogleFeedback` | `data-preview-field-path`, `data-preview-list-path`, Dual-Layer Star Repaint | Official Google review badge, aggregate rating, & review cards |
+| `TestimonialSection` | `EditableTestimonialSection` | `data-preview-field-path`, `data-preview-list-path`, Star Sync | Editorial critic testimonials with typography & star ratings |
+| `Testimonials` | `EditableTestimonialSection` | `data-preview-field-path`, `data-preview-list-path` | Alias for `EditableTestimonialSection` |
+| `TestimonialCard` | `EditableTestimonialCard` | `data-preview-item-path`, `data-preview-static` | Single customer testimonial card with avatar & 5-star rating |
+| `CustomerReviews` | `EditableCustomerReviews` | `data-preview-page-key`, `data-preview-field-path` | Customer review summary & rating breakdown |
+
+### 5. Services, Pricing & Navigation
+| Canonical Alias | Full Component Identifier | Visual Editing Support | Description |
+| :--- | :--- | :--- | :--- |
+| `ServiceCard` | `EditableServiceCard` | `data-preview-field-path`, `data-preview-item-path` | Storefront service card with icon, price tag, & action button |
+| `PricingCard` | `EditablePricingCard` | `data-preview-field-path`, `data-preview-item-path` | Tiered pricing card with feature list & popular tier highlight |
+| `Accordion` / `FAQ` | `EditableFAQAccordion` | `data-preview-item-path`, `data-preview-list-path` | Collapsible FAQ accordion with Fivora list markers |
+| `ContactForm` | `EditableContactForm` | `data-preview-field-path`, `useSiteData` | Lead generation & inquiry form with custom endpoint support |
+| `Navbar` / `Header` | `EditableNavbar` | `data-preview-field-path`, `data-preview-static` | Storefront navigation header with mobile drawer & cart badge |
+| `Footer` | `EditableFooter` | `data-preview-field-path`, `data-preview-static` | Multi-column storefront footer with social & policy links |
+
+### 6. Smart Actions, Location & Business
+| Component | Module Path | Visual Editing Support | Description |
+| :--- | :--- | :--- | :--- |
+| `Map` | `EditableMap` | `data-preview-field-path` | Universal Google Maps embed with automatic URL/coordinate parsing |
+| `MapEmbed` | `location/MapEmbed` | `data-preview-field-path` | Responsive Google Maps iframe embed with fallback placeholder |
+| `MapLink` | `location/MapLink` | `data-preview-field-path` | Direct link to Google Maps directions |
+| `LocationCard` | `location/LocationCard` | `data-preview-static` | Storefront location card with map directions button |
+| `LocationLink` | `location/LocationLink` | `data-preview-field-path` | Interactive map address trigger with directions |
+| `Address` | `location/Address` | `data-preview-field-path` | Structured semantic address component |
+| `ContactActions` | `contact/ContactActions` | `data-preview-field-path` | Multi-channel contact bar (Phone, WhatsApp, Email) |
+| `ContactButton` | `contact/ContactButton` | `data-preview-field-path` | Configurable contact button with phone/email/WhatsApp presets |
+| `WhatsAppButton` | `contact/WhatsAppButton` | `data-preview-field-path` | One-click WhatsApp chat launcher with dynamic link resolution |
+| `PhoneButton` | `contact/PhoneButton` | `data-preview-field-path` | Direct call action with tel: protocol and visual editing bindings |
+| `EmailButton` | `contact/EmailButton` | `data-preview-field-path` | Pre-formatted mailto action with subject line support |
+| `FloatingContactWidget`| `contact/FloatingContactWidget` | `data-preview-field-path` | Sticky bottom-corner conversion widget |
+| `BusinessHours` | `business/BusinessHours` | `data-preview-field-path` | Weekly schedule renderer with dynamic live Open/Closed badge |
+| `HeritageCollage` | `business/HeritageCollage` | `data-preview-field-path`, `data-preview-item-path` | Visual brand story collage with historical milestone cards |
+| `SocialLinks` | `social/SocialLinks` | `data-preview-field-path` | Filtered social channel container with brand icons |
+| `SocialButton` | `social/SocialButton` | `data-preview-field-path` | Individual branded social media button |
+
+### 7. Runtime State & Theming Primitives
+| Component / Hook | Module Path | Purpose |
 | :--- | :--- | :--- |
-| `GoogleFeedback` | `EditableGoogleFeedback` | Official Google review badge, aggregate rating, & review cards |
-| `TestimonialSection` | `EditableTestimonialSection` | Editorial critic testimonials with typography & star ratings |
-| `Testimonials` | `EditableTestimonialSection` | Alias for `EditableTestimonialSection` |
-| `Map` | `EditableMap` | Universal Google Maps embed with automatic URL parsing |
-| `CustomerReviews` | `EditableCustomerReviews` | Customer review summary & rating breakdown |
-| `ProductCard` | `EditableProductCard` | Visual commerce product card with live price & badges |
-| `ProductGrid` | `EditableProductGrid` | Responsive grid with visual editing markers |
-| `Navbar` / `Header` | `EditableNavbar` | Responsive header with mobile drawer & cart trigger |
-| `Hero` | `EditableHeroCentered` | High-converting split / centered storefront hero |
-| `Footer` | `EditableFooter` | Multi-column commerce footer with social links & legal links |
-| `CartDrawer` | `EditableCartDrawer` | Sliding visual cart drawer with item counter |
-| `Accordion` / `FAQ`| `EditableFAQAccordion` | Collapsible FAQ accordion with Fivora list markers |
-| `Button` | `EditableButton` | Visual button with action contract & ripple feedback |
-| `Image` | `EditableImage` | Visual image with aspect ratio preservation & Fivora focus |
-| `Text` | `EditableText` | Inline editable text with instant DOM sync |
-
----
+| `SiteDataProvider` | `SiteDataProvider` | Real-time `BroadcastChannel` & `postMessage` state synchronizer |
+| `useSiteData` | `SiteDataProvider` | React hook to access live synchronized `siteData` |
+| `ThemeStyles` | `ThemeStyles` | Dynamic CSS variable injector for colors, fonts, and radii |
+| `ResponsiveBaseStyles`| `ResponsiveBaseStyles` | Universal fluid typography & responsive baseline styles |
+| `DenebComponentStyles`| `DenebComponentStyles` | Scoped component style definitions |
+| `FontLoader` | `fonts/FontLoader` | Google Fonts pre-fetch & dynamic injection engine |
+| `useDenebFonts` | `fonts/useDenebFonts` | Hook for checking active font definitions |
+| `CartProvider` / `useCart`| `cart/useCart` | Global cart state management with persistent storage |
 
 ## Component Guides & API Reference
 
