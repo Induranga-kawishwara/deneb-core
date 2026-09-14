@@ -163,6 +163,45 @@ function printRollback(reason) {
   console.log(`${C.dim}${reason}${C.reset}\n`);
 }
 
+// ─── AI Agent Progress Messages ──────────────────────────────────
+
+function printAiDetected(unknownCount) {
+  console.log(`\n  ${C.cyan}⚡${C.reset} ${C.bold}AI Agent:${C.reset} Detected ${unknownCount} unknown component${unknownCount > 1 ? 's' : ''}`);
+}
+
+function printAiAttempt(componentName, attempt, maxRetries) {
+  console.log(`  ${C.cyan}⚡${C.reset} Adapting ${C.bold}<${componentName} />${C.reset}... attempt ${attempt}/${maxRetries}`);
+}
+
+function printAiValidationFail(errors, attempt) {
+  for (const err of errors.slice(0, 3)) {
+    console.log(`    ${C.red}❌${C.reset} ${err}`);
+  }
+  if (errors.length > 3) {
+    console.log(`    ${C.dim}... ${errors.length - 3} more errors${C.reset}`);
+  }
+}
+
+function printAiSuccess(componentName, attempt, fieldsCount) {
+  console.log(`    ${C.green}✅${C.reset} All checks passed! (${fieldsCount} editable field${fieldsCount !== 1 ? 's' : ''})`);
+}
+
+function printAiSkipped(componentName, reason) {
+  console.log(`  ${C.yellow}⚠${C.reset} Skipped ${C.bold}<${componentName} />${C.reset}: ${reason}`);
+}
+
+function printAiPr(repoName, branchName, prNumber) {
+  if (prNumber === 0) {
+    console.log(`  ${C.cyan}📦${C.reset} ${C.dim}(dry-run)${C.reset} ${repoName}: ${branchName}`);
+  } else {
+    console.log(`  ${C.cyan}📦${C.reset} PR opened: ${C.bold}${repoName}${C.reset} (#${prNumber})`);
+  }
+}
+
+function printAiSummary(adapted, skipped, totalTokens) {
+  console.log(`\n  ${C.cyan}⚡${C.reset} AI Agent Summary: ${C.green}${adapted} adapted${C.reset}, ${C.yellow}${skipped} skipped${C.reset}, ~${totalTokens.toLocaleString()} tokens used`);
+}
+
 module.exports = {
   printBanner,
   printProfile,
@@ -177,6 +216,13 @@ module.exports = {
   printUncoveredText,
   printDeveloperNextSteps,
   printRollback,
+  printAiDetected,
+  printAiAttempt,
+  printAiValidationFail,
+  printAiSuccess,
+  printAiSkipped,
+  printAiPr,
+  printAiSummary,
   ok,
   warn,
   info,

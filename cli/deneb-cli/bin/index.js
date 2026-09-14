@@ -1021,6 +1021,8 @@ if (command === 'init') {
   let explain = false;
   let legacy = false;
   let telemetry = 'off';
+  let aiEnabled = false;
+  let aiDryRun = false;
   for (let i = 0; i < commandArgs.length; i++) {
     const arg = commandArgs[i];
     if (arg === '--recipe' || arg === '-r') {
@@ -1033,6 +1035,11 @@ if (command === 'init') {
       explain = true;
     } else if (arg === '--legacy') {
       legacy = true;
+    } else if (arg === '--ai') {
+      aiEnabled = true;
+    } else if (arg === '--ai-dry-run') {
+      aiEnabled = true;
+      aiDryRun = true;
     } else if (arg === '--telemetry' && commandArgs[i + 1]) {
       telemetry = commandArgs[++i];
     } else if (arg.startsWith('--telemetry=')) {
@@ -1041,7 +1048,7 @@ if (command === 'init') {
       targetInput = arg;
     }
   }
-  initProject(targetInput, { recipeName, dryRun, explain, legacy, telemetry });
+  initProject(targetInput, { recipeName, dryRun, explain, legacy, telemetry, aiEnabled, aiDryRun });
 } else if (command === 'create') {
   createTemplate(commandArgs[0]);
 } else if (command === 'add') {
@@ -1108,7 +1115,7 @@ if (command === 'init') {
 
 Core Commands:
   init              Deneb ARC: convert an existing React/Next.js app into a Fivora-editable storefront
-                    flags: --dry-run  --explain  --recipe <name>  --legacy  --telemetry off|anonymous|enhanced
+                    flags: --dry-run  --explain  --recipe <name>  --legacy  --ai  --ai-dry-run  --telemetry off|anonymous|enhanced
   doctor            Run comprehensive environment, manifest, visual editing AST & asset diagnostic checks (flags: --fix, --json)
   save-recipe       Learn and save calibrated fixes & schemas into reusable recipe bank (e.g. deneb save-recipe . shoes-store)
   learn             Alias for save-recipe
@@ -1136,6 +1143,8 @@ Examples:
   deneb init --recipe electronics
   deneb init --recipe cosmetics
   deneb init --legacy
+  deneb init --ai
+  deneb init --ai-dry-run
   deneb fonts list
   deneb fonts install .
   deneb fonts install . --font inter --font playfair-display
