@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { useCart, CartItem } from './cart/useCart';
+import { useCart, CartItem, formatCurrency } from './cart/useCart';
 import { useSiteData } from './SiteDataProvider';
 import { withBasePath } from './utils/urls';
 
@@ -20,7 +20,7 @@ export function EditableCartDrawer({
   basePath = 'cart',
   whatsappNumber = '94770000000',
   storeName,
-  currency = '$',
+  currency = 'LKR',
   checkoutUrl,
   freeShippingThreshold,
   onCheckout,
@@ -73,7 +73,7 @@ export function EditableCartDrawer({
   const subtotalLabel = getContent('subtotalLabel', 'Subtotal');
   const shippingNote = getContent('shippingNote', 'Taxes and shipping calculated at checkout');
   const checkoutButtonText = getContent('checkoutButtonText', 'Proceed to Checkout');
-  const whatsappButtonText = getContent('whatsappButtonText', 'Order via WhatsApp');
+  const whatsappButtonText = getContent('whatsappButtonText', 'Purchase through WhatsApp');
   const clearCartText = getContent('clearCartText', 'Clear all');
 
   const whatsappHref = getWhatsAppOrderUrl(whatsappNumber, {
@@ -236,8 +236,10 @@ export function EditableCartDrawer({
                       </div>
 
                       {/* Variant metadata */}
-                      {(item.size || item.color) && (
+                      {(item.brand || item.size || item.color) && (
                         <p className="mt-0.5 text-xs text-neutral-400">
+                          {item.brand && <span className="text-emerald-400 font-semibold">{item.brand}</span>}
+                          {item.brand && (item.size || item.color) && ' · '}
                           {item.size && `Size: ${item.size}`}
                           {item.size && item.color && ' · '}
                           {item.color && `Color: ${item.color}`}
@@ -245,7 +247,7 @@ export function EditableCartDrawer({
                       )}
 
                       <p className="mt-1 text-sm font-semibold text-emerald-400">
-                        {currency}{(item.price * item.quantity).toFixed(2)}
+                        {formatCurrency(item.price * item.quantity, currency)}
                       </p>
                     </div>
 
@@ -293,7 +295,7 @@ export function EditableCartDrawer({
                 {subtotalLabel}
               </span>
               <span className="text-xl font-bold text-white">
-                {currency}{subtotal.toFixed(2)}
+                {formatCurrency(subtotal, currency)}
               </span>
             </div>
 

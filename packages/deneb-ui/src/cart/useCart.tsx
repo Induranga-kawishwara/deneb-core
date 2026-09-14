@@ -5,6 +5,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo, useCall
 export interface CartItem {
   id: string;
   name: string;
+  brand?: string;
   price: number;
   originalPrice?: number;
   image?: string;
@@ -13,6 +14,40 @@ export interface CartItem {
   quantity: number;
   sku?: string;
   metadata?: Record<string, unknown>;
+}
+
+export function formatCurrency(amount: number, currency = 'LKR'): string {
+  const formatted = (amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (currency === 'LKR' || currency === 'Rs.' || currency === 'Rs') {
+    return `LKR ${formatted}`;
+  }
+  if (currency === '$' || currency === 'USD') {
+    return `$${formatted}`;
+  }
+  return `${currency} ${formatted}`;
+}
+
+export function getProductWhatsAppUrl(
+  product: { name?: string; title?: string; brand?: string; price?: string | number; [key: string]: unknown },
+  whatsappNumber: string,
+  options?: { storeName?: string; currency?: string }
+): string {
+  const cleanNumber = (whatsappNumber || '').replace(/\D/g, '');
+  const title = product.name || product.title || 'Product';
+  const brand = product.brand ? ` (Brand: ${product.brand})` : '';
+  const priceNum = typeof product.price === 'number' ? product.price : parseFloat(String(product.price || '').replace(/[^0-9.]/g, '')) || 0;
+  const priceStr = priceNum > 0 ? `\nPrice: ${formatCurrency(priceNum, options?.currency || 'LKR')}` : '';
+  const store = options?.storeName ? ` at ${options.storeName}` : '';
+
+  const message = [
+    `Hello${store}! 👋`,
+    `I am interested in this product:`,
+    `*${title}*${brand}${priceStr}`,
+    '',
+    `Could you please share more details, availability, and ordering instructions? Thank you!`,
+  ].join('\n');
+
+  return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
 }
 
 export interface CartContextValue {
@@ -141,36 +176,38 @@ export function CartProvider({
 
   const getWhatsAppOrderUrl = useCallback(
     (whatsappNumber: string, options?: { storeName?: string; currency?: string }) => {
-      const cleanNumber = whatsappNumber.replace(/\D/g, '');
-      const currency = options?.currency || '$';
+      const cleanNumber = (whatsappNumber || '').replace(/\D/g, '');
+      const currency = options?.currency || 'LKR';
       const store = options?.storeName ? ` at *${options.storeName}*` : '';
 
       const lines: string[] = [
-        `*New Order Request${store}*`,
-        `Date: ${new Date().toLocaleDateString()}`,
+        `🛒 *New Order Request${store}*`,
+        `📅 Date: ${new Date().toLocaleDateString()}`,
         '',
-        '*Order Items:*',
+        '📦 *Order Items:*',
       ];
 
       items.forEach((item, index) => {
+        const brandStr = item.brand ? ` (Brand: *${item.brand}*)` : '';
         const variantParts: string[] = [];
         if (item.size) variantParts.push(`Size: ${item.size}`);
         if (item.color) variantParts.push(`Color: ${item.color}`);
-        const variantStr = variantParts.length > 0 ? ` (${variantParts.join(', ')})` : '';
+        const variantStr = variantParts.length > 0 ? ` [${variantParts.join(', ')}]` : '';
 
         lines.push(
-          `${index + 1}. *${item.name}*${variantStr}`,
+          `${index + 1}. *${item.name}*${brandStr}${variantStr}`,
         );
         lines.push(
-          `   Qty: ${item.quantity} x ${currency}${item.price.toFixed(2)} = *${currency}${(item.price * item.quantity).toFixed(2)}*`,
+          `   Qty: ${item.quantity} x ${formatCurrency(item.price, currency)} = *${formatCurrency(item.price * item.quantity, currency)}*`,
         );
       });
 
       lines.push('');
-      lines.push(`*Total Amount: ${currency}${subtotal.toFixed(2)}*`);
-      lines.push(`Total Items: ${totalCount}`);
+      lines.push('──────────────────────────────');
+      lines.push(`💰 *Grand Total: ${formatCurrency(subtotal, currency)}*`);
+      lines.push(`📊 Total Items: ${totalCount}`);
       lines.push('');
-      lines.push('Please confirm availability and delivery details. Thank you!');
+      lines.push('Please confirm availability and delivery details. Thank you! 🙏');
 
       return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(lines.join('\n'))}`;
     },
@@ -211,6 +248,10 @@ export function CartProvider({
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
+export function useOptionalCart(): CartContextValue | null {
+  return useContext(CartContext);
+}
+
 export function useCart(): CartContextValue {
   const context = useContext(CartContext);
   if (!context) {
@@ -218,3 +259,4 @@ export function useCart(): CartContextValue {
   }
   return context;
 }
+
