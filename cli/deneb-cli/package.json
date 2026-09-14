@@ -50,7 +50,9 @@
   "dependencies": {
     "@babel/parser": "^7.28.0",
     "@deneb-ui/core": "^2.0.41",
+    "@octokit/rest": "^22.0.1",
     "adm-zip": "^0.6.0",
+    "dotenv": "^17.4.2",
     "recast": "^0.23.11"
   },
   "devDependencies": {

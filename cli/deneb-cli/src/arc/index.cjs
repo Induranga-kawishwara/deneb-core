@@ -36,6 +36,9 @@ const {
   findUncoveredVisibleText,
 } = require('./fivora-contract.cjs');
 const printer = require('./printer.cjs');
+const { classifyComponents } = require('./component-registry.cjs');
+const { checkAiReady, adaptComponent, generateDocsPage, loadEnv } = require('./ai-agent.cjs');
+const { checkGithubReady, createComponentPR } = require('./pr-agent.cjs');
 
 function parseArcOptions(raw = {}) {
   return {
@@ -46,6 +49,8 @@ function parseArcOptions(raw = {}) {
     skipInstall: Boolean(raw.skipInstall),
     detectedPages: raw.detectedPages || null,
     json: Boolean(raw.json),
+    aiEnabled: Boolean(raw.aiEnabled),
+    aiDryRun: Boolean(raw.aiDryRun),
   };
 }
 
@@ -224,7 +229,7 @@ function analyzeProjectFiles(profile, graph) {
   return analyses;
 }
 
-function runDenebArc(projectDir, projectName, options = {}) {
+async function runDenebArcAsync(projectDir, projectName, options = {}) {
   const opts = parseArcOptions(options);
   const runId = createRunId();
   const startedAt = new Date().toISOString();
@@ -255,6 +260,133 @@ function runDenebArc(projectDir, projectName, options = {}) {
   );
   printer.printScan(profile, graph, candidateCount, actionCount);
 
+  // ─── AI Agent: Classify & Adapt Unknown Components ──────────
+  let aiResults = [];
+  loadEnv(projectDir);
+  const aiCheck = checkAiReady();
+  if (!aiCheck.ready) {
+    printer.warn(`AI Agent disabled: ${aiCheck.reason}`);
+  } else {
+    const componentNames = (profile.components || []).map((c) => c.name || c.tag).filter(Boolean);
+    const { unknown } = classifyComponents(componentNames);
+
+    if (unknown.length > 0) {
+      printer.printAiDetected(unknown.length);
+
+      for (const componentName of unknown) {
+        const meta = (profile.components || []).find((c) => (c.name || c.tag) === componentName);
+        const absFile = meta?.file ? path.join(projectDir, meta.file) : null;
+        let sourceCode = '';
+        if (absFile && fs.existsSync(absFile)) {
+          try { sourceCode = fs.readFileSync(absFile, 'utf8'); } catch { /* skip */ }
+        }
+        if (!sourceCode) {
+          printer.printAiSkipped(componentName, 'could not read source file');
+          continue;
+        }
+
+        try {
+          const aiResult = await adaptComponent(sourceCode, componentName, profile, {
+            onAttempt: (attempt, max) => printer.printAiAttempt(componentName, attempt, max),
+            onValidationFail: (errors, attempt) => printer.printAiValidationFail(errors, attempt),
+            onSuccess: (attempt) => printer.printAiSuccess(componentName, attempt, 0),
+          });
+
+          if (aiResult.success) {
+            aiResults.push({ componentName, ...aiResult });
+            printer.printAiSuccess(componentName, aiResult.attempts, aiResult.fields.length);
+          } else {
+            printer.printAiSkipped(componentName, aiResult.error || 'failed after max retries');
+          }
+        } catch (err) {
+          printer.printAiSkipped(componentName, err.message);
+        }
+      }
+
+      // Background: Open PRs for successfully adapted components
+      const ghCheck = checkGithubReady();
+      if (ghCheck.ready && aiResults.length > 0) {
+        for (const aiResult of aiResults) {
+          try {
+            const docsResult = await generateDocsPage(aiResult.componentName, aiResult.code, aiResult.fields);
+            const prResult = await createComponentPR({
+              componentName: aiResult.componentName,
+              componentCode: aiResult.code,
+              docsCode: docsResult.success ? docsResult.code : null,
+              editableFields: aiResult.fields,
+              attempts: aiResult.attempts,
+              totalInputTokens: aiResult.totalInputTokens,
+              totalOutputTokens: aiResult.totalOutputTokens,
+              dryRun: opts.aiDryRun,
+            });
+            if (prResult.corePr) {
+              printer.printAiPr('chamikathereal/core → deneb-ui/core', `feat/ai-editable-${aiResult.componentName.toLowerCase()}`, prResult.corePr.number);
+            }
+            if (prResult.uiPr) {
+              printer.printAiPr('chamikathereal/ui → deneb-ui/ui', `feat/ai-docs-${aiResult.componentName.toLowerCase()}`, prResult.uiPr.number);
+            }
+            for (const err of prResult.errors) {
+              printer.warn(`PR: ${err}`);
+            }
+          } catch (err) {
+            printer.warn(`PR creation failed for ${aiResult.componentName}: ${err.message}`);
+          }
+        }
+      } else if (!ghCheck.ready && aiResults.length > 0) {
+        printer.warn(`GitHub PRs skipped: ${ghCheck.reason}`);
+      }
+
+      const totalTokens = aiResults.reduce((n, r) => n + r.totalInputTokens + r.totalOutputTokens, 0);
+      printer.printAiSummary(aiResults.length, unknown.length - aiResults.length, totalTokens);
+    }
+  }
+
+  return runArcTransformations(projectDir, projectName, opts, profile, graph, analyses, runId, startedAt);
+}
+
+function runDenebArcSync(projectDir, projectName, options = {}) {
+  const opts = parseArcOptions(options);
+  const runId = createRunId();
+  const startedAt = new Date().toISOString();
+
+  printer.printBanner(opts.dryRun ? 'dry-run' : opts.explain ? 'explain' : 'run');
+
+  const profile = scanProject(projectDir);
+  if (opts.detectedPages && Array.isArray(opts.detectedPages) && opts.detectedPages.length) {
+    const scannedIds = new Set(profile.routes.map((r) => r.id));
+    for (const page of opts.detectedPages) {
+      if (page && page.id && !scannedIds.has(page.id)) {
+        profile.routes.push(page);
+      }
+    }
+  }
+
+  printer.printProfile(profile);
+  const graph = buildDependencyGraph(profile);
+  const analyses = analyzeProjectFiles(profile, graph);
+
+  const candidateCount = analyses.reduce(
+    (n, a) => n + (a.candidates || []).filter((c) => c.kind !== 'decoration' && c.kind !== 'already-editable' && !c.skip).length,
+    0
+  );
+  const actionCount = analyses.reduce(
+    (n, a) => n + (a.candidates || []).filter((c) => c.operation === 'split-action-contract' || c.kind === 'url').length,
+    0
+  );
+  printer.printScan(profile, graph, candidateCount, actionCount);
+
+  return runArcTransformations(projectDir, projectName, opts, profile, graph, analyses, runId, startedAt);
+}
+
+function runDenebArc(projectDir, projectName, options = {}) {
+  const opts = parseArcOptions(options);
+  if (opts.aiEnabled) {
+    return runDenebArcAsync(projectDir, projectName, options);
+  }
+  return runDenebArcSync(projectDir, projectName, options);
+}
+
+function runArcTransformations(projectDir, projectName, opts, profile, graph, analyses, runId, startedAt) {
   const sourceAbs = profile.jsxFiles.map((f) => path.join(projectDir, f));
   const recipeMatch = matchRecipeV2(projectDir, profile, sourceAbs, opts.recipeName);
   if (recipeMatch.recipe) {
