@@ -156,14 +156,106 @@ export default function Page() {
 ### 7. Runtime State & Theming Primitives
 | Component / Hook | Module Path | Purpose |
 | :--- | :--- | :--- |
-| `SiteDataProvider` | `SiteDataProvider` | Real-time `BroadcastChannel` & `postMessage` state synchronizer |
-| `useSiteData` | `SiteDataProvider` | React hook to access live synchronized `siteData` |
+| `SiteDataProvider` / `DenebDataProvider` | `SiteDataProvider` | Real-time backend catalog fetcher & `postMessage` preview state synchronizer |
+| `useProducts` | `SiteDataProvider` | React hook to access live synchronized products list (`content.products`) |
+| `useServices` | `SiteDataProvider` | React hook to access live synchronized services list (`content.services`) |
+| `useSiteCatalog` | `SiteDataProvider` | Returns `{ products, services, project, siteInstance, api }` in one call |
+| `useSiteApi` | `SiteDataProvider` | Returns official Fivora backend endpoints (`catalogUrl`, `contactUrl`, `analyticsUrl`) |
+| `useSiteData` / `useDenebData` | `SiteDataProvider` | React hook to access full live synchronized `siteData` |
 | `ThemeStyles` | `ThemeStyles` | Dynamic CSS variable injector for colors, fonts, and radii |
 | `ResponsiveBaseStyles`| `ResponsiveBaseStyles` | Universal fluid typography & responsive baseline styles |
 | `DenebComponentStyles`| `DenebComponentStyles` | Scoped component style definitions |
 | `FontLoader` | `fonts/FontLoader` | Google Fonts pre-fetch & dynamic injection engine |
 | `useDenebFonts` | `fonts/useDenebFonts` | Hook for checking active font definitions |
 | `CartProvider` / `useCart`| `cart/useCart` | Global cart state management with persistent storage |
+
+---
+
+## Data Fetching & Backend Integration Hooks
+
+### 1. `useProducts(fallback?: ProductItem[])`
+Retrieves the live products list from the site data. Automatically resolves top-level `content.products`, nested `content.home.products`, and live backend rehydration updates from `api.catalogUrl`.
+
+```tsx
+import { useProducts, ProductGrid } from '@deneb-ui/ui';
+
+export default function CatalogSection() {
+  const products = useProducts();
+
+  return (
+    <ProductGrid
+      title="Featured Collection"
+      subtitle="Handpicked Styles"
+      products={products}
+      categories={['All', 'Accessories', 'Apparel']}
+      cardVariant="modern-glass" // 'modern-glass' | 'classic' | 'minimal' | 'horizontal'
+      columns={{ mobile: 1, tablet: 2, desktop: 3 }}
+    />
+  );
+}
+```
+
+### 2. `useSiteApi()`
+Returns the official backend API configuration object (`SiteDataApiConfig`) defined in `site-data.json`. Use this hook whenever you need to connect custom forms or direct API calls to the backend:
+
+```tsx
+import { useSiteApi } from '@deneb-ui/ui';
+
+export default function ApiDemo() {
+  const api = useSiteApi();
+
+  // api?.baseUrl      -> "https://api.fivora.site"
+  // api?.catalogUrl   -> "https://api.fivora.site/site-catalog/:slug/live-data"
+  // api?.contactUrl   -> "https://api.fivora.site/site-contact"
+  // api?.analyticsUrl -> "https://api.fivora.site/site-analytics/page-view"
+  
+  return null;
+}
+```
+
+### 3. `useSiteCatalog()`
+Convenience hook that bundles catalog metadata and live status together:
+
+```tsx
+import { useSiteCatalog } from '@deneb-ui/ui';
+
+export default function CatalogOverview() {
+  const { products, services, project, siteInstance, api } = useSiteCatalog();
+
+  return (
+    <div>
+      <h3>{project?.title}</h3>
+      <p>Active live products: {products.length}</p>
+      <p>Active live services: {services.length}</p>
+    </div>
+  );
+}
+```
+
+### 4. `useServices(fallback?: ServiceItem[])`
+Retrieves the live services list from `content.services` or `content.home.services`:
+
+```tsx
+import { useServices, ServiceCard } from '@deneb-ui/ui';
+
+export default function ServicesList() {
+  const services = useServices();
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {services.map((service, index) => (
+        <ServiceCard
+          key={service.id || index}
+          itemPath={`services[${index}]`}
+          service={service}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+---
 
 ## Component Guides & API Reference
 

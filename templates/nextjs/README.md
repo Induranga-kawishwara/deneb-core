@@ -75,6 +75,41 @@ When you run **`npm run lab`**, you can click directly on any element with a `da
 
 ---
 
+## Backend Data Fetching & Commerce Hooks
+
+The root layout wraps your application with `<SiteDataProvider>`, which automatically connects to the Fivora backend (`api.catalogUrl`) on live sites and listens to live visual editing updates in the Lab.
+
+Import hooks from `@/lib/siteDataContext` or `@deneb-ui/ui`:
+
+```tsx
+import { useProducts, useSiteCatalog, useSiteApi, useSiteData } from '@/lib/siteDataContext';
+import { EditableProductGrid, EditableProductCard } from '@deneb-ui/ui';
+
+export default function MyCommercePage() {
+  // 1. Get live products (automatically handles backend hydration & editor changes)
+  const products = useProducts();
+
+  // 2. Access backend API endpoints
+  const api = useSiteApi(); // api?.catalogUrl, api?.contactUrl, api?.baseUrl
+
+  // 3. Get full catalog & project metadata
+  const { services, project } = useSiteCatalog();
+
+  return (
+    <section>
+      <h2>{project?.title} Products</h2>
+      <EditableProductGrid
+        products={products}
+        cardVariant="modern-glass"
+        columns={{ mobile: 1, tablet: 2, desktop: 3 }}
+      />
+    </section>
+  );
+}
+```
+
+---
+
 ## How to Customize
 
 ### 1. Change Theme & Colors
