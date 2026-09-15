@@ -159,18 +159,23 @@ function applyTransformToElement(pathNode, transform) {
         b.jsxAttribute(b.jsxIdentifier('type'), b.stringLiteral('submit'))
       );
     }
-    if (!hasJsxAttribute(node, 'data-preview-static')) {
+    if (transform.labelField) {
+      if (hasJsxAttribute(node, 'data-preview-static')) {
+        node.openingElement.attributes = node.openingElement.attributes.filter(
+          (attr) => !(attr.type === 'JSXAttribute' && attr.name && attr.name.name === 'data-preview-static')
+        );
+      }
+      if (hasJsxAttribute(node, 'data-preview-field-path')) {
+        node.openingElement.attributes = node.openingElement.attributes.filter(
+          (attr) => !(attr.type === 'JSXAttribute' && attr.name && attr.name.name === 'data-preview-field-path')
+        );
+      }
+      splitActionChildren(node, transform.labelField, transform.labelFallback || '');
+    } else if (!hasJsxAttribute(node, 'data-preview-static')) {
       node.openingElement.attributes.push(
         b.jsxAttribute(b.jsxIdentifier('data-preview-static'), b.stringLiteral('action-button'))
       );
     }
-    if (hasJsxAttribute(node, 'data-preview-field-path')) {
-      node.openingElement.attributes = node.openingElement.attributes.filter(
-        (attr) => !(attr.type === 'JSXAttribute' && attr.name && attr.name.name === 'data-preview-field-path')
-      );
-    }
-    splitActionChildren(node, transform.labelField, transform.labelFallback || '');
-    wrapHiddenUrlSibling(pathNode, transform.urlField, transform.fallback);
     return;
   }
   if (transform.operation === 'split-action-contract') {
@@ -206,18 +211,17 @@ function applyTransformToElement(pathNode, transform) {
       }
     }
 
-    if (!hasJsxAttribute(node, 'data-preview-static')) {
-      node.openingElement.attributes.push(
-        b.jsxAttribute(b.jsxIdentifier('data-preview-static'), b.stringLiteral('action-link'))
-      );
-    }
-    if (hasJsxAttribute(node, 'data-preview-field-path')) {
+    // Fivora Strict Action/Label Contract:
+    // Bind the URL action marker directly to the outer <a> element (never hidden)
+    replaceAttrValue(node, 'data-preview-field-path', b.stringLiteral(transform.urlField));
+    // Remove data-preview-static if present to prevent static/field collisions
+    if (hasJsxAttribute(node, 'data-preview-static')) {
       node.openingElement.attributes = node.openingElement.attributes.filter(
-        (attr) => !(attr.type === 'JSXAttribute' && attr.name && attr.name.name === 'data-preview-field-path')
+        (attr) => !(attr.type === 'JSXAttribute' && attr.name && attr.name.name === 'data-preview-static')
       );
     }
+    // Bind the label to the inner text child
     splitActionChildren(node, transform.labelField, transform.labelFallback || '');
-    wrapHiddenUrlSibling(pathNode, transform.urlField, transform.fallback);
     return;
   }
   if (transform.operation === 'extract-url') {

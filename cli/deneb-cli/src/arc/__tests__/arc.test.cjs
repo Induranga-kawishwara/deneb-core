@@ -158,8 +158,8 @@ test('AST transformer preserves className and uses nullish fallbacks', () => {
   assert.match(result.code, /data-preview-field-path=/);
   assert.match(result.code, /\?\?/);
   assert.match(result.code, /<span[\s\S]*data-preview-field-path="/);
-  assert.match(result.code, /<span[^>]*hidden[^>]*data-preview-field-path="/);
-  assert.match(result.code, /data-preview-static="action-link"/);
+  assert.match(result.code, /<a\b[^>]*data-preview-field-path=/);
+  assert.doesNotMatch(result.code, /<span[^>]*hidden[^>]*data-preview-field-path/);
   assert.doesNotMatch(result.code, /'use client'/);
   assert.match(result.code, /site-data\.json|@\/data\/site-data\.json/);
   assert.match(result.code, /data-preview-style-target=/);
@@ -821,11 +821,12 @@ export function ActionPanel() {
   assert.match(result.code, /<a\s+[^>]*href=\{siteData\?\.content\?\.home\?\.hero\?\.whatsappUrl \?\? "https:\/\/wa\.me\/1234567890"\}/);
   assert.match(result.code, /target="_blank"/);
   assert.match(result.code, /rel="noopener noreferrer"/);
-  assert.match(result.code, /data-preview-static="action-link"/);
+  // URL field path is bound directly to outer <a> element (never hidden, never static conflict)
+  assert.match(result.code, /<a\s+[^>]*data-preview-field-path=\{?"home\.hero\.whatsappUrl"?\}/);
   // Text label wrapped in editable span
   assert.match(result.code, /<span\s+data-preview-field-path="home\.hero\.whatsappLabel"[^>]*>\{siteData\?\.content\?\.home\?\.hero\?\.whatsappLabel \?\? "Order on WhatsApp"\}<\/span>/);
-  // Hidden URL span present for Fivora contract
-  assert.match(result.code, /<span hidden aria-hidden="true" data-preview-field-path="home\.hero\.whatsappUrl">/);
+  // Never emit hidden preview markers
+  assert.doesNotMatch(result.code, /<span[^>]*hidden[^>]*data-preview-field-path/);
   // No parse errors
   assert.doesNotThrow(() => parseSource(result.code, 'ActionPanel.tsx'));
 });
@@ -1333,9 +1334,30 @@ export function ContactSection() {
   assert.ok(transformed.changed, 'file must be changed');
   assert.match(transformed.code, /data-preview-field-path/);
   assert.match(transformed.code, /formSubmitLabel/);
-  assert.match(transformed.code, /formWhatsappUrl/);
   assert.match(transformed.code, /type="submit"/);
-  assert.match(transformed.code, /hidden/);
+  assert.doesNotMatch(transformed.code, /<span[^>]*hidden/);
+  assert.doesNotMatch(transformed.code, /data-preview-static[\s\S]*data-preview-field-path/);
+});
+
+test('auditMarkerPlacement detects and rejects hidden preview markers', () => {
+  const hiddenCode = `
+    <div>
+      <span className="hidden" aria-hidden="true" data-preview-field-path="home.hero.buttonUrl">https://wa.me/123</span>
+      <span>Click me</span>
+    </div>
+  `;
+  const errors = contract.auditMarkerPlacement(hiddenCode, 'TestHidden.tsx');
+  assert.ok(errors.some((e) => e.includes('data-preview field/list/item marker is hidden')));
+});
+
+test('auditCoupledListMarkers detects and rejects coupling parallel list arrays by index', () => {
+  const coupledCode = `
+    <div data-preview-item-path="seasonal.items[0]">
+      <span data-preview-field-path="seasonal.preOrderCta[0].buttonLabel">Pre-Order</span>
+    </div>
+  `;
+  const errors = contract.auditCoupledListMarkers(coupledCode, 'TestCoupled.tsx');
+  assert.ok(errors.some((e) => e.includes('belongs to a different list')));
 });
 
 

@@ -214,6 +214,17 @@ function auditMarkerPlacement(code, filePath) {
     const staticMatch = attrs.match(/\bdata-preview-static\s*=\s*(?:"([^"]*)"|'([^']*)')/);
     const hasStatic = /\bdata-preview-static\b/.test(attrs);
 
+    const isHidden =
+      /\bhidden(?:[\s=]|\/?>)/i.test(attrs) ||
+      /\baria-hidden\s*=\s*(?:"true"|'true'|\{\s*true\s*\})/i.test(attrs) ||
+      /\bstyle\s*=\s*\{\s*\{[\s\S]*?\b(?:display\s*:\s*['"]none['"]|visibility\s*:\s*['"]hidden['"])[\s\S]*?\}\s*\}/i.test(attrs) ||
+      /\bclassName\s*=\s*(?:"[^"]*\bhidden\b[^"]*"|'[^']*\bhidden\b[^']*'|\{\s*`[^`]*\bhidden\b[^`]*`\s*\})/i.test(attrs);
+
+    if ((hasField || hasList || hasItem) && isHidden) {
+      errors.push(
+        `${filePath}:${line} data-preview field/list/item marker is hidden. Strict visual-edit targets must remain visible and clickable in the exported page.`
+      );
+    }
     if (hasStatic && !(staticMatch?.[1] ?? staticMatch?.[2] ?? '').trim()) {
       errors.push(`${filePath}:${line} data-preview-static requires a reason.`);
     }
@@ -234,6 +245,33 @@ function auditMarkerPlacement(code, filePath) {
     }
   }
 
+  errors.push(...auditCoupledListMarkers(code, filePath));
+  return errors;
+}
+
+/**
+ * Detects coupling parallel arrays by index: rendering a field from list B inside an item belonging to list A.
+ */
+function auditCoupledListMarkers(code, filePath) {
+  const errors = [];
+  const itemBlockPattern = /<\s*([a-zA-Z][a-zA-Z0-9.:-]*)((?:[^<>{}]|\{[^{}]*\})*?)\bdata-preview-item-path\s*=\s*(?:"([^"]*)"|'([^']*)'|\{\s*`([^`]*)`\s*\})([\s\S]*?)<\/\1>/g;
+  for (const match of String(code).matchAll(itemBlockPattern)) {
+    const itemPath = match[3] ?? match[4] ?? match[5] ?? '';
+    const inner = match[6] || '';
+    if (!itemPath) continue;
+    const baseList = itemPath.replace(/\[[^\]]*\]$/, '');
+
+    for (const fieldMatch of inner.matchAll(/\bdata-preview-field-path\s*=\s*(?:"([^"]*)"|'([^']*)'|\{\s*`([^`]*)`\s*\})/g)) {
+      const fieldPath = fieldMatch[1] ?? fieldMatch[2] ?? fieldMatch[3] ?? '';
+      if (!fieldPath || !/\[\d+\]/.test(fieldPath)) continue;
+      const fieldList = fieldPath.replace(/\[\d+\][\s\S]*$/, '');
+      if (fieldList && baseList && fieldList !== baseList) {
+        errors.push(
+          `${filePath}:${lineNumberAt(code, match.index ?? 0)} repeated field "${fieldPath}" is rendered inside item "${itemPath}" but belongs to a different list. Model one visual card as one object-list item instead of coupling parallel arrays by index.`
+        );
+      }
+    }
+  }
   return errors;
 }
 
@@ -509,6 +547,7 @@ module.exports = {
   enumerateSchemaPaths,
   extractMarkers,
   auditMarkerPlacement,
+  auditCoupledListMarkers,
   auditActionLabelCollision,
   auditPathCoverage,
   auditSchemaUniqueness,
