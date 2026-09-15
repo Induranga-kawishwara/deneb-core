@@ -196,7 +196,7 @@ function classifyActionIntent(text, href) {
   if (
     /wa\.me|whatsapp/i.test(h) ||
     /\b(?:whatsapp|wa\.me)\b/i.test(t) ||
-    /order on whatsapp|chat on whatsapp|message on whatsapp|whatsapp order|order via whatsapp|proceed to order|proceed to checkout|complete order/i.test(t)
+    /order on whatsapp|chat on whatsapp|message on whatsapp|whatsapp order|order via whatsapp|proceed to order|proceed to checkout|complete order|confirm priority repair|book repair|schedule repair|confirm repair/i.test(t)
   ) {
     return {
       action: 'whatsapp',
