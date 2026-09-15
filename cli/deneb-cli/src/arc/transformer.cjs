@@ -857,7 +857,7 @@ function instrumentLayoutSource(code, siteDataImport, providerImport = '@deneb-u
     ensureDefaultImport(ast, siteDataImport, jsonIdent);
   }
 
-  const hasProvider = /SiteDataProvider|DenebDataProvider/.test(code);
+  const hasProvider = /SiteDataProvider|DenebDataProvider|<Providers\b/.test(code);
   let wrapped = hasProvider;
 
   if (!hasProvider) {
