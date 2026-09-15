@@ -38,12 +38,13 @@ function createNextConfig(projectDir, isTypeScript) {
     : '';
   const annotation = isTypeScript ? ': NextConfig' : '';
 
-  const code = `${typed}const basePath = process.env.${BASE_PATH_ENV} || '';
+  const code = `${typed}const basePath = (process.env.${BASE_PATH_ENV} ?? '').replace(/\\/$/, '');
 
 const nextConfig${annotation} = {
   output: 'export',
+  trailingSlash: true,
   basePath: basePath || undefined,
-  assetPrefix: basePath ? \`\${basePath}/\` : undefined,
+  assetPrefix: basePath || undefined,
   images: {
     unoptimized: true,
   },
