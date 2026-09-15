@@ -1075,3 +1075,40 @@ test('AI Evaluator runAiEvaluatorPipeline passes on clean valid project', async 
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
+test('AI Evaluator audits and heals missing global CSS stylesheet import in layout.tsx', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-eval-css-'));
+  const appDir = path.join(tmp, 'src', 'app');
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.writeFileSync(path.join(appDir, 'globals.css'), '@import "tailwindcss";', 'utf8');
+
+  const unstyledLayout = `
+import { Providers } from '@/components/providers';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return <html><body><Providers>{children}</Providers></body></html>;
+}
+`;
+  fs.writeFileSync(path.join(appDir, 'layout.tsx'), unstyledLayout, 'utf8');
+
+  const profile = {
+    root: tmp,
+    framework: 'nextjs',
+    router: 'next-app',
+    appDir: 'src/app',
+    language: 'typescript',
+    jsxFiles: ['src/app/layout.tsx'],
+  };
+
+  const issues = auditRuntimeIntegrity(tmp, profile);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].type, 'missing-global-css-import');
+
+  const healRes = await healRuntimeIntegrity(tmp, profile, issues);
+  assert.equal(healRes.healedCount, 1);
+
+  const fixed = fs.readFileSync(path.join(appDir, 'layout.tsx'), 'utf8');
+  assert.match(fixed, /import\s+['"]\.\/globals\.css['"]/);
+
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+

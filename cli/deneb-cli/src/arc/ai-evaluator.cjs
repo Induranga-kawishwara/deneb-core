@@ -65,6 +65,31 @@ function auditRuntimeIntegrity(projectDir, profile) {
         });
       }
     }
+
+    // Check Global CSS Import in layout.tsx
+    const hasCssImport = /import\s+['"][^'"]+\.css['"]/.test(layoutCode);
+    if (!hasCssImport) {
+      const cssCandidates = [
+        path.join(path.dirname(targetLayout), 'globals.css'),
+        path.join(path.dirname(targetLayout), 'global.css'),
+        path.join(projectDir, 'src', 'app', 'globals.css'),
+        path.join(projectDir, 'src', 'styles', 'globals.css'),
+        path.join(projectDir, 'styles', 'globals.css'),
+      ];
+      const foundCss = cssCandidates.find((c) => fs.existsSync(c));
+      if (foundCss) {
+        const relPath = path.relative(path.dirname(targetLayout), foundCss).replace(/\\/g, '/');
+        const relImport = relPath.startsWith('.') ? relPath : `./${relPath}`;
+        issues.push({
+          type: 'missing-global-css-import',
+          file: path.relative(projectDir, targetLayout).replace(/\\/g, '/'),
+          absPath: targetLayout,
+          message: `Root layout is missing global stylesheet import (${path.basename(foundCss)}), which would cause unstyled HTML.`,
+          severity: 'error',
+          meta: { cssRel: relImport },
+        });
+      }
+    }
   }
 
   // 2. Check Component Export / Import Integrity in page.tsx
@@ -248,6 +273,34 @@ async function healRuntimeIntegrity(projectDir, profile, issues, options = {}) {
         log.push(`Healed RSC boundary: removed redundant <SiteDataProvider> from server component ${issue.file}`);
       } catch (err) {
         log.push(`Failed to heal ${issue.file}: ${err.message}`);
+      }
+      continue;
+    }
+
+    // Healing Pattern 1b: Missing global CSS stylesheet import in layout.tsx
+    if (issue.type === 'missing-global-css-import' && issue.absPath && fs.existsSync(issue.absPath)) {
+      try {
+        let code = fs.readFileSync(issue.absPath, 'utf8');
+        const cssImport = `import "${issue.meta?.cssRel || './globals.css'}";\n`;
+        const firstImportIdx = code.indexOf('import ');
+        if (firstImportIdx !== -1) {
+          const nextLineIdx = code.indexOf('\n', firstImportIdx);
+          code = code.slice(0, nextLineIdx + 1) + cssImport + code.slice(nextLineIdx + 1);
+        } else {
+          code = cssImport + code;
+        }
+        fs.writeFileSync(issue.absPath, code, 'utf8');
+        healedCount++;
+        recordEvaluatorFix({
+          projectDir,
+          issueType: issue.type,
+          file: issue.file,
+          action: 'restore-global-css-import',
+          success: true,
+        });
+        log.push(`Healed layout styles: restored ${issue.meta?.cssRel || './globals.css'} import in ${issue.file}`);
+      } catch (err) {
+        log.push(`Failed to heal global CSS import in ${issue.file}: ${err.message}`);
       }
       continue;
     }
