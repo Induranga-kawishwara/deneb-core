@@ -12,6 +12,7 @@ export interface ProductQuickViewItem {
   imageUrl?: string;
   gallery?: string[];
   inStock?: boolean;
+  isAvailable?: boolean;
   rating?: number;
   reviewCount?: number;
   [key: string]: unknown;
@@ -82,8 +83,10 @@ export function ProductQuickView({
 
   const images = product.gallery && product.gallery.length > 0 ? product.gallery : [product.imageUrl || ''];
   const currency = product.currency || '$';
+  const isAvailable = product.isAvailable !== false && product.inStock !== false;
 
   const handleAddToCart = () => {
+    if (!isAvailable) return;
     if (onAddToCart) {
       onAddToCart(product, quantity);
     }
@@ -159,9 +162,9 @@ export function ProductQuickView({
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
-                product.inStock !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                isAvailable ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
               }`}>
-                {product.inStock !== false ? 'In Stock' : 'Out of Stock'}
+                {isAvailable ? 'In Stock' : 'Out of Stock'}
               </span>
               {product.rating && (
                 <span className="text-xs text-amber-500 flex items-center gap-1 font-medium">
@@ -231,7 +234,7 @@ export function ProductQuickView({
             {/* Action Buttons */}
             <button
               type="button"
-              disabled={product.inStock === false}
+              disabled={!isAvailable}
               onClick={handleAddToCart}
               className="w-full py-3.5 px-4 rounded-xl font-bold text-sm text-white shadow-lg transition-all duration-200 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 flex items-center justify-center gap-2"
               style={{
@@ -243,7 +246,7 @@ export function ProductQuickView({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
               <span {...(itemPath ? { 'data-preview-field-path': `${itemPath}.addToSelectionLabel` } : {})}>
-                {addToCartLabel}
+                {isAvailable ? addToCartLabel : 'Out of Stock'}
               </span>
             </button>
           </div>

@@ -11,6 +11,7 @@ export interface ProductItem {
   title?: string;
   brand?: string;
   price?: string | number;
+  compareAtPrice?: string | number;
   originalPrice?: string | number;
   currency?: string;
   description?: string;
@@ -23,6 +24,7 @@ export interface ProductItem {
   reviewsCount?: number | string;
   isNew?: boolean;
   isBestSeller?: boolean;
+  isAvailable?: boolean;
 
   // WhatsApp & CTA custom bindings per product
   whatsappNumber?: string;
@@ -235,11 +237,13 @@ export function EditableProductCard({
   const priceNum = typeof rawPrice === 'number' ? rawPrice : parseFloat(String(rawPrice || '').replace(/[^0-9.]/g, '')) || 0;
   const formattedPrice = hasPrice ? (typeof rawPrice === 'string' && rawPrice.includes('LKR') ? rawPrice : formatCurrency(priceNum, currency)) : '';
 
-  const originalPrice = product?.originalPrice !== undefined ? String(product.originalPrice) : '';
+  const comparePrice = product?.originalPrice ?? product?.compareAtPrice;
+  const originalPrice = comparePrice !== undefined && comparePrice !== null ? String(comparePrice) : '';
   const description = String(product?.description || '');
   const category = String(product?.category || '');
   const badge = String(product?.badge || '');
   const imageUrl = String(product?.imageUrl || product?.image || '');
+  const isAvailable = product?.isAvailable !== false;
 
   // Resolved phone number for WhatsApp
   const resolvedPhone = String(product?.whatsappNumber || whatsappNumber || '94770000000');
@@ -250,6 +254,7 @@ export function EditableProductCard({
 
   const handleWhatsAppClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isAvailable) return;
     const url = getProductWhatsAppUrl(
       { ...product, name, brand, price: formattedPrice },
       resolvedPhone,
@@ -265,6 +270,7 @@ export function EditableProductCard({
 
   const handleAddToCartClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isAvailable) return;
     const itemToAdd = {
       id: String(product?.id || name.toLowerCase().replace(/\s+/g, '-')),
       name,
@@ -366,6 +372,25 @@ export function EditableProductCard({
               badgeVariant="primary"
             />
           </div>
+        )}
+        {!isAvailable && (
+          <span
+            data-preview-field-path={`${itemPath}.isAvailable`}
+            style={{
+              position: 'absolute',
+              right: '10px',
+              top: '10px',
+              zIndex: 10,
+              borderRadius: '999px',
+              backgroundColor: '#be123c',
+              color: '#ffffff',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              padding: '4px 10px',
+            }}
+          >
+            Out of Stock
+          </span>
         )}
       </div>
 
@@ -511,7 +536,24 @@ export function EditableProductCard({
           ) : null}
 
           {/* Actions: Custom Action Slot OR Dual Buttons */}
-          {actionSlot ? (
+          {!isAvailable ? (
+            <div
+              data-preview-field-path={`${itemPath}.isAvailable`}
+              role="status"
+              style={{
+                width: '100%',
+                borderRadius: '10px',
+                backgroundColor: '#e2e8f0',
+                color: '#475569',
+                padding: '0.65rem 0.75rem',
+                textAlign: 'center',
+                fontSize: '0.8125rem',
+                fontWeight: 700,
+              }}
+            >
+              Out of Stock
+            </div>
+          ) : actionSlot ? (
             <div>{actionSlot}</div>
           ) : (
             <div
