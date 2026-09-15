@@ -256,7 +256,7 @@ async function runDenebArcAsync(projectDir, projectName, options = {}) {
     0
   );
   const actionCount = analyses.reduce(
-    (n, a) => n + (a.candidates || []).filter((c) => c.operation === 'split-action-contract' || c.kind === 'url').length,
+    (n, a) => n + (a.candidates || []).filter((c) => c.operation === 'split-action-contract' || c.operation === 'form-submit-action' || c.kind === 'url').length,
     0
   );
   printer.printScan(profile, graph, candidateCount, actionCount);
@@ -397,7 +397,7 @@ function runDenebArcSync(projectDir, projectName, options = {}) {
     0
   );
   const actionCount = analyses.reduce(
-    (n, a) => n + (a.candidates || []).filter((c) => c.operation === 'split-action-contract' || c.kind === 'url').length,
+    (n, a) => n + (a.candidates || []).filter((c) => c.operation === 'split-action-contract' || c.operation === 'form-submit-action' || c.kind === 'url').length,
     0
   );
   printer.printScan(profile, graph, candidateCount, actionCount);

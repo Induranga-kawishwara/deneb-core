@@ -23,6 +23,8 @@ const {
   TEXT_TAGS,
   ACTION_TAGS,
   IMAGE_TAGS,
+  FORM_INPUT_TAGS,
+  FORM_CONTAINER_TAGS,
   DECORATIVE_TAGS,
 } = require('./adapters.cjs');
 const { shortHash } = require('./fs-utils.cjs');
@@ -392,7 +394,7 @@ function confidenceFor(kind, extras = {}) {
   if (extras.icon) return 0.1;
   if (kind === 'url' && extras.action === 'whatsapp') return 0.96;
   if (kind === 'url' && extras.social) return 0.93;
-  if (kind === 'split-action-contract') return 0.94;
+  if (kind === 'split-action-contract' || kind === 'form-submit-action') return 0.94;
   if (kind === 'text' && HEADING_TAGS.has(extras.tag)) return 0.95;
   if (kind === 'text' && extras.tag === 'p') return 0.9;
   if (kind === 'image') return 0.88;
@@ -562,14 +564,47 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
         });
       }
 
+      const insideForm = parents.some((p) => FORM_CONTAINER_TAGS.has(p));
+
       const actionableHref = href || (name === 'Button' ? getJsxAttributeLiteral(node, 'href') : null);
       const innerText = textInfo.dynamic ? '' : textInfo.text;
       const typeAttr = getJsxAttributeLiteral(node, 'type');
       const isSubmit = typeAttr === 'submit';
 
-      // Check for action intent via classifyActionIntent (covers WhatsApp, Call/Phone, Directions, Location, Shop, Email)
-      const actionIntent = !isSubmit && !apiOwned ? classifyActionIntent(innerText, actionableHref) : null;
-      const isAction = (Boolean(actionableHref) || Boolean(actionIntent)) && (ACTION_TAGS.has(name) || isLikelyCtaClass(className));
+      // Check for action intent via classifyActionIntent (covers Form Submit, WhatsApp, Call/Phone, Directions, Location, Shop, Email)
+      const actionIntent = !apiOwned ? classifyActionIntent(innerText, actionableHref) : null;
+
+      const isFormSubmit =
+        !apiOwned &&
+        (ACTION_TAGS.has(name) || isLikelyCtaClass(className)) &&
+        (isSubmit ||
+          (insideForm && (actionIntent?.action === 'form-submit' || (innerText && !actionableHref))) ||
+          actionIntent?.action === 'form-submit');
+
+      if (isFormSubmit && innerText && !textInfo.dynamic) {
+        usedLocs.add(loc);
+        const resolvedHref = actionableHref || (actionIntent ? actionIntent.defaultUrl : 'https://wa.me/1234567890');
+        candidates.push({
+          ...baseMeta,
+          kind: 'form-submit-action',
+          operation: 'form-submit-action',
+          value: resolvedHref,
+          label: innerText,
+          extra: {
+            action: 'form-submit',
+            external: true,
+            insideForm,
+            isSubmit,
+          },
+          confidence: confidenceFor('form-submit-action'),
+          reason: 'form-submit-whatsapp-dispatch',
+          fingerprint: fingerprintCandidate({ tag: name, kind: 'form-submit-action', action: 'form-submit' }),
+        });
+        this.traverse(pathNode);
+        return;
+      }
+
+      const isAction = !isSubmit && (Boolean(actionableHref) || Boolean(actionIntent)) && (ACTION_TAGS.has(name) || isLikelyCtaClass(className));
 
       if (isAction && (actionableHref || actionIntent)) {
         const action = actionIntent ? actionIntent.action : classifyHref(actionableHref);

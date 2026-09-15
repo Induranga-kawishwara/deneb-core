@@ -43,6 +43,7 @@ export { DenebComponentStyles } from './DenebComponentStyles';
 export { FontLoader, DENEB_FONTS_LINK_ID } from './fonts/FontLoader';
 export { useDenebFonts } from './fonts/useDenebFonts';
 export * from './hooks/useComponentStyle';
+export * from './hooks/useWhatsAppForm';
 export {
   DENEB_FONT_REGISTRY,
   DENEB_GOOGLE_FONT_COUNT,

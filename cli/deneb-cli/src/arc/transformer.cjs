@@ -152,6 +152,27 @@ function wrapHiddenUrlSibling(pathNode, urlField, fallback) {
 
 function applyTransformToElement(pathNode, transform) {
   const node = pathNode.node;
+  if (transform.operation === 'form-submit-action') {
+    const tagName = getJsxName(node);
+    if (!hasJsxAttribute(node, 'type') && tagName === 'button') {
+      node.openingElement.attributes.push(
+        b.jsxAttribute(b.jsxIdentifier('type'), b.stringLiteral('submit'))
+      );
+    }
+    if (!hasJsxAttribute(node, 'data-preview-static')) {
+      node.openingElement.attributes.push(
+        b.jsxAttribute(b.jsxIdentifier('data-preview-static'), b.stringLiteral('action-button'))
+      );
+    }
+    if (hasJsxAttribute(node, 'data-preview-field-path')) {
+      node.openingElement.attributes = node.openingElement.attributes.filter(
+        (attr) => !(attr.type === 'JSXAttribute' && attr.name && attr.name.name === 'data-preview-field-path')
+      );
+    }
+    splitActionChildren(node, transform.labelField, transform.labelFallback || '');
+    wrapHiddenUrlSibling(pathNode, transform.urlField, transform.fallback);
+    return;
+  }
   if (transform.operation === 'split-action-contract') {
     const tagName = getJsxName(node);
     if (tagName === 'button') {
@@ -625,6 +646,7 @@ function applyFilePlan(filePlan, profile) {
 
   const supported = new Set([
     'split-action-contract',
+    'form-submit-action',
     'extract-url',
     'extract-image',
     'extract-alt',

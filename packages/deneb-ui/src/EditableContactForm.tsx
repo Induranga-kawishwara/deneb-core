@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { useSiteData } from './SiteDataProvider';
+import { useWhatsAppForm } from './hooks/useWhatsAppForm';
 
 export interface EditableContactFormProps extends React.FormHTMLAttributes<HTMLFormElement> {
   endpoint?: string;
+  whatsappUrl?: string;
+  whatsappUrlPath?: string;
+  submitMode?: 'whatsapp' | 'api' | 'both';
   formTitle?: string;
   formTitlePath?: string;
   submitButtonText?: string;
@@ -21,6 +25,9 @@ export interface EditableContactFormProps extends React.FormHTMLAttributes<HTMLF
 
 export function EditableContactForm({
   endpoint = 'https://api.fivora.com/site-contact',
+  whatsappUrl,
+  whatsappUrlPath = 'contact.formWhatsappUrl',
+  submitMode = 'whatsapp',
   formTitle,
   formTitlePath,
   submitButtonText = 'Send Message',
@@ -55,6 +62,19 @@ export function EditableContactForm({
   const resolvedMessageLabel = String(contactContent?.messageLabel || 'Message');
   const resolvedMessagePlaceholder = String(contactContent?.messagePlaceholder || 'Tell us how we can help...');
 
+  const { submitViaWhatsApp, resolvedWhatsappUrl } = useWhatsAppForm({
+    whatsappUrl,
+    whatsappUrlPath,
+    formName: resolvedFormTitle || 'Contact Form',
+    onSuccess: () => {
+      setStatus('success');
+    },
+    onError: (err) => {
+      setStatus('error');
+      setErrorMessage(err.message || 'Something went wrong. Please try again.');
+    },
+  });
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setStatus('submitting');
@@ -71,22 +91,40 @@ export function EditableContactForm({
       message: formData.get('message'),
     };
 
-    try {
-      const res = await fetch(endpoint, {
+    if (submitMode === 'api') {
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Submission error: ${res.statusText || 'Unable to send message'}`);
+        }
+
+        setStatus('success');
+        form.reset();
+      } catch (err: any) {
+        setStatus('error');
+        setErrorMessage(err.message || 'Something went wrong. Please try again.');
+      }
+      return;
+    }
+
+    // Default to WhatsApp dispatch (or both if requested)
+    if (submitMode === 'both') {
+      fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      });
+      }).catch(() => {});
+    }
 
-      if (!res.ok) {
-        throw new Error(`Submission error: ${res.statusText || 'Unable to send message'}`);
-      }
-
+    const success = submitViaWhatsApp(form);
+    if (success) {
       setStatus('success');
       form.reset();
-    } catch (err: any) {
-      setStatus('error');
-      setErrorMessage(err.message || 'Something went wrong. Please try again.');
     }
   };
 
@@ -277,6 +315,14 @@ export function EditableContactForm({
           {status === 'submitting' ? 'Sending Message...' : resolvedSubmitText}
         </span>
       </button>
+
+      <span
+        hidden
+        aria-hidden="true"
+        data-preview-field-path={whatsappUrlPath}
+      >
+        {resolvedWhatsappUrl}
+      </span>
 
       {status === 'success' && (
         <div

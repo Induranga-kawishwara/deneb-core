@@ -47,6 +47,7 @@ function inferSection(context) {
     ['testimonials', /testimonial/],
     ['map', /map\b|location-map|google-map/],
     ['faq', /faq|accordion/],
+    ['form', /form|booking|inquiry|registration/],
     ['contact', /contact|whatsapp|mailto/],
     ['featuredProducts', /featured|product-grid|collection/],
     ['newsletter', /newsletter|subscribe/],
@@ -65,6 +66,7 @@ function inferSection(context) {
 
 function inferFieldName(kind, tag, text, extra = {}) {
   if (kind === 'url') {
+    if (extra.action === 'form-submit') return 'formWhatsappUrl';
     if (extra.platform) return `${extra.platform}Url`;
     if (extra.action === 'whatsapp') return 'whatsappUrl';
     if (extra.action === 'phone') return 'phoneUrl';
@@ -74,6 +76,7 @@ function inferFieldName(kind, tag, text, extra = {}) {
     return fromText || (extra.action ? `${extra.action}Url` : 'ctaUrl');
   }
   if (kind === 'label' && extra.paired) {
+    if (extra.action === 'form-submit') return 'formSubmitLabel';
     if (extra.action === 'whatsapp') return 'whatsappLabel';
     if (extra.action === 'phone') return 'phoneLabel';
     if (extra.action === 'email') return 'emailLabel';
@@ -100,6 +103,7 @@ function inferFieldName(kind, tag, text, extra = {}) {
     Description: 'description',
     Typography: 'text',
     Badge: 'badge',
+    label: 'label',
     button: 'label',
     Button: 'label',
     span: 'label',

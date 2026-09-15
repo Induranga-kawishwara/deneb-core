@@ -118,6 +118,7 @@ function mapOperation(operation) {
     case 'extract-url':
       return 'url-extraction';
     case 'split-action-contract':
+    case 'form-submit-action':
       return 'contract-split';
     case 'style-bind':
       return 'style-bind';

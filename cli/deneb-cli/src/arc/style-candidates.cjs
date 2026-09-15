@@ -5,6 +5,7 @@ const BUTTON_TAGS = new Set(['button', 'Button', 'CTAButton']);
 
 function inferStyleKind(transform) {
   if (transform.operation === 'collection-conversion') return 'grid';
+  if (transform.operation === 'form-submit-action') return 'button';
   if (transform.operation === 'split-action-contract') return 'text';
   if (BUTTON_TAGS.has(transform.tag) && transform.operation === 'extract-text') return 'button';
   if (TEXT_OPS.has(transform.operation)) return 'text';
@@ -14,7 +15,7 @@ function inferStyleKind(transform) {
 function stylePathFor(transform, kind) {
   if (kind === 'grid' && transform.listField) return `${transform.listField}.grid`;
   if (kind === 'card' && transform.listField) return `${transform.listField}[*].card`;
-  if (transform.operation === 'split-action-contract') return transform.labelField;
+  if (transform.operation === 'split-action-contract' || transform.operation === 'form-submit-action') return transform.labelField;
   return transform.field || transform.labelField || null;
 }
 
