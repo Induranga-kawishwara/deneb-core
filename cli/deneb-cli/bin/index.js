@@ -604,7 +604,7 @@ function getComponentRegistry(importPkg) {
   };
 }
 
-function initProject(targetInput, options = {}) {
+async function initProject(targetInput, options = {}) {
   const targetDir = path.resolve(process.cwd(), targetInput || '.');
   const pkgPath = path.join(targetDir, 'package.json');
 
@@ -652,7 +652,7 @@ function initProject(targetInput, options = {}) {
       conversionRes = runUniversalTemplateConversion(targetDir, projectName, detectedPages, options);
     } else {
       const { runDenebArc } = require('../src/arc/index.cjs');
-      conversionRes = runDenebArc(targetDir, projectName, {
+      conversionRes = await runDenebArc(targetDir, projectName, {
         ...options,
         detectedPages,
       });
@@ -1054,8 +1054,10 @@ if (command === 'init') {
     } else if (!arg.startsWith('-')) {
       targetInput = arg;
     }
-  }
-  initProject(targetInput, { recipeName, dryRun, explain, legacy, telemetry, aiEnabled, aiDryRun });
+  initProject(targetInput, { recipeName, dryRun, explain, legacy, telemetry, aiEnabled, aiDryRun }).catch((err) => {
+    console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
+    process.exit(1);
+  });
 } else if (command === 'create') {
   createTemplate(commandArgs[0]);
 } else if (command === 'add') {

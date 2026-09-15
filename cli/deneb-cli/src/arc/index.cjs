@@ -39,6 +39,7 @@ const printer = require('./printer.cjs');
 const { classifyComponents } = require('./component-registry.cjs');
 const { checkAiReady, adaptComponent, generateDocsPage, loadEnv } = require('./ai-agent.cjs');
 const { checkGithubReady, createComponentPR } = require('./pr-agent.cjs');
+const { runAiEvaluatorPipeline } = require('./ai-evaluator.cjs');
 
 function parseArcOptions(raw = {}) {
   return {
@@ -341,7 +342,33 @@ async function runDenebArcAsync(projectDir, projectName, options = {}) {
     }
   }
 
-  return runArcTransformations(projectDir, projectName, opts, profile, graph, analyses, runId, startedAt);
+  const result = runArcTransformations(projectDir, projectName, opts, profile, graph, analyses, runId, startedAt);
+
+  if (!opts.dryRun && result && result.outcome === 'success') {
+    printer.printAiEvaluatorStart();
+    try {
+      const evalResult = await runAiEvaluatorPipeline(projectDir, profile, {
+        dryRun: opts.aiDryRun,
+        aiEnabled: opts.aiEnabled,
+      });
+      if (evalResult.healed > 0) {
+        for (const logItem of evalResult.log) {
+          printer.printAiEvaluatorHealed(logItem);
+        }
+      }
+      if (evalResult.remainingIssues && evalResult.remainingIssues.length > 0) {
+        for (const issue of evalResult.remainingIssues) {
+          printer.printAiEvaluatorIssue(`${issue.file}: ${issue.message}`);
+        }
+      } else {
+        printer.printAiEvaluatorPass('All runtime integrity checks passed (RSC boundaries, exports, Fivora contracts).');
+      }
+    } catch (err) {
+      printer.warn(`AI Evaluator audit encountered an issue: ${err.message}`);
+    }
+  }
+
+  return result;
 }
 
 function runDenebArcSync(projectDir, projectName, options = {}) {

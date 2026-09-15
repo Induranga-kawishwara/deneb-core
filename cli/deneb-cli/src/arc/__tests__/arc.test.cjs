@@ -17,6 +17,7 @@ const { parseSource } = require('../ast.cjs');
 const { loadFingerprintBoost } = require('../learning.cjs');
 const { classifyActionIntent } = require('../adapters.cjs');
 const { validateGeneratedCode } = require('../ai-agent.cjs');
+const { auditRuntimeIntegrity, healRuntimeIntegrity, runAiEvaluatorPipeline } = require('../ai-evaluator.cjs');
 
 test('field-paths recognizes list action CTA keys', () => {
   assert.equal(isListActionCtaKey('preOrderCta'), true);
@@ -959,5 +960,118 @@ export function Card() {
   assert.doesNotMatch(res.code, /<div[^>]*data-preview-field-path/);
   // The inner text must be wrapped in a <span> with data-preview-field-path
   assert.match(res.code, /<span[^>]*data-preview-field-path=/);
+});
+
+test('AI Evaluator audits and heals RSC duplicate SiteDataProvider in layout.tsx', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-eval-'));
+  const appDir = path.join(tmp, 'src', 'app');
+  fs.mkdirSync(appDir, { recursive: true });
+
+  const brokenLayout = `
+import { SiteDataProvider } from '@deneb-ui/ui';
+import { Providers } from '@/components/providers';
+import initialSiteData from '@/data/site-data.json';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <Providers>
+          <SiteDataProvider initialSiteData={initialSiteData}>
+            {children}
+          </SiteDataProvider>
+        </Providers>
+      </body>
+    </html>
+  );
+}
+`;
+  fs.writeFileSync(path.join(appDir, 'layout.tsx'), brokenLayout, 'utf8');
+
+  const profile = {
+    root: tmp,
+    framework: 'nextjs',
+    router: 'next-app',
+    appDir: 'src/app',
+    language: 'typescript',
+    jsxFiles: ['src/app/layout.tsx'],
+  };
+
+  const issues = auditRuntimeIntegrity(tmp, profile);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].type, 'rsc-duplicate-provider');
+
+  const healRes = await healRuntimeIntegrity(tmp, profile, issues);
+  assert.equal(healRes.healedCount, 1);
+  assert.equal(healRes.remainingCount, 0);
+
+  const fixed = fs.readFileSync(path.join(appDir, 'layout.tsx'), 'utf8');
+  assert.doesNotMatch(fixed, /<SiteDataProvider/);
+  assert.match(fixed, /<Providers>\s*\{children\}\s*<\/Providers>/);
+
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('AI Evaluator detects missing component exports in page.tsx imports', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-eval-exp-'));
+  const appDir = path.join(tmp, 'src', 'app');
+  const compDir = path.join(tmp, 'src', 'components');
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.mkdirSync(compDir, { recursive: true });
+
+  fs.writeFileSync(
+    path.join(appDir, 'page.tsx'),
+    `import { ProductList, MissingHero } from '@/components/Widgets';\nexport default function Page() { return <div><ProductList /></div>; }`,
+    'utf8'
+  );
+
+  fs.writeFileSync(
+    path.join(compDir, 'Widgets.tsx'),
+    `export function ProductList() { return <div>Products</div>; }`,
+    'utf8'
+  );
+
+  const profile = {
+    root: tmp,
+    framework: 'nextjs',
+    router: 'next-app',
+    appDir: 'src/app',
+    language: 'typescript',
+    jsxFiles: ['src/app/page.tsx', 'src/components/Widgets.tsx'],
+  };
+
+  const issues = auditRuntimeIntegrity(tmp, profile);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].type, 'missing-named-export');
+  assert.equal(issues[0].meta?.componentName, 'MissingHero');
+
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('AI Evaluator runAiEvaluatorPipeline passes on clean valid project', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-eval-clean-'));
+  const appDir = path.join(tmp, 'src', 'app');
+  fs.mkdirSync(appDir, { recursive: true });
+
+  fs.writeFileSync(
+    path.join(appDir, 'layout.tsx'),
+    `import { Providers } from '@/components/providers';\nexport default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body><Providers>{children}</Providers></body></html>; }`,
+    'utf8'
+  );
+
+  const profile = {
+    root: tmp,
+    framework: 'nextjs',
+    router: 'next-app',
+    appDir: 'src/app',
+    language: 'typescript',
+    jsxFiles: ['src/app/layout.tsx'],
+  };
+
+  const res = await runAiEvaluatorPipeline(tmp, profile);
+  assert.equal(res.passed, true);
+  assert.equal(res.issuesFound, 0);
+
+  fs.rmSync(tmp, { recursive: true, force: true });
 });
 
