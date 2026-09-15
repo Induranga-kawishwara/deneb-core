@@ -10,6 +10,7 @@ export interface ProductDetailItem {
   brand?: string;
   category?: string;
   price?: string | number;
+  compareAtPrice?: string | number;
   originalPrice?: string | number;
   description?: string;
   badge?: string;
@@ -26,6 +27,7 @@ export interface ProductDetailItem {
   relatedTitle?: string;
   whatsappNumber?: string;
   whatsappMessage?: string;
+  isAvailable?: boolean;
 
   // Variants & Measurements System
   unit?: MeasurementUnit;
@@ -125,6 +127,8 @@ export function EditableProductDetail({
 
   const name = String(product.name || product.title || 'Product Title');
   const price = product.price !== undefined ? String(product.price) : 'LKR 0';
+  const originalPrice = product.originalPrice ?? product.compareAtPrice;
+  const isAvailable = product.isAvailable !== false;
   const description = String(product.description || '');
   const badge = String(product.badge || '');
   const addToSelectionLabel = String(product.addToSelectionLabel || 'Add to Selection');
@@ -212,6 +216,17 @@ export function EditableProductDetail({
               {name}
             </h1>
 
+            <span
+              data-preview-field-path={`${sectionPath}.isAvailable`}
+              className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-bold ${
+                isAvailable
+                  ? 'bg-emerald-500/15 text-emerald-300'
+                  : 'bg-rose-500/15 text-rose-300'
+              }`}
+            >
+              {isAvailable ? 'In Stock' : 'Out of Stock'}
+            </span>
+
             {/* Price */}
             <div className="mt-4 flex items-baseline gap-3">
               <span
@@ -220,9 +235,9 @@ export function EditableProductDetail({
               >
                 {price}
               </span>
-              {product.originalPrice ? (
+              {originalPrice ? (
                 <span className="text-lg font-medium text-slate-500 line-through">
-                  {String(product.originalPrice)}
+                  {String(originalPrice)}
                 </span>
               ) : null}
             </div>
@@ -300,16 +315,17 @@ export function EditableProductDetail({
             <div className="mt-8 flex flex-col gap-3">
               <button
                 type="button"
+                disabled={!isAvailable}
                 onClick={() => onAddToSelection?.(product, selectedSize, selectedColor)}
-                className="w-full py-4 px-6 rounded-2xl font-black text-sm uppercase tracking-wider bg-lime-400 text-slate-950 hover:bg-lime-300 active:scale-98 transition-all duration-150 shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2"
+                className="w-full py-4 px-6 rounded-2xl font-black text-sm uppercase tracking-wider bg-lime-400 text-slate-950 hover:bg-lime-300 active:scale-98 transition-all duration-150 shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 disabled:shadow-none"
               >
                 <span data-preview-field-path={`${sectionPath}.addToSelectionLabel`}>
-                  {addToSelectionLabel}
+                  {isAvailable ? addToSelectionLabel : 'Out of Stock'}
                 </span>
               </button>
 
               {/* Direct WhatsApp CTA Button */}
-              {resolvedWhatsappUrl && (
+              {isAvailable && resolvedWhatsappUrl && (
                 <a
                   href={resolvedWhatsappUrl}
                   target="_blank"
