@@ -16,6 +16,7 @@ const {
   resolveActionWithAdapters,
   isIconComponent,
   classifyHref,
+  classifyActionIntent,
   isLikelyCtaClass,
   SKIP_TAGS,
   HEADING_TAGS,
@@ -474,22 +475,30 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
       }
 
       const actionableHref = href || (name === 'Button' ? getJsxAttributeLiteral(node, 'href') : null);
-      const isAction = Boolean(actionableHref) && ACTION_TAGS.has(name);
-      if (isAction && actionableHref) {
-        const action = classifyHref(actionableHref);
-        const innerText = textInfo.dynamic ? '' : textInfo.text;
-        const looksCta = isLikelyCtaClass(className) || ['whatsapp', 'phone', 'email'].includes(action) || Boolean(innerText);
+      const innerText = textInfo.dynamic ? '' : textInfo.text;
+      const typeAttr = getJsxAttributeLiteral(node, 'type');
+      const isSubmit = typeAttr === 'submit';
+
+      // Check for action intent via classifyActionIntent (covers WhatsApp, Call/Phone, Directions, Location, Shop, Email)
+      const actionIntent = !isSubmit && !apiOwned ? classifyActionIntent(innerText, actionableHref) : null;
+      const isAction = (Boolean(actionableHref) || Boolean(actionIntent)) && (ACTION_TAGS.has(name) || isLikelyCtaClass(className));
+
+      if (isAction && (actionableHref || actionIntent)) {
+        const action = actionIntent ? actionIntent.action : classifyHref(actionableHref);
+        const resolvedHref = actionableHref || (actionIntent ? actionIntent.defaultUrl : '#');
+        const looksCta = isLikelyCtaClass(className) || ['whatsapp', 'phone', 'email', 'directions', 'location', 'shop'].includes(action) || Boolean(innerText);
         if (looksCta && innerText && !textInfo.dynamic && !apiOwned) {
           usedLocs.add(loc);
           candidates.push({
             ...baseMeta,
             kind: 'split-action-contract',
             operation: 'split-action-contract',
-            value: actionableHref,
+            value: resolvedHref,
             label: innerText,
             extra: {
               action,
-              social: !['whatsapp', 'phone', 'email', 'link'].includes(action),
+              external: actionIntent ? actionIntent.external : false,
+              social: !['whatsapp', 'phone', 'email', 'directions', 'location', 'shop', 'link'].includes(action),
               platform: ['instagram', 'facebook', 'tiktok', 'twitter', 'youtube', 'linkedin', 'pinterest'].includes(action) ? action : undefined,
             },
             confidence: confidenceFor('split-action-contract', { action, social: action !== 'link' }),
@@ -500,7 +509,7 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
           return;
         }
 
-        if (action !== 'link' && !innerText) {
+        if (action !== 'link' && !innerText && actionableHref) {
           usedLocs.add(loc);
           candidates.push({
             ...baseMeta,

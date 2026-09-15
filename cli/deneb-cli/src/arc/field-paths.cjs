@@ -71,14 +71,14 @@ function inferFieldName(kind, tag, text, extra = {}) {
     if (extra.action === 'email') return 'emailUrl';
     if (extra.cta) return extra.cta === 'primary' ? 'primaryCtaUrl' : `${extra.cta}Url`;
     const fromText = toCamel([text || '', 'url']);
-    return fromText || 'ctaUrl';
+    return fromText || (extra.action ? `${extra.action}Url` : 'ctaUrl');
   }
   if (kind === 'label' && extra.paired) {
     if (extra.action === 'whatsapp') return 'whatsappLabel';
     if (extra.action === 'phone') return 'phoneLabel';
     if (extra.action === 'email') return 'emailLabel';
     if (extra.cta) return extra.cta === 'primary' ? 'primaryCtaLabel' : `${extra.cta}Label`;
-    return toCamel([text || '', 'label']) || 'ctaLabel';
+    return toCamel([text || '', 'label']) || (extra.action ? `${extra.action}Label` : 'ctaLabel');
   }
   if (kind === 'image') return extra.alt ? toCamel([extra.alt, 'image']) || 'image' : 'image';
   if (kind === 'alt') return extra.imageField ? extra.imageField.replace(/Image$/, 'ImageAlt').replace(/image$/, 'imageAlt') : 'imageAlt';

@@ -142,14 +142,48 @@ function wrapHiddenUrlSibling(pathNode, urlField, fallback) {
     [b.jsxExpressionContainer(siteDataBinding(urlParts, fallback, 'url'))],
     false
   );
-  pathNode.insertAfter(hiddenUrl);
+  if (pathNode.parent && Array.isArray(pathNode.parent.node?.children)) {
+    pathNode.insertAfter(hiddenUrl);
+  } else if (pathNode.node && Array.isArray(pathNode.node.children)) {
+    pathNode.node.children = [hiddenUrl, ...(pathNode.node.children || [])];
+  }
 }
 
 function applyTransformToElement(pathNode, transform) {
   const node = pathNode.node;
   if (transform.operation === 'split-action-contract') {
+    const tagName = getJsxName(node);
+    if (tagName === 'button') {
+      node.openingElement.name = b.jsxIdentifier('a');
+      if (node.closingElement) {
+        node.closingElement.name = b.jsxIdentifier('a');
+      }
+      node.openingElement.attributes = (node.openingElement.attributes || []).filter(
+        (attr) => !(attr.type === 'JSXAttribute' && attr.name && attr.name.name === 'type')
+      );
+    }
+
     const urlParts = transform.urlField.split('.');
     replaceAttrValue(node, 'href', siteDataBinding(urlParts, transform.fallback, 'url'));
+
+    const isExternal =
+      transform.extra?.external ||
+      ['whatsapp', 'directions', 'location'].includes(transform.extra?.action) ||
+      /^https?:\/\//i.test(String(transform.fallback || ''));
+
+    if (isExternal && (tagName === 'button' || tagName === 'a')) {
+      if (!hasJsxAttribute(node, 'target')) {
+        node.openingElement.attributes.push(
+          b.jsxAttribute(b.jsxIdentifier('target'), b.stringLiteral('_blank'))
+        );
+      }
+      if (!hasJsxAttribute(node, 'rel')) {
+        node.openingElement.attributes.push(
+          b.jsxAttribute(b.jsxIdentifier('rel'), b.stringLiteral('noopener noreferrer'))
+        );
+      }
+    }
+
     if (!hasJsxAttribute(node, 'data-preview-static')) {
       node.openingElement.attributes.push(
         b.jsxAttribute(b.jsxIdentifier('data-preview-static'), b.stringLiteral('action-link'))

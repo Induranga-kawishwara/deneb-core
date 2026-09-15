@@ -15,6 +15,7 @@ const { enrichSchemasFromContent } = require('../manifest.cjs');
 const { runDenebArc } = require('../index.cjs');
 const { parseSource } = require('../ast.cjs');
 const { loadFingerprintBoost } = require('../learning.cjs');
+const { classifyActionIntent } = require('../adapters.cjs');
 
 test('field-paths recognizes list action CTA keys', () => {
   assert.equal(isListActionCtaKey('preOrderCta'), true);
@@ -699,5 +700,178 @@ export function BrandMarquee() {
   assert.match(result.code, /const BRANDS = siteData\?\.content\?\.home\?\.BRANDS \?\? DEFAULT_BRANDS;/);
   // Verify AST parses cleanly
   assert.doesNotThrow(() => parseSource(result.code, 'BrandMarquee.tsx'));
+});
+
+test('classifyActionIntent identifies action keywords and assigns correct fallback URLs', () => {
+  const wa = classifyActionIntent('Order on WhatsApp', null);
+  assert.equal(wa?.action, 'whatsapp');
+  assert.equal(wa?.defaultUrl, 'https://wa.me/1234567890');
+  assert.equal(wa?.external, true);
+
+  const call = classifyActionIntent('Call Us', null);
+  assert.equal(call?.action, 'phone');
+  assert.equal(call?.defaultUrl, 'tel:+1234567890');
+
+  const dir = classifyActionIntent('Get Directions', null);
+  assert.equal(dir?.action, 'directions');
+  assert.equal(dir?.defaultUrl, 'https://maps.google.com/?q=store+location');
+  assert.equal(dir?.external, true);
+
+  const loc = classifyActionIntent('Our Location', null);
+  assert.equal(loc?.action, 'location');
+  assert.equal(loc?.defaultUrl, 'https://maps.google.com/?q=store+location');
+  assert.equal(loc?.external, true);
+
+  const shop = classifyActionIntent('Shop Now', null);
+  assert.equal(shop?.action, 'shop');
+  assert.equal(shop?.defaultUrl, '/shop');
+  assert.equal(shop?.external, false);
+
+  const nonAction = classifyActionIntent('Submit Form', null);
+  assert.equal(nonAction, null);
+});
+
+test('semantic engine recognizes <button> with action text as split-action-contract', () => {
+  const code = `
+export function ContactBar() {
+  return (
+    <div className="contact-bar">
+      <button className="btn-primary">Order on WhatsApp</button>
+      <button className="btn-secondary">Get Directions</button>
+      <button type="submit">Submit Feedback</button>
+    </div>
+  );
+}
+`;
+  const profile = {
+    root: os.tmpdir(),
+    framework: 'nextjs',
+    router: 'next-app',
+    language: 'typescript',
+    cssSystems: ['tailwind'],
+    hasSrc: true,
+  };
+
+  const analysis = analyzeFile({
+    code,
+    relativeFile: 'src/components/ContactBar.tsx',
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'home',
+    componentMeta: { name: 'ContactBar', role: 'contact' },
+  });
+
+  const waSplit = analysis.candidates.find((c) => c.operation === 'split-action-contract' && c.label === 'Order on WhatsApp');
+  assert.ok(waSplit, 'expected split-action-contract for WhatsApp button');
+  assert.equal(waSplit.extra.action, 'whatsapp');
+  assert.equal(waSplit.value, 'https://wa.me/1234567890');
+
+  const dirSplit = analysis.candidates.find((c) => c.operation === 'split-action-contract' && c.label === 'Get Directions');
+  assert.ok(dirSplit, 'expected split-action-contract for Directions button');
+  assert.equal(dirSplit.extra.action, 'directions');
+
+  // Submit button should NOT be split into a redirect link
+  const submitSplit = analysis.candidates.find((c) => c.label === 'Submit Feedback' && c.operation === 'split-action-contract');
+  assert.equal(submitSplit, undefined, 'submit button must not be an action redirect');
+});
+
+test('AST transformer converts <button> action to <a> with redirect URL and editable text label', () => {
+  const code = `
+export function ActionPanel() {
+  return (
+    <div className="panel">
+      <button className="px-4 py-2 bg-green-600 text-white rounded">Order on WhatsApp</button>
+    </div>
+  );
+}
+`;
+  const profile = {
+    root: os.tmpdir(),
+    framework: 'nextjs',
+    router: 'next-app',
+    language: 'typescript',
+    cssSystems: ['tailwind'],
+    hasSrc: true,
+    aliasMap: { '@/*': ['src/*'] },
+  };
+
+  const analysis = analyzeFile({
+    code,
+    relativeFile: 'src/components/ActionPanel.tsx',
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'home',
+    componentMeta: { name: 'ActionPanel', role: 'hero' },
+  });
+  analysis.code = code;
+  analysis.relativeFile = 'src/components/ActionPanel.tsx';
+
+  const plan = planTransformations({ profile, analyses: [analysis] });
+  const result = applyFilePlan(plan.files[0], profile);
+
+  assert.equal(result.changed, true);
+  // Converted from <button> to <a ...>
+  assert.match(result.code, /<a\s+[^>]*href=\{siteData\?\.content\?\.home\?\.hero\?\.whatsappUrl \?\? "https:\/\/wa\.me\/1234567890"\}/);
+  assert.match(result.code, /target="_blank"/);
+  assert.match(result.code, /rel="noopener noreferrer"/);
+  assert.match(result.code, /data-preview-static="action-link"/);
+  // Text label wrapped in editable span
+  assert.match(result.code, /<span\s+data-preview-field-path="home\.hero\.whatsappLabel"[^>]*>\{siteData\?\.content\?\.home\?\.hero\?\.whatsappLabel \?\? "Order on WhatsApp"\}<\/span>/);
+  // Hidden URL span present for Fivora contract
+  assert.match(result.code, /<span hidden aria-hidden="true" data-preview-field-path="home\.hero\.whatsappUrl">/);
+  // No parse errors
+  assert.doesNotThrow(() => parseSource(result.code, 'ActionPanel.tsx'));
+});
+
+test('end-to-end ARC conversion transforms action buttons and passes strict Fivora audit', () => {
+  const dir = copyOf(FIXTURE);
+  const actionPagePath = path.join(dir, 'src', 'components', 'ActionPage.tsx');
+  fs.writeFileSync(
+    actionPagePath,
+    `
+export function ActionPage() {
+  return (
+    <div className="action-page p-8">
+      <h1>Connect & Visit</h1>
+      <button className="btn-wa">Order on WhatsApp</button>
+      <button className="btn-call">Call Us</button>
+      <button className="btn-dir">Get Directions</button>
+      <button className="btn-loc">Our Location</button>
+      <button className="btn-shop">Shop Now</button>
+    </div>
+  );
+}
+`
+  );
+
+  // Link ActionPage in page.tsx
+  const pageFile = path.join(dir, 'src', 'app', 'page.tsx');
+  const pageSrc = fs.readFileSync(pageFile, 'utf8');
+  fs.writeFileSync(
+    pageFile,
+    `import { ActionPage } from '../components/ActionPage';\n` +
+      pageSrc.replace('</main>', '  <ActionPage />\n    </main>')
+  );
+
+  silence(() => runDenebArc(dir, 'actions-fixture', { telemetry: 'off' }));
+
+  const transformed = fs.readFileSync(actionPagePath, 'utf8');
+  // All 5 buttons converted to <a> tags with href
+  assert.match(transformed, /<a\s+[^>]*href=\{siteData\?\.content\?\.home\?\.contact\?\.whatsappUrl/);
+  assert.match(transformed, /<a\s+[^>]*href=\{siteData\?\.content\?\.home\?\.contact\?\.phoneUrl/);
+  assert.match(transformed, /<a\s+[^>]*href=\{siteData\?\.content\?\.home\?\.contact\?\.getDirectionsUrl/);
+  assert.match(transformed, /<a\s+[^>]*href=\{siteData\?\.content\?\.home\?\.contact\?\.ourLocationUrl/);
+  assert.match(transformed, /<a\s+[^>]*href=\{siteData\?\.content\?\.home\?\.shop\?\.shopNowUrl/);
+
+  // All 5 buttons have editable labels
+  assert.match(transformed, /data-preview-field-path="home\.contact\.whatsappLabel"/);
+  assert.match(transformed, /data-preview-field-path="home\.contact\.phoneLabel"/);
+  assert.match(transformed, /data-preview-field-path="home\.contact\.getDirectionsLabel"/);
+  assert.match(transformed, /data-preview-field-path="home\.contact\.ourLocationLabel"/);
+  assert.match(transformed, /data-preview-field-path="home\.shop\.shopNowLabel"/);
+
+  // Strict Fivora audit passes with 0 errors
+  const { errors } = auditFivora(dir);
+  assert.deepEqual(errors, []);
 });
 

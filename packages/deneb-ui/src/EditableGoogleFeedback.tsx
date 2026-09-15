@@ -99,6 +99,7 @@ function FeedbackCard({
   basePath,
   maxStars,
   badgeIcon,
+  badgeTitle,
   cardClassName,
 }: {
   item: FeedbackItem;
@@ -106,6 +107,7 @@ function FeedbackCard({
   basePath: string;
   maxStars: number;
   badgeIcon?: string;
+  badgeTitle?: string;
   cardClassName?: string;
 }) {
   const currentItem = item || {};
@@ -186,11 +188,31 @@ function FeedbackCard({
             </div>
           </div>
 
-          <img
-            src={badgeIcon || DEFAULT_GOOGLE_ICON}
-            alt="Google"
-            className="w-5 h-5 object-contain opacity-90"
-          />
+          {(() => {
+            const itemCustomIcon = (currentItem as Record<string, unknown>)?.badgeIcon || (currentItem as Record<string, unknown>)?.platformIcon;
+            const finalCardIcon = typeof itemCustomIcon === 'string' && itemCustomIcon.trim() ? itemCustomIcon : (badgeIcon || DEFAULT_GOOGLE_ICON);
+            const cardIconFieldPath = typeof itemCustomIcon === 'string' && itemCustomIcon.trim()
+              ? `${basePath}.feedbacks[${index}].badgeIcon`
+              : `${basePath}.badgeIcon`;
+
+            return (
+              <img
+                src={finalCardIcon}
+                alt={badgeTitle || 'Review Platform'}
+                data-preview-field-path={cardIconFieldPath}
+                className="w-5 h-5 object-contain opacity-90 shrink-0 cursor-pointer"
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  minWidth: '20px',
+                  minHeight: '20px',
+                  maxWidth: '20px',
+                  maxHeight: '20px',
+                }}
+                title="Click to upload/change review platform icon (Google, Twitter, Trustpilot, etc.)"
+              />
+            );
+          })()}
         </div>
 
         {/* Star rating row & Google verified tag */}
@@ -368,6 +390,7 @@ export function EditableGoogleFeedback({
               basePath={basePath}
               maxStars={maxStars}
               badgeIcon={badgeIcon}
+              badgeTitle={badgeTitle}
               cardClassName={cardClassName}
             />
           ))}

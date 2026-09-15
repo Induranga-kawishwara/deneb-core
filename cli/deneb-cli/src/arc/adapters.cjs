@@ -188,6 +188,79 @@ function isLikelyCtaClass(className) {
   return /\b(btn|button|cta|action|rounded|bg-|hero[-_]?cta)\b/i.test(className || '');
 }
 
+function classifyActionIntent(text, href) {
+  const t = String(text || '').trim().toLowerCase();
+  const h = String(href || '').trim().toLowerCase();
+
+  // 1. WhatsApp
+  if (/wa\.me|whatsapp/i.test(h) || /\b(?:whatsapp|wa\.me)\b/i.test(t) || /order on whatsapp|chat on whatsapp|message on whatsapp/i.test(t)) {
+    return {
+      action: 'whatsapp',
+      defaultUrl: /^https?:\/\//i.test(h) && !h.includes('#') ? href : 'https://wa.me/1234567890',
+      external: true,
+    };
+  }
+
+  // 2. Phone / Call
+  if (/^tel:/i.test(h) || /\b(?:call\s*(?:me|us|now)?|phone\s*(?:me|us|now)?|direct\s*line|ring\s*us)\b/i.test(t)) {
+    return {
+      action: 'phone',
+      defaultUrl: /^tel:/i.test(h) ? href : 'tel:+1234567890',
+      external: false,
+    };
+  }
+
+  // 3. Directions
+  if (/maps\.google|goo\.gl\/maps|map\.apple/i.test(h) || /\b(?:directions?|get\s*directions?|route|navigate)\b/i.test(t)) {
+    return {
+      action: 'directions',
+      defaultUrl: /^https?:\/\//i.test(h) && !h.includes('#') ? href : 'https://maps.google.com/?q=store+location',
+      external: true,
+    };
+  }
+
+  // 4. Location / Map
+  if (/\b(?:locations?|our\s*location|store\s*location|view\s*location|find\s*us|visit\s*us|locate\s*us|map)\b/i.test(t)) {
+    return {
+      action: 'location',
+      defaultUrl: /^https?:\/\//i.test(h) && !h.includes('#') ? href : 'https://maps.google.com/?q=store+location',
+      external: true,
+    };
+  }
+
+  // 5. Shop / Order / Catalog / Menu
+  if (/\b(?:shop(?:\s*now)?|order(?:\s*now)?|buy(?:\s*now)?|explore\s*(?:shop|products|offerings|collection|menu)|browse\s*(?:menu|catalog|shop)|view\s*(?:menu|catalog)|menu)\b/i.test(t) || /^\/(?:shop|products|menu|catalog)/i.test(h)) {
+    return {
+      action: 'shop',
+      defaultUrl: h && !['#', ''].includes(h) ? href : '/shop',
+      external: false,
+    };
+  }
+
+  // 6. Email
+  if (/^mailto:/i.test(h) || /\b(?:email\s*us|send\s*(?:us\s*)?email|contact\s*by\s*email)\b/i.test(t)) {
+    return {
+      action: 'email',
+      defaultUrl: /^mailto:/i.test(h) ? href : 'mailto:info@example.com',
+      external: false,
+    };
+  }
+
+  // 7. Check href using existing classifyHref
+  if (h && !['#', ''].includes(h)) {
+    const fromHref = classifyHref(href);
+    if (fromHref && fromHref !== 'link') {
+      return {
+        action: fromHref,
+        defaultUrl: href,
+        external: ['instagram', 'facebook', 'tiktok', 'twitter', 'youtube', 'linkedin', 'pinterest'].includes(fromHref),
+      };
+    }
+  }
+
+  return null;
+}
+
 module.exports = {
   ADAPTERS,
   activeAdapters,
@@ -195,6 +268,7 @@ module.exports = {
   resolveActionWithAdapters,
   isIconComponent,
   classifyHref,
+  classifyActionIntent,
   isLikelyCtaClass,
   DECORATIVE_TAGS,
   SKIP_TAGS,

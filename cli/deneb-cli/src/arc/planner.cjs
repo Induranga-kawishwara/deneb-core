@@ -230,8 +230,11 @@ function sectionForAction(scope, section, extra) {
   if (scope === 'common' && (extra.social || ['instagram', 'facebook', 'twitter', 'tiktok', 'youtube', 'linkedin'].includes(extra.action))) {
     return 'footer';
   }
-  if (extra.action === 'whatsapp' || extra.action === 'phone' || extra.action === 'email') {
+  if (['whatsapp', 'phone', 'email', 'directions', 'location'].includes(extra.action)) {
     return section || 'contact';
+  }
+  if (extra.action === 'shop') {
+    return section || 'shop';
   }
   return section;
 }
