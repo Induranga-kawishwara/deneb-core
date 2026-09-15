@@ -9,7 +9,7 @@ const { appendStyleBindTransforms } = require('./style-candidates.cjs');
 function recipeBoost(candidate, recipe) {
   if (!recipe) return 0;
   let boost = 0;
-  if (recipe.actionRules?.splitActionAndLabel && candidate.operation === 'split-action-contract') boost += 0.03;
+  if (recipe.actionRules?.splitActionAndLabel && (candidate.operation === 'split-action-contract' || candidate.operation === 'form-submit-action')) boost += 0.03;
   const keywords = recipe.signatures?.keywords || [];
   const hay = `${candidate.tag} ${candidate.value || ''} ${candidate.label || ''} ${candidate.file || ''}`.toLowerCase();
   if (keywords.some((kw) => hay.includes(String(kw).toLowerCase()))) boost += 0.02;
@@ -66,8 +66,8 @@ function planTransformations({ profile, analyses, recipe }) {
       }
 
       const extra = { ...(candidate.extra || {}) };
-      if (candidate.operation === 'split-action-contract') {
-        extra.action = extra.action || classifyHref(candidate.value);
+      if (candidate.operation === 'split-action-contract' || candidate.operation === 'form-submit-action') {
+        extra.action = extra.action || (candidate.operation === 'form-submit-action' ? 'form-submit' : classifyHref(candidate.value));
         extra.paired = true;
       }
 
@@ -107,7 +107,7 @@ function planTransformations({ profile, analyses, recipe }) {
         continue;
       }
 
-      if (candidate.operation === 'split-action-contract') {
+      if (candidate.operation === 'split-action-contract' || candidate.operation === 'form-submit-action') {
         const urlName = inferFieldName('url', candidate.tag, candidate.label, extra);
         const labelName = inferFieldName('label', candidate.tag, candidate.label, { ...extra, paired: true });
         const actionSection = sectionForAction(scope, section, extra);
@@ -117,6 +117,9 @@ function planTransformations({ profile, analyses, recipe }) {
         transform.labelField = uniquePath(usedPaths, sibling.join('.'));
         transform.fieldType = 'url';
         transform.labelFieldType = 'text';
+        if (candidate.operation === 'form-submit-action') {
+          transform.formContext = true;
+        }
       } else if (candidate.operation === 'extract-url') {
         transform.field = buildFieldPath({
           scope,
@@ -238,7 +241,7 @@ function sectionForAction(scope, section, extra) {
   if (scope === 'common' && (extra.social || ['instagram', 'facebook', 'twitter', 'tiktok', 'youtube', 'linkedin'].includes(extra.action))) {
     return 'footer';
   }
-  if (['whatsapp', 'phone', 'email', 'directions', 'location'].includes(extra.action)) {
+  if (['whatsapp', 'phone', 'email', 'directions', 'location', 'form-submit'].includes(extra.action)) {
     return section || 'contact';
   }
   if (extra.action === 'shop') {

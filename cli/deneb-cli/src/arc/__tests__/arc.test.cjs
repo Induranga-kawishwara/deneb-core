@@ -729,7 +729,12 @@ test('classifyActionIntent identifies action keywords and assigns correct fallba
   assert.equal(shop?.defaultUrl, '/shop');
   assert.equal(shop?.external, false);
 
-  const nonAction = classifyActionIntent('Submit Form', null);
+  const formSubmit = classifyActionIntent('Submit Form', null);
+  assert.equal(formSubmit?.action, 'form-submit');
+  assert.equal(formSubmit?.defaultUrl, 'https://wa.me/1234567890');
+  assert.equal(formSubmit?.external, true);
+
+  const nonAction = classifyActionIntent('Random Content Text', null);
   assert.equal(nonAction, null);
 });
 
@@ -1214,4 +1219,123 @@ export function CartDrawer() {
   assert.ok(splitAction, 'split action must be planned');
   assert.match(splitAction.urlField, /whatsapp/i);
 });
+
+test('classifyActionIntent recognizes form submit action keywords', () => {
+  const submit = classifyActionIntent('Submit', null);
+  assert.equal(submit?.action, 'form-submit');
+  assert.equal(submit?.defaultUrl, 'https://wa.me/1234567890');
+
+  const sendMessage = classifyActionIntent('Send Message', null);
+  assert.equal(sendMessage?.action, 'form-submit');
+
+  const confirmBooking = classifyActionIntent('Confirm Booking', null);
+  assert.equal(confirmBooking?.action, 'form-submit');
+
+  const getQuote = classifyActionIntent('Get Quote', null);
+  assert.equal(getQuote?.action, 'form-submit');
+});
+
+test('semantic engine recognizes form inputs, labels, placeholders, and form-submit-action buttons', () => {
+  const code = `
+export function BookingForm() {
+  return (
+    <form className="booking-form">
+      <h2>Book Appointment</h2>
+      <label>Full Name</label>
+      <input type="text" placeholder="Enter your full name" />
+      <label>Email Address</label>
+      <input type="email" placeholder="you@example.com" />
+      <label>Special Instructions</label>
+      <textarea placeholder="Describe your request..." />
+      <button type="submit">Confirm Booking</button>
+    </form>
+  );
+}
+`;
+  const profile = {
+    root: os.tmpdir(),
+    framework: 'nextjs',
+    router: 'next-app',
+    language: 'typescript',
+    cssSystems: ['tailwind'],
+    hasSrc: true,
+  };
+
+  const analysis = analyzeFile({
+    code,
+    relativeFile: 'src/components/BookingForm.tsx',
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'home',
+    componentMeta: { name: 'BookingForm', role: 'form' },
+  });
+
+  const placeholders = analysis.candidates.filter((c) => c.kind === 'placeholder');
+  assert.equal(placeholders.length, 3, 'expected 3 placeholder candidates');
+
+  const labels = analysis.candidates.filter((c) => c.kind === 'text' && c.tag === 'label');
+  assert.equal(labels.length, 3, 'expected 3 label candidates');
+
+  const submitAction = analysis.candidates.find((c) => c.kind === 'form-submit-action');
+  assert.ok(submitAction, 'expected form-submit-action candidate');
+  assert.equal(submitAction.label, 'Confirm Booking');
+  assert.equal(submitAction.extra.action, 'form-submit');
+  assert.equal(submitAction.extra.insideForm, true);
+});
+
+test('planner and transformer make entire form editable with submit button and WhatsApp URL binding', () => {
+  const code = `
+import React from 'react';
+
+export function ContactSection() {
+  return (
+    <form className="contact-form">
+      <label>Your Name</label>
+      <input type="text" placeholder="John Doe" />
+      <button type="submit">Send Message</button>
+    </form>
+  );
+}
+`;
+  const profile = {
+    root: os.tmpdir(),
+    framework: 'nextjs',
+    router: 'next-app',
+    language: 'typescript',
+    cssSystems: ['tailwind'],
+    hasSrc: true,
+    aliasMap: { '@/*': ['src/*'] },
+  };
+
+  const analysis = analyzeFile({
+    code,
+    relativeFile: 'src/components/ContactSection.tsx',
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'home',
+    componentMeta: { name: 'ContactSection', role: 'contact' },
+  });
+  analysis.code = code;
+  analysis.relativeFile = 'src/components/ContactSection.tsx';
+
+  const plan = planTransformations({
+    profile,
+    analyses: [analysis],
+  });
+
+  const filePlan = plan.files[0];
+  const formSubmit = filePlan.transformations.find((t) => t.operation === 'form-submit-action');
+  assert.ok(formSubmit, 'form-submit-action must be planned');
+  assert.match(formSubmit.urlField, /formWhatsappUrl/i);
+  assert.match(formSubmit.labelField, /formSubmitLabel/i);
+
+  const transformed = applyFilePlan(filePlan, profile);
+  assert.ok(transformed.changed, 'file must be changed');
+  assert.match(transformed.code, /data-preview-field-path/);
+  assert.match(transformed.code, /formSubmitLabel/);
+  assert.match(transformed.code, /formWhatsappUrl/);
+  assert.match(transformed.code, /type="submit"/);
+  assert.match(transformed.code, /hidden/);
+});
+
 

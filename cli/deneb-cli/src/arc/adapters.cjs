@@ -23,6 +23,8 @@ const HEADING_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'Heading', 'Ti
 const TEXT_TAGS = new Set(['p', 'span', 'li', 'blockquote', 'figcaption', 'label', 'CardDescription', 'Description', 'Subtitle', 'Typography', 'Text', 'Badge', 'badge']);
 const ACTION_TAGS = new Set(['a', 'Link', 'NavLink', 'Button', 'button', 'IconButton', 'NavbarBrand']);
 const IMAGE_TAGS = new Set(['img', 'Image', 'Img', 'BackgroundImage']);
+const FORM_INPUT_TAGS = new Set(['input', 'Input', 'textarea', 'Textarea', 'select', 'Select']);
+const FORM_CONTAINER_TAGS = new Set(['form', 'Form']);
 
 const shadcn = createAdapter('shadcn', {
   detect: (project) => detectFromProfile(project, 'shadcn') || project.shadcn,
@@ -106,6 +108,9 @@ const deneb = createAdapter('deneb', {
     Boolean(project.dependencies && project.dependencies['@deneb-ui/ui']),
   recognizeNode(node) {
     const name = getJsxName(node);
+    if (['EditableContactForm', 'ContactForm'].includes(name)) {
+      return { library: 'deneb', kind: 'form', tag: name };
+    }
     if (['EditableGoogleFeedback', 'EditableCustomerReviews', 'CustomerReviews', 'GoogleFeedback'].includes(name)) {
       return { library: 'deneb', kind: 'feedback', tag: name };
     }
@@ -191,6 +196,18 @@ function isLikelyCtaClass(className) {
 function classifyActionIntent(text, href) {
   const t = String(text || '').trim().toLowerCase();
   const h = String(href || '').trim().toLowerCase();
+
+  // 0. Form Submit / WhatsApp Form Action
+  if (
+    /^(submit|send\s*message|send\s*inquiry|confirm\s*booking|place\s*order|book\s*now|confirm|get\s*quote|request\s*quote|send\s*request|schedule|register|sign\s*up|subscribe|apply|enroll)$/i.test(t) ||
+    /\b(?:send\s*message|confirm\s*booking|submit\s*form|submit\s*inquiry|send\s*inquiry|request\s*quote|get\s*quote|send\s*request)\b/i.test(t)
+  ) {
+    return {
+      action: 'form-submit',
+      defaultUrl: /^https?:\/\//i.test(h) && !h.includes('#') ? href : 'https://wa.me/1234567890',
+      external: true,
+    };
+  }
 
   // 1. WhatsApp
   if (
@@ -280,6 +297,8 @@ module.exports = {
   TEXT_TAGS,
   ACTION_TAGS,
   IMAGE_TAGS,
+  FORM_INPUT_TAGS,
+  FORM_CONTAINER_TAGS,
   collectJsxText,
   getJsxAttributeLiteral,
 };
