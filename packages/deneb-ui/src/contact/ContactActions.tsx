@@ -24,9 +24,8 @@ export interface ContactActionsProps {
 }
 
 /**
- * Smart container that automatically renders available contact channels.
- * When a merchant adds phone, WhatsApp, or email in site-data.json,
- * the corresponding action button appears automatically with zero template code changes.
+ * Always-mounted contact channels so Fivora empty-state validation keeps
+ * the field markers clickable when values are blank.
  */
 export function ContactActions({
   phone,
@@ -41,14 +40,6 @@ export function ContactActions({
   className = '',
   style,
 }: ContactActionsProps) {
-  const hasPhone = Boolean(phone && phone.trim());
-  const hasWhatsApp = Boolean(whatsapp && whatsapp.trim());
-  const hasEmail = Boolean(email && email.trim());
-
-  if (!hasPhone && !hasWhatsApp && !hasEmail) {
-    return null;
-  }
-
   const layoutStyles: React.CSSProperties = {
     display: 'flex',
     flexDirection: layout === 'column' ? 'column' : 'row',
@@ -60,30 +51,24 @@ export function ContactActions({
 
   return (
     <div className={`deneb-contact-actions deneb-layout-${layout} ${className}`.trim()} style={layoutStyles}>
-      {hasPhone && (
-        <PhoneButton
-          value={phone}
+      <PhoneButton
+          value={phone ?? ''}
           fieldPath={phoneFieldPath}
           label={labels.phone || 'Call Us'}
           size={size}
         />
-      )}
-      {hasWhatsApp && (
-        <WhatsAppButton
-          value={whatsapp}
+      <WhatsAppButton
+          value={whatsapp ?? ''}
           fieldPath={whatsappFieldPath}
           label={labels.whatsapp || 'Chat on WhatsApp'}
           size={size}
         />
-      )}
-      {hasEmail && (
-        <EmailButton
-          value={email}
+      <EmailButton
+          value={email ?? ''}
           fieldPath={emailFieldPath}
           label={labels.email || 'Email Us'}
           size={size}
         />
-      )}
     </div>
   );
 }

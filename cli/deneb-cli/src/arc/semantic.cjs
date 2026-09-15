@@ -128,8 +128,9 @@ function objectLiteralToPlain(node) {
       out[key] = val.quasis?.map((q) => q.value?.cooked || q.value?.raw || '').join('') || '';
     } else if (val.type === 'Identifier') {
       if (/^[A-Z]/.test(val.name)) {
-        // Component references (e.g. icon: Truck, Icon: ShieldCheck) are not merchant content
-        return null;
+        // Component references (e.g. icon: Truck) are not merchant content.
+        // Skip this key only so primitive siblings (title, body) stay convertible.
+        continue;
       }
       out[key] = val.name;
     } else if (val.type === 'UnaryExpression' && val.argument) {
@@ -349,12 +350,15 @@ function collectItemFieldUsage(callback, itemParam) {
   }
 
   let usesItemAsComponent = false;
+  const componentProps = new Set();
   recast.types.visit(callback, {
     visitJSXOpeningElement(pathNode) {
       const name = pathNode.node.name;
       if (name?.type === 'JSXMemberExpression') {
-        if (name.object?.type === 'Identifier' && name.object.name === itemParam) {
+        const objectName = name.object && name.object.name;
+        if ((name.object?.type === 'Identifier' || name.object?.type === 'JSXIdentifier') && objectName === itemParam) {
           usesItemAsComponent = true;
+          if (name.property?.name) componentProps.add(name.property.name);
         }
       }
       this.traverse(pathNode);
@@ -362,6 +366,7 @@ function collectItemFieldUsage(callback, itemParam) {
     visitJSXExpressionContainer(pathNode) {
       const properties = findItemMemberProperties(pathNode.node.expression);
       for (const property of properties) {
+        if (componentProps.has(property)) continue;
         const parent = pathNode.parent?.node || pathNode.parent?.value;
         if (parent?.type === 'JSXAttribute') {
           const attribute = parent.name?.name;
@@ -719,7 +724,6 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
         const objectItems = arr.items.every((item) => item.type === 'object');
         const boundProperties = [...itemUsage.keys()];
         const convertible =
-          !usesItemAsComponent &&
           objectItems &&
           boundProperties.length > 0 &&
           arr.items.some((item) => boundProperties.some((key) => key in item.value));

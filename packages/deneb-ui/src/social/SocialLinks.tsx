@@ -25,8 +25,7 @@ const SUPPORTED_PLATFORMS: SocialPlatform[] = [
 ];
 
 /**
- * Smart container rendering active social buttons.
- * Automatically filters out any unconfigured or empty platforms.
+ * Always-mounted social buttons so empty-state preview keeps field markers.
  */
 export function SocialLinks({
   social = {},
@@ -36,14 +35,10 @@ export function SocialLinks({
   className = '',
   style,
 }: SocialLinksProps) {
-  // Find platforms with valid URLs
-  const activePlatforms = Object.entries(social).filter(([platform, url]) => {
-    return Boolean(url && typeof url === 'string' && url.trim().length > 0);
-  });
-
-  if (activePlatforms.length === 0) {
-    return null;
-  }
+  const platforms = SUPPORTED_PLATFORMS.filter((platform) =>
+    Object.prototype.hasOwnProperty.call(social, platform) || Object.keys(social).length === 0
+  );
+  const rendered = platforms.length ? platforms : SUPPORTED_PLATFORMS;
 
   const containerStyles: React.CSSProperties = {
     display: 'inline-flex',
@@ -55,21 +50,16 @@ export function SocialLinks({
 
   return (
     <div className={`deneb-social-links ${className}`.trim()} style={containerStyles}>
-      {activePlatforms.map(([key, url]) => {
-        const lowerKey = key.toLowerCase() as SocialPlatform;
-        const platform = SUPPORTED_PLATFORMS.includes(lowerKey) ? lowerKey : 'x';
-
-        return (
-          <SocialButton
-            key={key}
-            platform={platform}
-            url={url}
-            fieldPath={`${fieldPathPrefix}.${key}`}
-            variant={variant}
-            size={size}
-          />
-        );
-      })}
+      {rendered.map((platform) => (
+        <SocialButton
+          key={platform}
+          platform={platform}
+          url={social[platform] ?? ''}
+          fieldPath={`${fieldPathPrefix}.${platform}`}
+          variant={variant}
+          size={size}
+        />
+      ))}
     </div>
   );
 }

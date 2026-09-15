@@ -14,10 +14,11 @@ const fs = require('fs');
 const path = require('path');
 const { ARC_NAME, ARC_VERSION, SCHEMA_VERSION, ENGINE_ID } = require('./version.cjs');
 const { walkFiles, isJsxFile, rel, copyFilePreserve, writeJson, readJsonSafe, findFirstExisting } = require('./fs-utils.cjs');
-const { scanProject, buildDependencyGraph, inferOwnerScope } = require('./scanner.cjs');
+const { scanProject, buildDependencyGraph, inferOwnerScope, resolvePageFileOnDisk } = require('./scanner.cjs');
 const { analyzeFile, collectDesignSnapshot } = require('./semantic.cjs');
 const { planTransformations } = require('./planner.cjs');
 const { applyFilePlan, instrumentLayoutSource, instrumentPageKey, resolveSiteDataSpecifier, resolveSiteDataRuntimeSpecifier, rewriteRecursiveSiteDataContext, ensureJsonModule, sanitizeContradictoryMarkersInSource } = require('./transformer.cjs');
+const { applyResidualPass } = require('./residual.cjs');
 const { parseSource } = require('./ast.cjs');
 const { buildSiteDataAndManifest, writeDataBank, loadExistingData, countSchemaFields } = require('./manifest.cjs');
 const { validateAstFiles, validateContracts, designPreservationScore, coverageMetrics } = require('./validator.cjs');
@@ -34,6 +35,11 @@ const {
   auditPageCoverage,
   auditPreviewRuntime,
   findUncoveredVisibleText,
+  auditEmptyStateSource,
+  auditSelectOptions,
+  auditListBounds,
+  auditStaticMarkerAuthorship,
+  auditRouteOwnedMarkerCoverage,
 } = require('./fivora-contract.cjs');
 const printer = require('./printer.cjs');
 const { classifyComponents } = require('./component-registry.cjs');
@@ -52,6 +58,7 @@ function parseArcOptions(raw = {}) {
     json: Boolean(raw.json),
     aiEnabled: Boolean(raw.aiEnabled),
     aiDryRun: Boolean(raw.aiDryRun),
+    strict: Boolean(raw.strict),
   };
 }
 
@@ -151,6 +158,8 @@ function auditFivoraContract({ profile, siteData, manifest, inventory }) {
   const placement = [];
   const collisions = [];
   const uncoveredText = [];
+  const emptyState = [];
+  const staticAuthorship = [];
   const allMarkers = [];
 
   for (const source of inventory.sources) {
@@ -159,6 +168,8 @@ function auditFivoraContract({ profile, siteData, manifest, inventory }) {
     placement.push(...auditMarkerPlacement(source.code, source.rel));
     collisions.push(...auditActionLabelCollision(source.code, source.rel));
     uncoveredText.push(...findUncoveredVisibleText(source.code, source.rel));
+    emptyState.push(...auditEmptyStateSource(source.code, source.rel));
+    staticAuthorship.push(...auditStaticMarkerAuthorship(source.code, source.rel));
   }
 
   const coverage = auditPathCoverage({
@@ -177,19 +188,34 @@ function auditFivoraContract({ profile, siteData, manifest, inventory }) {
     ...coverage.errors,
     ...placement,
     ...collisions,
+    ...emptyState,
+    ...staticAuthorship,
     ...auditSchemaUniqueness(manifest.editorSchema),
+    ...auditSelectOptions(manifest.editorSchema, manifest.pages),
+    ...auditListBounds(manifest.editorSchema, siteData.content),
     ...auditPageCoverage({
       pages: manifest.pages,
       routeFiles,
       pageMarkersByFile: inventory.pageKeysByFile,
     }),
+    ...auditRouteOwnedMarkerCoverage({
+      editorSchema: manifest.editorSchema,
+      pages: manifest.pages,
+      markers: allMarkers,
+      controlOnlyPaths: manifest.visualEditing?.controlOnlyPaths || [],
+    }),
     ...auditPreviewRuntime(inventory.sources.map((source) => source.code)),
   ];
 
   return {
-    passed: errors.length === 0,
+    passed: errors.length === 0 && uncoveredText.length === 0,
     errors: [...new Set(errors)],
     uncoveredVisibleText: uncoveredText,
+    emptyStatePassed: emptyState.length === 0,
+    fieldMarkers: coverage.fieldMarkers,
+    listMarkers: coverage.listMarkers,
+    itemMarkers: coverage.itemMarkers,
+    pathCoverage: coverage,
   };
 }
 
@@ -230,6 +256,21 @@ function analyzeProjectFiles(profile, graph) {
   return analyses;
 }
 
+function mergeDetectedPages(profile, detectedPages) {
+  if (!Array.isArray(detectedPages) || !detectedPages.length) return;
+  const scannedIds = new Set(profile.routes.map((route) => route.id));
+  const scannedRoutes = new Set(profile.routes.map((route) => route.route));
+  for (const page of detectedPages) {
+    if (!page || !page.id) continue;
+    if (scannedIds.has(page.id) || scannedRoutes.has(page.route)) continue;
+    const file = resolvePageFileOnDisk(profile.root, page);
+    if (!file) continue;
+    profile.routes.push({ ...page, file });
+    scannedIds.add(page.id);
+    scannedRoutes.add(page.route);
+  }
+}
+
 async function runDenebArcAsync(projectDir, projectName, options = {}) {
   const opts = parseArcOptions(options);
   const runId = createRunId();
@@ -238,15 +279,7 @@ async function runDenebArcAsync(projectDir, projectName, options = {}) {
   printer.printBanner(opts.dryRun ? 'dry-run' : opts.explain ? 'explain' : 'run');
 
   const profile = scanProject(projectDir);
-  if (opts.detectedPages && Array.isArray(opts.detectedPages) && opts.detectedPages.length) {
-    const scannedIds = new Set(profile.routes.map((r) => r.id));
-    for (const page of opts.detectedPages) {
-      if (page && page.id && !scannedIds.has(page.id)) {
-        profile.routes.push(page);
-      }
-    }
-  }
-
+  mergeDetectedPages(profile, opts.detectedPages);
   printer.printProfile(profile);
   const graph = buildDependencyGraph(profile);
   const analyses = analyzeProjectFiles(profile, graph);
@@ -379,14 +412,7 @@ function runDenebArcSync(projectDir, projectName, options = {}) {
   printer.printBanner(opts.dryRun ? 'dry-run' : opts.explain ? 'explain' : 'run');
 
   const profile = scanProject(projectDir);
-  if (opts.detectedPages && Array.isArray(opts.detectedPages) && opts.detectedPages.length) {
-    const scannedIds = new Set(profile.routes.map((r) => r.id));
-    for (const page of opts.detectedPages) {
-      if (page && page.id && !scannedIds.has(page.id)) {
-        profile.routes.push(page);
-      }
-    }
-  }
+  mergeDetectedPages(profile, opts.detectedPages);
 
   printer.printProfile(profile);
   const graph = buildDependencyGraph(profile);
@@ -545,6 +571,48 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     }
   }
 
+  const residualFields = [];
+  const usedPaths = new Set(plan.usedPaths || []);
+  for (const relativeFile of profile.jsxFiles || []) {
+    const abs = path.join(projectDir, relativeFile);
+    if (!fs.existsSync(abs)) continue;
+    const original = fs.readFileSync(abs, 'utf8');
+    const analysis = analyses.find((item) => item.relativeFile === relativeFile);
+    const residual = applyResidualPass({
+      code: original,
+      file: relativeFile,
+      ownerScope: analysis?.ownerScope || inferOwnerScope(profile, graph, relativeFile),
+      usedPaths,
+      componentName: analysis?.componentMeta?.name,
+      role: analysis?.componentMeta?.role,
+    });
+    if (!residual.changed) continue;
+    try {
+      parseSource(residual.code, relativeFile);
+    } catch {
+      continue;
+    }
+    backupFile(projectDir, backupDir, abs);
+    fs.writeFileSync(abs, residual.code, 'utf8');
+    if (!changedFiles.includes(relativeFile)) changedFiles.push(relativeFile);
+    afterFiles[relativeFile] = residual.code;
+    appliedCount += residual.applied || 0;
+    residualFields.push(...(residual.fields || []));
+  }
+
+  for (const relativeFile of profile.jsxFiles || []) {
+    const abs = path.join(projectDir, relativeFile);
+    if (!fs.existsSync(abs)) continue;
+    const original = fs.readFileSync(abs, 'utf8');
+    const sanitized = sanitizeContradictoryMarkersInSource(original, relativeFile);
+    if (sanitized.updated && sanitized.code !== original) {
+      backupFile(projectDir, backupDir, abs);
+      fs.writeFileSync(abs, sanitized.code, 'utf8');
+      if (!changedFiles.includes(relativeFile)) changedFiles.push(relativeFile);
+      afterFiles[relativeFile] = sanitized.code;
+    }
+  }
+
   if (profile.framework === 'nextjs') {
     const before = findNextConfig(projectDir);
     if (before) backupFile(projectDir, backupDir, before.abs);
@@ -589,6 +657,8 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     existingSiteData: existing.siteData,
     existingManifest: existing.manifest,
     boundFieldPaths: markerInventory.fieldPaths,
+    boundListPaths: markerInventory.listPaths,
+    extraFields: residualFields,
     markerRoutes: markerInventory.markerRoutes,
   });
 
@@ -611,13 +681,6 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
   const design = designPreservationScore(plan.files, afterFiles);
   const alreadyEditable = analyses.filter((a) => a.alreadyEditable).length;
   const skippedDynamic = plan.skipped.filter((s) => /dynamic|api/.test(s.reason || '')).length;
-  const coverage = coverageMetrics({
-    analyses,
-    plan,
-    appliedCount,
-    skippedDynamic,
-    alreadyEditable,
-  });
 
   const fivoraAudit = auditFivoraContract({
     profile,
@@ -626,11 +689,24 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     inventory: collectMarkerInventory(projectDir, profile, graph),
   });
 
+  const coverage = coverageMetrics({
+    analyses,
+    plan,
+    appliedCount,
+    skippedDynamic,
+    alreadyEditable,
+    content: dataBundle.siteData.content,
+    controlOnlyPaths: dataBundle.manifest.visualEditing?.controlOnlyPaths || [],
+    pathCoverage: fivoraAudit.pathCoverage,
+    uncoveredVisibleText: fivoraAudit.uncoveredVisibleText,
+  });
+
   const validation = {
     syntaxPassed,
     fivoraContractPassed: fivoraAudit.passed,
     fivoraContractErrors: fivoraAudit.errors,
     uncoveredVisibleText: fivoraAudit.uncoveredVisibleText.length,
+    emptyStatePassed: fivoraAudit.emptyStatePassed !== false,
     contractPassed: contracts.contractPassed,
     orphans: contracts.orphans.length,
     missingSchema: contracts.missingSchema.length,
@@ -638,9 +714,12 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     staticAncestorCollisions: contracts.staticAncestorCollisions,
     astFailures: astResults.filter((r) => !r.passed),
     transformFailures,
+    designPreservation: design.score,
   };
 
-  const criticalFailure = !syntaxPassed || contracts.actionCollisions > 0 && appliedCount === 0;
+  const criticalFailure = !syntaxPassed || (contracts.actionCollisions > 0 && appliedCount === 0);
+  const contractFailure = !fivoraAudit.passed || fivoraAudit.uncoveredVisibleText.length > 0;
+  const designFailure = design.score < 98 && design.total > 0;
   let outcome = 'success';
   if (criticalFailure) {
     restoreBackup(projectDir, backupDir);
@@ -653,6 +732,21 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     }
     outcome = 'rolled-back';
     printer.printRollback(validation.astFailures[0]?.error || 'Critical validation failed');
+  } else if (opts.strict && (contractFailure || designFailure)) {
+    restoreBackup(projectDir, backupDir);
+    for (const created of createdDuringRun) {
+      try {
+        if (fs.existsSync(created)) fs.rmSync(created, { force: true });
+      } catch {
+        // ignore
+      }
+    }
+    outcome = 'rolled-back';
+    printer.printRollback('Strict Fivora contract failed');
+  } else if (contractFailure) {
+    outcome = 'contract-failed';
+  } else if (designFailure) {
+    outcome = 'design-regression';
   }
 
   printer.printValidation(validation, coverage, design);
@@ -686,7 +780,10 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     validation: {
       syntaxPassed,
       contractPassed: contracts.contractPassed,
-      visualPassed: design.score >= 95,
+      fivoraContractPassed: fivoraAudit.passed,
+      emptyStatePassed: fivoraAudit.emptyStatePassed !== false,
+      uncoveredVisibleText: fivoraAudit.uncoveredVisibleText.length,
+      visualPassed: design.score >= 98,
       idempotencyPassed: true,
     },
     outcome,
@@ -749,6 +846,8 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
   if (outcome === 'success') {
     printer.printSuccess();
     printer.printDeveloperNextSteps();
+  } else if (outcome === 'contract-failed' || outcome === 'design-regression') {
+    printer.printContractFailed();
   }
   return result;
 }

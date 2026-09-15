@@ -11,6 +11,43 @@ const {
   wildcardPath,
 } = require('./fivora-contract.cjs');
 
+function pruneUnboundLeaves(content, isBound) {
+  function walk(node, path) {
+    if (Array.isArray(node)) {
+      node.forEach((item, index) => {
+        if (item && typeof item === 'object') walk(item, `${path}[${index}]`);
+      });
+      return;
+    }
+    if (!isPlainObject(node)) return;
+    for (const key of Object.keys(node)) {
+      const next = path ? `${path}.${key}` : key;
+      const value = node[key];
+      if (Array.isArray(value)) {
+        const listBound =
+          isBound(next) || isBound(`${next}[0]`) || isBound(`${next}[*]`);
+        if (!listBound && !isAllowedControlOnly(next)) {
+          delete node[key];
+          continue;
+        }
+        walk(value, next);
+        continue;
+      }
+      if (isPlainObject(value)) {
+        walk(value, next);
+        if (Object.keys(value).length === 0 && !isBound(next) && !isAllowedControlOnly(next)) {
+          delete node[key];
+        }
+        continue;
+      }
+      if (!isBound(next) && !isAllowedControlOnly(next)) {
+        delete node[key];
+      }
+    }
+  }
+  walk(content, '');
+}
+
 function setDeep(target, pathStr, value) {
   const parts = String(pathStr).split('.').filter(Boolean);
   let curr = target;
@@ -254,11 +291,32 @@ function baseContent(projectName, routes) {
 
 /**
  * Fivora strict mode requires every concrete site-data field to either render a
- * data-preview-field-path marker or be declared control-only. ARC always emits
- * a merchant-facing baseline (business phone, logo, nav labels) that an
- * arbitrary project may not render, so every unbound path is declared here
- * instead of being silently shipped as an ingest failure.
+ * data-preview-field-path marker or be declared control-only. Control-only is
+ * reserved for ids, internal flags, and the unrendered merchant baseline — not
+ * as a dump for fields ARC planned but failed to bind.
  */
+const BASELINE_CONTROL_ONLY = /^(common\.(websiteTitle|shortDescription|logoUrl|headerCtaLabel|copyright|navLabels(\.[^.]+)?|business(\.[^.]+)*))$/;
+const SYSTEM_FIELD = /(^|\.)(id|key|slug|internalId|sku|_id)$/i;
+
+function slimListItems(items, itemFields) {
+  const keys = (itemFields || []).map((field) => field.key).filter(Boolean);
+  if (!keys.length || !Array.isArray(items)) return items || [];
+  return items.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+    const out = {};
+    for (const key of keys) {
+      if (!(key in item)) continue;
+      if (Array.isArray(item[key])) continue;
+      out[key] = item[key];
+    }
+    return Object.keys(out).length ? out : item;
+  });
+}
+
+function isAllowedControlOnly(path) {
+  return BASELINE_CONTROL_ONLY.test(path) || SYSTEM_FIELD.test(path);
+}
+
 function computeControlOnlyPaths(content, boundPaths, declared = []) {
   const inventory = enumerateContentPaths(content);
   const bound = new Set([...(boundPaths || [])].map(wildcardPath));
@@ -266,9 +324,7 @@ function computeControlOnlyPaths(content, boundPaths, declared = []) {
 
   for (const declaredPath of declared) {
     const canonical = canonicalizeMarkerPath(declaredPath);
-    if (!canonical) continue;
-    // Drop stale declarations that no longer exist in content; the platform
-    // rejects controlOnlyPaths entries it cannot resolve.
+    if (!canonical || !isAllowedControlOnly(canonical)) continue;
     const known = [...inventory.fieldPatterns, ...inventory.concreteFields].some(
       (path) => wildcardPath(path) === wildcardPath(canonical)
     );
@@ -276,7 +332,8 @@ function computeControlOnlyPaths(content, boundPaths, declared = []) {
   }
 
   for (const path of inventory.concreteFields) {
-    if (!bound.has(wildcardPath(path))) controlOnly.add(path);
+    if (bound.has(wildcardPath(path))) continue;
+    if (isAllowedControlOnly(path)) controlOnly.add(path);
   }
 
   return [...controlOnly].sort();
@@ -314,6 +371,8 @@ function buildSiteDataAndManifest({
   existingSiteData,
   existingManifest,
   boundFieldPaths = [],
+  boundListPaths = [],
+  extraFields = [],
   markerRoutes = {},
 }) {
   const routes = (profile.routes && profile.routes.length ? profile.routes : [{ id: 'home', label: 'Home', route: '/', required: true }])
@@ -329,7 +388,15 @@ function buildSiteDataAndManifest({
   // Recipes may hint schema shape, but must not dump another storefront's content
   // into an unrelated project. Extracted values always win.
 
-  const plannedFields = collectFieldsFromPlan(plan);
+  const plannedFields = [...collectFieldsFromPlan(plan), ...(extraFields || [])];
+  const boundSet = new Set(
+    [...(boundFieldPaths || []), ...(boundListPaths || [])].map((path) => wildcardPath(path))
+  );
+  function isBound(path) {
+    if (!path) return false;
+    const wild = wildcardPath(path);
+    return boundSet.has(wild) || [...boundSet].some((marker) => wildcardPath(marker) === wild);
+  }
 
   // A second `init` run re-reads already-transformed sources, where the former
   // literals are now site-data expressions and therefore no longer detectable.
@@ -373,8 +440,15 @@ function buildSiteDataAndManifest({
 
   for (const field of plannedFields) {
     if (field.type === 'list') {
-      setDeep(content, field.path, field.value ?? []);
-      upsertSchemaList(editorSections, field.path, field.itemFields, field.value);
+      if (!isBound(field.path) && !isBound(`${field.path}[0]`) && !isBound(`${field.path}[*]`)) continue;
+      const value = slimListItems(field.value ?? [], field.itemFields);
+      setDeep(content, field.path, value);
+      upsertSchemaList(editorSections, field.path, field.itemFields, value);
+      continue;
+    }
+    if (!isBound(field.path) && !isAllowedControlOnly(field.path)) continue;
+    if (!isBound(field.path) && isAllowedControlOnly(field.path)) {
+      setDeep(content, field.path, field.value ?? '');
       continue;
     }
     setDeep(content, field.path, field.value ?? '');
@@ -387,11 +461,14 @@ function buildSiteDataAndManifest({
     // Planned extracted values should win over empty recipe defaults when existing is absent,
     // but never erase merchant-configured existing values.
     for (const field of plannedFields) {
+      if (!isBound(field.path) && field.type !== 'list' && !isAllowedControlOnly(field.path)) continue;
       const existingVal = getDeep(existingSiteData.content, field.path);
       if (existingVal !== undefined) setDeep(content, field.path, existingVal);
       else if (field.value !== undefined) setDeep(content, field.path, field.value);
     }
   }
+
+  pruneUnboundLeaves(content, isBound);
 
   const siteData = {
     denebVersion: existingSiteData?.denebVersion || undefined,
@@ -503,4 +580,5 @@ module.exports = {
   upsertSchemaList,
   enrichSchemasFromContent,
   isListActionCtaKey,
+  isAllowedControlOnly,
 };

@@ -84,9 +84,12 @@ function printValidation(validation, coverage, design) {
   else warn('AST validation reported parse issues');
   if (validation.contractPassed) ok('editable contracts');
   else warn('editable contract issues detected');
+  if (validation.fivoraContractPassed) ok('Fivora strict contract');
+  else warn('Fivora strict contract failed — package is not upload-ready');
   ok('manifest');
   if (validation.idempotencyPassed !== false) ok('idempotency');
   console.log('');
+  console.log(`  Visual coverage: ${coverage.visualCoverage != null ? coverage.visualCoverage : coverage.editableCoverage}%`);
   console.log(`  Editable coverage: ${coverage.editableCoverage}%`);
   console.log(`  Design preservation: ${design.score}%`);
 }
@@ -133,6 +136,11 @@ function printError(file, reason, confidence) {
 
 function printSuccess() {
   console.log(`\n${C.green}${C.bold}Deneb ARC completed successfully.${C.reset}\n`);
+}
+
+function printContractFailed() {
+  console.log(`\n${C.yellow}${C.bold}Deneb ARC finished with Fivora contract findings.${C.reset}`);
+  console.log(`${C.dim}Files were kept for debugging. This package is not upload-ready. Re-run with --strict to roll back.${C.reset}\n`);
 }
 
 function printUncoveredText(findings = []) {
@@ -229,6 +237,7 @@ module.exports = {
   printDryRun,
   printError,
   printSuccess,
+  printContractFailed,
   printUncoveredText,
   printDeveloperNextSteps,
   printRollback,

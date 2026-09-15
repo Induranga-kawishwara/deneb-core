@@ -189,7 +189,8 @@ function planTransformations({ profile, analyses, recipe }) {
               type: typeof sample[k] === 'number' ? 'number' : /image|photo|avatar/i.test(k) ? 'image' : /url|link/i.test(k) ? 'url' : 'text',
             }));
         }
-        if (!transform.itemFields.length || !extra.objectItems || extra.hasComponentRef) transform.decision = 'skip';
+        transform.hasComponentRef = Boolean(extra.hasComponentRef);
+        if (!transform.itemFields.length || !extra.objectItems) transform.decision = 'skip';
       } else {
         transform.field = buildFieldPath({
           scope,

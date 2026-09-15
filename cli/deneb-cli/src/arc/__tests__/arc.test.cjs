@@ -158,8 +158,8 @@ test('AST transformer preserves className and uses nullish fallbacks', () => {
   assert.match(result.code, /data-preview-field-path=/);
   assert.match(result.code, /\?\?/);
   assert.match(result.code, /<span[\s\S]*data-preview-field-path="/);
-  assert.match(result.code, /<span[^>]*hidden[^>]*data-preview-field-path="/);
-  assert.match(result.code, /data-preview-static="action-link"/);
+  assert.match(result.code, /<a\b[^>]*data-preview-field-path=/);
+  assert.doesNotMatch(result.code, /<span[^>]*hidden[^>]*data-preview-field-path/);
   assert.doesNotMatch(result.code, /'use client'/);
   assert.match(result.code, /site-data\.json|@\/data\/site-data\.json/);
   assert.match(result.code, /data-preview-style-target=/);
@@ -409,12 +409,14 @@ test('static-array collections become list contracts without changing render log
   assert.equal(siteData.content.home.products[0].title, 'Minimalist Smart Watch');
 });
 
-test('collections holding component references are left alone', () => {
+test('collections holding component references still bind primitive item fields', () => {
   const dir = copyOf(STOREFRONT_FIXTURE);
   silence(() => runDenebArc(dir, 'acme-store', { telemetry: 'off' }));
   const features = fs.readFileSync(path.join(dir, 'src', 'components', 'Features.tsx'), 'utf8');
-  assert.ok(!features.includes('data-preview-list-path'), 'icon component refs are not merchant content');
+  assert.match(features, /data-preview-list-path=/);
   assert.match(features, /icon: Truck/);
+  assert.match(features, /data-preview-static="component-ref"/);
+  assert.match(features, /data-preview-field-path=\{`[^`]*\.title`\}/);
 });
 
 test('literal text inside a broad container is wrapped instead of marked illegally', () => {
@@ -435,8 +437,8 @@ test('shadcn Button asChild keeps the action on the link and the label in a span
   assert.match(hero, /<Button asChild>/);
   assert.match(hero, /href=\{siteData\?\.content\?\.home\?\.hero\?\.shopCollectionUrl \?\? "\/products"\}/);
   assert.match(hero, /<span[\s\S]*data-preview-field-path="home\.hero\.shopCollectionLabel"/);
-  // The decorative icon stays static.
-  assert.match(hero, /<ArrowRight className="ml-2 size-4" aria-hidden="true" \/>/);
+  // The decorative icon stays static (may also receive data-preview-static).
+  assert.match(hero, /<ArrowRight[^>]*className="ml-2 size-4"[^>]*aria-hidden="true"/);
 });
 
 test('a second init run converges on identical sources and manifest', () => {
@@ -821,11 +823,12 @@ export function ActionPanel() {
   assert.match(result.code, /<a\s+[^>]*href=\{siteData\?\.content\?\.home\?\.hero\?\.whatsappUrl \?\? "https:\/\/wa\.me\/1234567890"\}/);
   assert.match(result.code, /target="_blank"/);
   assert.match(result.code, /rel="noopener noreferrer"/);
-  assert.match(result.code, /data-preview-static="action-link"/);
+  // URL field path is bound directly to outer <a> element (never hidden, never static conflict)
+  assert.match(result.code, /<a\s+[^>]*data-preview-field-path=\{?"home\.hero\.whatsappUrl"?\}/);
   // Text label wrapped in editable span
   assert.match(result.code, /<span\s+data-preview-field-path="home\.hero\.whatsappLabel"[^>]*>\{siteData\?\.content\?\.home\?\.hero\?\.whatsappLabel \?\? "Order on WhatsApp"\}<\/span>/);
-  // Hidden URL span present for Fivora contract
-  assert.match(result.code, /<span hidden aria-hidden="true" data-preview-field-path="home\.hero\.whatsappUrl">/);
+  // Never emit hidden preview markers
+  assert.doesNotMatch(result.code, /<span[^>]*hidden[^>]*data-preview-field-path/);
   // No parse errors
   assert.doesNotThrow(() => parseSource(result.code, 'ActionPanel.tsx'));
 });
@@ -1333,9 +1336,91 @@ export function ContactSection() {
   assert.ok(transformed.changed, 'file must be changed');
   assert.match(transformed.code, /data-preview-field-path/);
   assert.match(transformed.code, /formSubmitLabel/);
-  assert.match(transformed.code, /formWhatsappUrl/);
   assert.match(transformed.code, /type="submit"/);
-  assert.match(transformed.code, /hidden/);
+  assert.doesNotMatch(transformed.code, /<span[^>]*hidden/);
+  assert.doesNotMatch(transformed.code, /data-preview-static[\s\S]*data-preview-field-path/);
+});
+
+test('auditMarkerPlacement detects and rejects hidden preview markers', () => {
+  const hiddenCode = `
+    <div>
+      <span className="hidden" aria-hidden="true" data-preview-field-path="home.hero.buttonUrl">https://wa.me/123</span>
+      <span>Click me</span>
+    </div>
+  `;
+  const errors = contract.auditMarkerPlacement(hiddenCode, 'TestHidden.tsx');
+  assert.ok(errors.some((e) => e.includes('data-preview field/list/item marker is hidden')));
+});
+
+test('auditCoupledListMarkers detects and rejects coupling parallel list arrays by index', () => {
+  const coupledCode = `
+    <div data-preview-item-path="seasonal.items[0]">
+      <span data-preview-field-path="seasonal.preOrderCta[0].buttonLabel">Pre-Order</span>
+    </div>
+  `;
+  const errors = contract.auditCoupledListMarkers(coupledCode, 'TestCoupled.tsx');
+  assert.ok(errors.some((e) => e.includes('belongs to a different list')));
+});
+
+test('detectedPages without a page file are not invented in the manifest', () => {
+  const dir = copyOf(FIXTURE);
+  silence(() =>
+    runDenebArc(dir, 'basic-store', {
+      telemetry: 'off',
+      detectedPages: [{ id: 'contact', label: 'Contact', route: '/contact', required: true }],
+    })
+  );
+  const { manifest } = auditFivora(dir);
+  assert.ok(!manifest.pages.some((page) => page.id === 'contact' || page.route === '/contact'));
+});
+
+test('learning records contract failure instead of success', () => {
+  const { honestOutcome } = require('../learning.cjs');
+  assert.equal(
+    honestOutcome({ syntaxPassed: true, contractPassed: true, fivoraContractPassed: false }, 'success'),
+    'failure'
+  );
+  assert.equal(
+    honestOutcome({ syntaxPassed: true, contractPassed: true, fivoraContractPassed: true, uncoveredVisibleText: 0 }, 'success'),
+    'success'
+  );
+});
+
+test('residual pass marks leftover decorative copy static with a reason', () => {
+  const { applyResidualPass } = require('../residual.cjs');
+  const code = `export function Chrome() { return <button aria-hidden="true">Close</button>; }`;
+  const result = applyResidualPass({
+    code,
+    file: 'src/components/Chrome.tsx',
+    ownerScope: 'home',
+    usedPaths: new Set(),
+  });
+  assert.equal(result.changed, true);
+  assert.match(result.code, /data-preview-static="[^"]+"/);
+});
+
+test('style-bind grid and card attributes are written onto collection nodes', () => {
+  const dir = copyOf(STOREFRONT_FIXTURE);
+  silence(() => runDenebArc(dir, 'acme-store', { telemetry: 'off' }));
+  const grid = fs.readFileSync(path.join(dir, 'src', 'components', 'ProductGrid.tsx'), 'utf8');
+  assert.match(grid, /data-preview-style-type="grid"/);
+  assert.match(grid, /data-preview-style-type="card"/);
+  assert.match(grid, /data-preview-style-target="home\.products\.grid"/);
+});
+
+test('ContactActions stays mounted when all channels are empty', () => {
+  const sourcePath = path.join(__dirname, '..', '..', '..', '..', '..', 'packages', 'deneb-ui', 'src', 'contact', 'ContactActions.tsx');
+  const source = fs.readFileSync(sourcePath, 'utf8');
+  assert.doesNotMatch(source, /if \(!hasPhone && !hasWhatsApp && !hasEmail\)/);
+  assert.doesNotMatch(source, /return null/);
+});
+
+test('empty-state source audit flags gated preview markers', () => {
+  const errors = contract.auditEmptyStateSource(
+    '{title && <span data-preview-field-path="home.hero.title">{title}</span>}',
+    'Hero.tsx'
+  );
+  assert.ok(errors.some((error) => error.includes('gated behind')));
 });
 
 

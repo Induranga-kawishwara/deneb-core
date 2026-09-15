@@ -34,6 +34,7 @@ function recordExperience({ projectDir, profile, plan, validation, outcome, tele
   if (telemetry && telemetry !== 'off') {
     // Network upload is intentionally unimplemented. Local persistence only.
   }
+  const learningOutcome = honestOutcome(validation, outcome);
   const records = [];
   for (const file of plan.files || []) {
     for (const t of file.transformations || []) {
@@ -51,10 +52,12 @@ function recordExperience({ projectDir, profile, plan, validation, outcome, tele
           typecheckPassed: validation.typecheckPassed,
           buildPassed: validation.buildPassed,
           contractPassed: Boolean(validation.contractPassed),
+          fivoraContractPassed: Boolean(validation.fivoraContractPassed),
+          emptyStatePassed: validation.emptyStatePassed !== false,
           visualPassed: validation.visualPassed,
           idempotencyPassed: validation.idempotencyPassed,
         },
-        outcome,
+        outcome: learningOutcome,
         anonymizedFeatures: {
           tag: t.tag,
           operation: t.operation,
@@ -83,6 +86,20 @@ function recordExperience({ projectDir, profile, plan, validation, outcome, tele
 
   updateFingerprintStats(records);
   return records;
+}
+
+function honestOutcome(validation, outcome) {
+  if (outcome === 'rolled-back') return 'rolled-back';
+  const passed =
+    validation &&
+    validation.syntaxPassed !== false &&
+    validation.contractPassed !== false &&
+    validation.fivoraContractPassed !== false &&
+    validation.emptyStatePassed !== false &&
+    !(validation.uncoveredVisibleText > 0);
+  if (!passed) return 'failure';
+  if (outcome && outcome !== 'success' && outcome !== 'dry-run') return 'failure';
+  return outcome === 'dry-run' ? 'dry-run' : 'success';
 }
 
 function loadFingerprintBoost(fingerprint) {
@@ -236,6 +253,7 @@ module.exports = {
   registryArchitecture,
   redactSecrets,
   promoteState,
+  honestOutcome,
   localStorePath,
   fingerprintStorePath,
   RULE_STATES,
