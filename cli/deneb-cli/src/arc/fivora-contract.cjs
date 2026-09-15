@@ -1,5 +1,8 @@
 'use strict';
 
+const PLATFORM_CONTRACT = require('../platform/platform-contract.json');
+
+
 /**
  * Faithful port of the Fivora strict visual-editing contract rules that the
  * platform ingest pipeline applies (backend/src/common/template-visual-edit-contract.ts).
@@ -64,7 +67,14 @@ function pathsOverlap(left, right) {
   return wildcardPath(left) === wildcardPath(right);
 }
 
+function isPlatformControlled(path) {
+  return (PLATFORM_CONTRACT.platformControlledPaths || []).some((platformPath) =>
+    platformPath.includes('[*]') ? wildcardPath(path) === platformPath : path === platformPath
+  );
+}
+
 function isControlOnly(path, controlOnlyPaths) {
+  if (isPlatformControlled(path)) return true;
   return (controlOnlyPaths || []).some((controlPath) =>
     controlPath.includes('[*]') ? wildcardPath(path) === controlPath : path === controlPath
   );
