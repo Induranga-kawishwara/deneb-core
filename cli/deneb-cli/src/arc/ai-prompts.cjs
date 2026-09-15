@@ -124,6 +124,7 @@ Your task is to create an editable wrapper component for an existing component.
 10. **Use \`'use strict'\` is NOT needed** — this is a .tsx file.
 11. **Do NOT import React hooks** like useState, useEffect, useContext. The component must be stateless.
 12. **Do NOT import useSiteData** — the wrapper component does not need it directly.
+13. **NEVER place data-preview-field-path on <div>, <section>, <article>, or broad containers**. ` + '`data-preview-field-path`' + ` must ONLY be on leaf text/media/control elements (<span>, <p>, <h1>-<h6>, <a>, <button>, EditableText, EditableImage).
 
 ## REFERENCE PATTERN (follow this structure exactly):
 

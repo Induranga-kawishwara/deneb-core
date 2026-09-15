@@ -20,9 +20,17 @@ const BABEL_PLUGIN_SETS = [
   ['jsx'],
 ];
 
-function parseWithBabel(code) {
+function parseWithBabel(code, filePath = 'file.tsx') {
+  const isTs =
+    /\.(tsx|ts|mts|cts)$/i.test(filePath) ||
+    /(?:interface\s+[A-Za-z0-9_$]+|type\s+[A-Za-z0-9_$]+\s*=|:\s*(?:string|number|boolean|any|void|unknown|React\.)|as\s+[A-Za-z0-9_$]+)/.test(code);
+
+  const pluginSets = isTs
+    ? BABEL_PLUGIN_SETS.filter((set) => set.includes('typescript'))
+    : BABEL_PLUGIN_SETS;
+
   let lastError = null;
-  for (const plugins of BABEL_PLUGIN_SETS) {
+  for (const plugins of pluginSets) {
     try {
       return babelParser.parse(code, {
         sourceType: 'unambiguous',
@@ -52,7 +60,7 @@ function parseSource(code, filePath = 'file.tsx') {
     ...options,
     parser: {
       parse(source) {
-        return parseWithBabel(source);
+        return parseWithBabel(source, filePath);
       },
     },
   });

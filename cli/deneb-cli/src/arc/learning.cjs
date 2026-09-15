@@ -199,8 +199,38 @@ function redactSecrets(value) {
     .replace(/-----BEGIN [A-Z ]+PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+PRIVATE KEY-----/g, '***REDACTED KEY***');
 }
 
+function recordEvaluatorFix({ projectDir, issueType, file, action, success = true }) {
+  const record = {
+    engineVersion: ARC_VERSION,
+    type: 'evaluator-fix',
+    timestamp: new Date().toISOString(),
+    issueType,
+    file,
+    action,
+    success: Boolean(success),
+  };
+  try {
+    if (projectDir) {
+      fs.mkdirSync(path.dirname(experiencePath(projectDir)), { recursive: true });
+      const local = loadJsonArray(experiencePath(projectDir));
+      writeJson(experiencePath(projectDir), [...local, record].slice(-400));
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    fs.mkdirSync(path.dirname(localStorePath()), { recursive: true });
+    const global = loadJsonArray(localStorePath());
+    writeJson(localStorePath(), [...global, record].slice(-800));
+  } catch {
+    // ignore
+  }
+  return record;
+}
+
 module.exports = {
   recordExperience,
+  recordEvaluatorFix,
   loadFingerprintBoost,
   registryArchitecture,
   redactSecrets,

@@ -233,8 +233,15 @@ function detectPages(projectDir) {
     }
   }
 
-  const hasContact = pages.some((p) => p.id === 'contact' || p.route === '/contact');
-  if (!hasContact) {
+  const contactExistsOnDisk = candidateDirs.some((cDir) =>
+    fs.existsSync(path.join(cDir, 'contact.tsx')) ||
+    fs.existsSync(path.join(cDir, 'contact.jsx')) ||
+    fs.existsSync(path.join(cDir, 'contact.js')) ||
+    fs.existsSync(path.join(cDir, 'contact', 'page.tsx')) ||
+    fs.existsSync(path.join(cDir, 'contact', 'page.jsx')) ||
+    fs.existsSync(path.join(cDir, 'contact', 'page.js'))
+  );
+  if (contactExistsOnDisk && !pages.some((p) => p.id === 'contact' || p.route === '/contact')) {
     pages.push({ id: 'contact', label: 'Contact', route: '/contact', required: true });
   }
 
@@ -597,7 +604,7 @@ function getComponentRegistry(importPkg) {
   };
 }
 
-function initProject(targetInput, options = {}) {
+async function initProject(targetInput, options = {}) {
   const targetDir = path.resolve(process.cwd(), targetInput || '.');
   const pkgPath = path.join(targetDir, 'package.json');
 
@@ -645,7 +652,7 @@ function initProject(targetInput, options = {}) {
       conversionRes = runUniversalTemplateConversion(targetDir, projectName, detectedPages, options);
     } else {
       const { runDenebArc } = require('../src/arc/index.cjs');
-      conversionRes = runDenebArc(targetDir, projectName, {
+      conversionRes = await runDenebArc(targetDir, projectName, {
         ...options,
         detectedPages,
       });
@@ -1048,7 +1055,10 @@ if (command === 'init') {
       targetInput = arg;
     }
   }
-  initProject(targetInput, { recipeName, dryRun, explain, legacy, telemetry, aiEnabled, aiDryRun });
+  initProject(targetInput, { recipeName, dryRun, explain, legacy, telemetry, aiEnabled, aiDryRun }).catch((err) => {
+    console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
+    process.exit(1);
+  });
 } else if (command === 'create') {
   createTemplate(commandArgs[0]);
 } else if (command === 'add') {

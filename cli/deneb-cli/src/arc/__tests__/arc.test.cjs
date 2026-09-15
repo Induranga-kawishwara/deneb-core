@@ -16,6 +16,8 @@ const { runDenebArc } = require('../index.cjs');
 const { parseSource } = require('../ast.cjs');
 const { loadFingerprintBoost } = require('../learning.cjs');
 const { classifyActionIntent } = require('../adapters.cjs');
+const { validateGeneratedCode } = require('../ai-agent.cjs');
+const { auditRuntimeIntegrity, healRuntimeIntegrity, runAiEvaluatorPipeline } = require('../ai-evaluator.cjs');
 
 test('field-paths recognizes list action CTA keys', () => {
   assert.equal(isListActionCtaKey('preOrderCta'), true);
@@ -873,5 +875,343 @@ export function ActionPage() {
   // Strict Fivora audit passes with 0 errors
   const { errors } = auditFivora(dir);
   assert.deepEqual(errors, []);
+});
+
+test('parseSource parses TypeScript interface declarations without experimental syntax errors', () => {
+  const tsCode = `
+import React from 'react';
+import { EditableText } from './EditableText';
+
+export interface EditableTradeinSectionProps {
+  itemPath: string;
+  title: string;
+}
+
+export function EditableTradeinSection({ itemPath, title }: EditableTradeinSectionProps) {
+  return (
+    <div data-preview-item-path={itemPath}>
+      <EditableText as="h2" id={\`\${itemPath}.title\`} data-preview-field-path={\`\${itemPath}.title\`} defaultValue={title} />
+    </div>
+  );
+}
+`;
+  assert.doesNotThrow(() => {
+    parseSource(tsCode, 'EditableTradeinSection.tsx');
+  });
+});
+
+test('validateGeneratedCode catches data-preview-field-path placed on broad <div> containers', () => {
+  const invalidCode = `
+import React from 'react';
+import { EditableText } from './EditableText';
+
+export interface EditableCardProps {
+  itemPath: string;
+}
+
+export function EditableCard({ itemPath }: EditableCardProps) {
+  return (
+    <div data-preview-item-path={itemPath}>
+      <div data-preview-field-path={\`\${itemPath}.content\`}>Some broad content</div>
+    </div>
+  );
+}
+`;
+  const res = validateGeneratedCode(invalidCode, 'EditableCard.tsx');
+  assert.equal(res.passed, false);
+  assert.ok(res.errors.some((e) => e.includes('cannot be placed on broad <div> content containers')));
+});
+
+test('AST transformer wraps literal text inside <div> with <span> instead of placing field path on <div>', () => {
+  const code = `
+export function Card() {
+  return (
+    <div className="card">
+      <div className="title-row">In-Store VIP Lab</div>
+    </div>
+  );
+}
+`;
+  const profile = {
+    root: os.tmpdir(),
+    framework: 'nextjs',
+    router: 'next-app',
+    language: 'typescript',
+    cssSystems: ['tailwind'],
+    hasSrc: true,
+    aliasMap: { '@/*': ['src/*'] },
+  };
+
+  const analysis = analyzeFile({
+    code,
+    relativeFile: 'src/components/Card.tsx',
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'home',
+    componentMeta: { name: 'Card', role: 'card' },
+  });
+  analysis.code = code;
+  analysis.relativeFile = 'src/components/Card.tsx';
+
+  const plan = planTransformations({ profile, analyses: [analysis] });
+  const res = applyFilePlan(plan.files[0], profile);
+  assert.equal(res.changed, true);
+  // The outer <div> must NOT have data-preview-field-path
+  assert.doesNotMatch(res.code, /<div[^>]*data-preview-field-path/);
+  // The inner text must be wrapped in a <span> with data-preview-field-path
+  assert.match(res.code, /<span[^>]*data-preview-field-path=/);
+});
+
+test('AI Evaluator audits and heals RSC duplicate SiteDataProvider in layout.tsx', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-eval-'));
+  const appDir = path.join(tmp, 'src', 'app');
+  fs.mkdirSync(appDir, { recursive: true });
+
+  const brokenLayout = `
+import { SiteDataProvider } from '@deneb-ui/ui';
+import { Providers } from '@/components/providers';
+import initialSiteData from '@/data/site-data.json';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <Providers>
+          <SiteDataProvider initialSiteData={initialSiteData}>
+            {children}
+          </SiteDataProvider>
+        </Providers>
+      </body>
+    </html>
+  );
+}
+`;
+  fs.writeFileSync(path.join(appDir, 'layout.tsx'), brokenLayout, 'utf8');
+
+  const profile = {
+    root: tmp,
+    framework: 'nextjs',
+    router: 'next-app',
+    appDir: 'src/app',
+    language: 'typescript',
+    jsxFiles: ['src/app/layout.tsx'],
+  };
+
+  const issues = auditRuntimeIntegrity(tmp, profile);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].type, 'rsc-duplicate-provider');
+
+  const healRes = await healRuntimeIntegrity(tmp, profile, issues);
+  assert.equal(healRes.healedCount, 1);
+  assert.equal(healRes.remainingCount, 0);
+
+  const fixed = fs.readFileSync(path.join(appDir, 'layout.tsx'), 'utf8');
+  assert.doesNotMatch(fixed, /<SiteDataProvider/);
+  assert.match(fixed, /<Providers>\s*\{children\}\s*<\/Providers>/);
+
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('AI Evaluator detects missing component exports in page.tsx imports', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-eval-exp-'));
+  const appDir = path.join(tmp, 'src', 'app');
+  const compDir = path.join(tmp, 'src', 'components');
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.mkdirSync(compDir, { recursive: true });
+
+  fs.writeFileSync(
+    path.join(appDir, 'page.tsx'),
+    `import { ProductList, MissingHero } from '@/components/Widgets';\nexport default function Page() { return <div><ProductList /></div>; }`,
+    'utf8'
+  );
+
+  fs.writeFileSync(
+    path.join(compDir, 'Widgets.tsx'),
+    `export function ProductList() { return <div>Products</div>; }`,
+    'utf8'
+  );
+
+  const profile = {
+    root: tmp,
+    framework: 'nextjs',
+    router: 'next-app',
+    appDir: 'src/app',
+    language: 'typescript',
+    jsxFiles: ['src/app/page.tsx', 'src/components/Widgets.tsx'],
+  };
+
+  const issues = auditRuntimeIntegrity(tmp, profile);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].type, 'missing-named-export');
+  assert.equal(issues[0].meta?.componentName, 'MissingHero');
+
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('AI Evaluator runAiEvaluatorPipeline passes on clean valid project', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-eval-clean-'));
+  const appDir = path.join(tmp, 'src', 'app');
+  fs.mkdirSync(appDir, { recursive: true });
+
+  fs.writeFileSync(
+    path.join(appDir, 'layout.tsx'),
+    `import { Providers } from '@/components/providers';\nexport default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body><Providers>{children}</Providers></body></html>; }`,
+    'utf8'
+  );
+
+  const profile = {
+    root: tmp,
+    framework: 'nextjs',
+    router: 'next-app',
+    appDir: 'src/app',
+    language: 'typescript',
+    jsxFiles: ['src/app/layout.tsx'],
+  };
+
+  const res = await runAiEvaluatorPipeline(tmp, profile);
+  assert.equal(res.passed, true);
+  assert.equal(res.issuesFound, 0);
+
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('AI Evaluator audits and heals missing global CSS stylesheet import in layout.tsx', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-eval-css-'));
+  const appDir = path.join(tmp, 'src', 'app');
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.writeFileSync(path.join(appDir, 'globals.css'), '@import "tailwindcss";', 'utf8');
+
+  const unstyledLayout = `
+import { Providers } from '@/components/providers';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return <html><body><Providers>{children}</Providers></body></html>;
+}
+`;
+  fs.writeFileSync(path.join(appDir, 'layout.tsx'), unstyledLayout, 'utf8');
+
+  const profile = {
+    root: tmp,
+    framework: 'nextjs',
+    router: 'next-app',
+    appDir: 'src/app',
+    language: 'typescript',
+    jsxFiles: ['src/app/layout.tsx'],
+  };
+
+  const issues = auditRuntimeIntegrity(tmp, profile);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].type, 'missing-global-css-import');
+
+  const healRes = await healRuntimeIntegrity(tmp, profile, issues);
+  assert.equal(healRes.healedCount, 1);
+
+  const fixed = fs.readFileSync(path.join(appDir, 'layout.tsx'), 'utf8');
+  assert.match(fixed, /import\s+['"]\.\/globals\.css['"]/);
+
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('collections with nested arrays, objects, and TS as const convert to editable list contracts', () => {
+  const code = `
+const phones = [
+  {
+    name: 'iPhone 16 Pro Max',
+    brand: 'Apple',
+    subtitle: 'Grade 5 Titanium' as const,
+    price: 1199,
+    storageOptions: ['256GB', '512GB', '1TB'],
+    colors: [{ name: 'Desert Titanium', hex: '#bba795' }],
+  },
+  {
+    name: 'Galaxy S25 Ultra',
+    brand: 'Samsung',
+    subtitle: 'Armor Titanium' as const,
+    price: 1299,
+    storageOptions: ['256GB', '512GB'],
+    colors: [{ name: 'Titanium Gray', hex: '#5e6166' }],
+  },
+];
+
+export function FeaturedPhones() {
+  return (
+    <div className="phones-grid">
+      {phones.map((phone, idx) => (
+        <div key={phone.name} className="phone-card">
+          <h4>{phone.brand}</h4>
+          <h3>{phone.name}</h3>
+          <p>{phone.subtitle}</p>
+          <span>Rs {phone.price}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+`;
+
+  const profile = { framework: 'nextjs', router: 'next-app', appDir: 'src/app', language: 'typescript' };
+  const analysis = analyzeFile({
+    code,
+    relativeFile: 'src/components/FeaturedPhones.tsx',
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'home',
+    componentMeta: { name: 'FeaturedPhones', role: 'shop' },
+  });
+
+  const collectionCandidate = analysis.candidates.find((c) => c.kind === 'collection');
+  assert.ok(collectionCandidate, 'collection with nested arrays and TS as const must be detected');
+  assert.equal(collectionCandidate.extra.objectItems, true);
+  assert.ok(collectionCandidate.confidence >= 0.8, 'collection must have high confidence');
+
+  const plan = planTransformations({
+    profile,
+    analyses: [analysis],
+  });
+
+  assert.equal(plan.files.length, 1);
+  const collectionTransform = plan.files[0].transformations.find((t) => t.fieldType === 'list');
+  assert.ok(collectionTransform, 'collection must be planned as list field');
+  assert.equal(collectionTransform.listField, 'home.phones');
+  assert.ok(collectionTransform.itemFields.some((f) => f.key === 'name'));
+  assert.ok(collectionTransform.itemFields.some((f) => f.key === 'price'));
+});
+
+test('proceed to order button is recognized as WhatsApp order split-action contract', () => {
+  const code = `
+export function CartDrawer() {
+  return (
+    <div className="cart-footer">
+      <button type="button" className="btn-primary w-full py-4 font-bold">
+        Proceed to Order · RS 1299
+      </button>
+    </div>
+  );
+}
+`;
+
+  const profile = { framework: 'nextjs', router: 'next-app', appDir: 'src/app', language: 'typescript' };
+  const analysis = analyzeFile({
+    code,
+    relativeFile: 'src/components/CartDrawer.tsx',
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'home',
+    componentMeta: { name: 'CartDrawer', role: 'cart' },
+  });
+
+  const actionCandidate = analysis.candidates.find((c) => c.kind === 'split-action-contract');
+  assert.ok(actionCandidate, 'proceed to order must be recognized as split-action-contract');
+  assert.equal(actionCandidate.extra.action, 'whatsapp');
+
+  const plan = planTransformations({
+    profile,
+    analyses: [analysis],
+  });
+
+  const filePlan = plan.files[0];
+  const splitAction = filePlan.transformations.find((t) => t.operation === 'split-action-contract');
+  assert.ok(splitAction, 'split action must be planned');
+  assert.match(splitAction.urlField, /whatsapp/i);
 });
 

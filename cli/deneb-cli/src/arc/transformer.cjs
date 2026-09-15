@@ -24,6 +24,7 @@ const {
   b,
 } = require('./ast.cjs');
 const { toPosix } = require('./fs-utils.cjs');
+const { BROAD_CONTENT_CONTAINERS } = require('./fivora-contract.cjs');
 
 function findElementByLoc(ast, loc) {
   let found = null;
@@ -222,6 +223,11 @@ function applyTransformToElement(pathNode, transform) {
     return;
   }
   if (transform.operation === 'extract-text') {
+    const tagName = getJsxName(node);
+    if (BROAD_CONTENT_CONTAINERS.has(tagName)) {
+      wrapLiteralTextChildren(node, transform.field, transform.fallback);
+      return;
+    }
     ensurePreviewPath(node, transform.field);
     ensureStyleAttrs(node, transform.field, inferButtonKind(transform.tag));
     replaceTextChildren(node, transform.field, transform.fallback, transform.fieldType || 'text');
@@ -851,7 +857,7 @@ function instrumentLayoutSource(code, siteDataImport, providerImport = '@deneb-u
     ensureDefaultImport(ast, siteDataImport, jsonIdent);
   }
 
-  const hasProvider = /SiteDataProvider|DenebDataProvider/.test(code);
+  const hasProvider = /SiteDataProvider|DenebDataProvider|<Providers\b/.test(code);
   let wrapped = hasProvider;
 
   if (!hasProvider) {

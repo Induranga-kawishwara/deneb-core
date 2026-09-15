@@ -202,6 +202,22 @@ function printAiSummary(adapted, skipped, totalTokens) {
   console.log(`\n  ${C.cyan}⚡${C.reset} AI Agent Summary: ${C.green}${adapted} adapted${C.reset}, ${C.yellow}${skipped} skipped${C.reset}, ~${totalTokens.toLocaleString()} tokens used`);
 }
 
+function printAiEvaluatorStart() {
+  console.log(`\n  ${C.cyan}⚡${C.reset} ${C.bold}AI Evaluator:${C.reset} Running pre-flight runtime integrity audit...`);
+}
+
+function printAiEvaluatorPass(message) {
+  console.log(`    ${C.green}✓${C.reset} ${message}`);
+}
+
+function printAiEvaluatorHealed(message) {
+  console.log(`    ${C.cyan}🔧${C.reset} ${C.bold}Auto-healed:${C.reset} ${message}`);
+}
+
+function printAiEvaluatorIssue(message) {
+  console.log(`    ${C.yellow}⚠${C.reset} ${message}`);
+}
+
 module.exports = {
   printBanner,
   printProfile,
@@ -223,6 +239,10 @@ module.exports = {
   printAiSkipped,
   printAiPr,
   printAiSummary,
+  printAiEvaluatorStart,
+  printAiEvaluatorPass,
+  printAiEvaluatorHealed,
+  printAiEvaluatorIssue,
   ok,
   warn,
   info,

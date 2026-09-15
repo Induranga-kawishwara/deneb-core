@@ -49,35 +49,53 @@ function isStaticSkipText(text) {
   return false;
 }
 
+function unwrapTypeCasts(node) {
+  let curr = node;
+  while (
+    curr &&
+    (curr.type === 'TSAsExpression' ||
+      curr.type === 'TSTypeAssertion' ||
+      curr.type === 'TypeCastExpression' ||
+      curr.type === 'TSNonNullExpression')
+  ) {
+    curr = curr.expression;
+  }
+  return curr;
+}
+
 function collectStringBindings(ast) {
   const bindings = new Map();
   recast.types.visit(ast, {
     visitVariableDeclarator(pathNode) {
       const node = pathNode.node;
       if (node.id && node.id.type === 'Identifier' && node.init) {
-        if (node.init.type === 'StringLiteral' || node.init.type === 'Literal' && typeof node.init.value === 'string') {
-          bindings.set(node.id.name, String(node.init.value));
+        const init = unwrapTypeCasts(node.init);
+        if (init.type === 'StringLiteral' || (init.type === 'Literal' && typeof init.value === 'string')) {
+          bindings.set(node.id.name, String(init.value));
         }
-        if (node.init.type === 'ArrayExpression') {
+        if (init.type === 'ArrayExpression') {
           const items = [];
-          let allLiteral = true;
-          for (const el of node.init.elements || []) {
+          for (const el of init.elements || []) {
             if (!el) continue;
-            if (el.type === 'StringLiteral' || (el.type === 'Literal' && typeof el.value === 'string')) {
-              items.push({ type: 'string', value: String(el.value) });
-            } else if (el.type === 'ObjectExpression') {
-              const obj = objectLiteralToPlain(el);
-              if (obj) items.push({ type: 'object', value: obj });
-              else allLiteral = false;
-            } else {
-              allLiteral = false;
+            const inner = unwrapTypeCasts(el);
+            if (inner.type === 'StringLiteral' || (inner.type === 'Literal' && typeof inner.value === 'string')) {
+              items.push({ type: 'string', value: String(inner.value) });
+            } else if (inner.type === 'ObjectExpression') {
+              const obj = objectLiteralToPlain(inner);
+              if (obj && Object.keys(obj).length > 0) {
+                items.push({ type: 'object', value: obj });
+              }
             }
           }
-          if (allLiteral && items.length) bindings.set(node.id.name, { kind: 'array', items });
+          if (items.length > 0) {
+            bindings.set(node.id.name, { kind: 'array', items });
+          }
         }
-        if (node.init.type === 'ObjectExpression') {
-          const obj = objectLiteralToPlain(node.init);
-          if (obj) bindings.set(node.id.name, { kind: 'object', value: obj });
+        if (init.type === 'ObjectExpression') {
+          const obj = objectLiteralToPlain(init);
+          if (obj && Object.keys(obj).length > 0) {
+            bindings.set(node.id.name, { kind: 'object', value: obj });
+          }
         }
       }
       this.traverse(pathNode);
@@ -90,18 +108,57 @@ function objectLiteralToPlain(node) {
   if (!node || node.type !== 'ObjectExpression') return null;
   const out = {};
   for (const prop of node.properties || []) {
-    if (prop.type !== 'ObjectProperty' && prop.type !== 'Property') return null;
+    if (prop.type !== 'ObjectProperty' && prop.type !== 'Property') continue;
     const key = prop.key && (prop.key.name || prop.key.value);
-    if (!key || prop.computed) return null;
-    const val = prop.value;
+    if (!key || prop.computed) continue;
+    const val = unwrapTypeCasts(prop.value);
+    if (!val) continue;
+
     if (val.type === 'StringLiteral' || (val.type === 'Literal' && typeof val.value === 'string')) {
       out[key] = String(val.value);
     } else if (val.type === 'NumericLiteral' || (val.type === 'Literal' && typeof val.value === 'number')) {
       out[key] = val.value;
     } else if (val.type === 'BooleanLiteral' || (val.type === 'Literal' && typeof val.value === 'boolean')) {
       out[key] = val.value;
-    } else {
-      return null;
+    } else if (val.type === 'NullLiteral' || (val.type === 'Literal' && val.value === null)) {
+      out[key] = null;
+    } else if (val.type === 'TemplateLiteral' && (!val.expressions || val.expressions.length === 0)) {
+      out[key] = val.quasis?.map((q) => q.value?.cooked || q.value?.raw || '').join('') || '';
+    } else if (val.type === 'Identifier') {
+      if (/^[A-Z]/.test(val.name)) {
+        // Component references (e.g. icon: Truck, Icon: ShieldCheck) are not merchant content
+        return null;
+      }
+      out[key] = val.name;
+    } else if (val.type === 'UnaryExpression' && val.argument) {
+      if (val.operator === '-' && (val.argument.type === 'NumericLiteral' || typeof val.argument.value === 'number')) {
+        out[key] = -val.argument.value;
+      } else if (val.operator === '!' && (val.argument.type === 'BooleanLiteral' || typeof val.argument.value === 'boolean')) {
+        out[key] = !val.argument.value;
+      }
+    } else if (val.type === 'ArrayExpression') {
+      const arr = [];
+      for (const el of val.elements || []) {
+        if (!el) continue;
+        const inner = unwrapTypeCasts(el);
+        if (!inner) continue;
+        if (inner.type === 'StringLiteral' || (inner.type === 'Literal' && typeof inner.value === 'string')) {
+          arr.push(String(inner.value));
+        } else if (inner.type === 'NumericLiteral' || (inner.type === 'Literal' && typeof inner.value === 'number')) {
+          arr.push(inner.value);
+        } else if (inner.type === 'BooleanLiteral' || (inner.type === 'Literal' && typeof inner.value === 'boolean')) {
+          arr.push(inner.value);
+        } else if (inner.type === 'ObjectExpression') {
+          const nestedObj = objectLiteralToPlain(inner);
+          if (nestedObj) arr.push(nestedObj);
+        } else if (inner.type === 'Identifier') {
+          arr.push(inner.name);
+        }
+      }
+      out[key] = arr;
+    } else if (val.type === 'ObjectExpression') {
+      const nestedObj = objectLiteralToPlain(val);
+      if (nestedObj) out[key] = nestedObj;
     }
   }
   return out;
@@ -262,16 +319,47 @@ function collectItemFieldUsage(callback, itemParam) {
     usage.set(property, role);
   }
 
-  function memberProperty(expr) {
-    if (!expr || expr.type !== 'MemberExpression' || expr.computed) return null;
-    if (expr.object?.type !== 'Identifier' || expr.object.name !== itemParam) return null;
-    return expr.property?.name || null;
+  function findItemMemberProperties(expr) {
+    const props = [];
+    if (!expr) return props;
+    if (expr.type === 'MemberExpression' && !expr.computed) {
+      if (expr.object?.type === 'Identifier' && expr.object.name === itemParam) {
+        if (expr.property?.name) props.push(expr.property.name);
+      } else if (expr.object?.type === 'MemberExpression') {
+        const sub = findItemMemberProperties(expr.object);
+        if (sub.length > 0 && expr.property?.name) {
+          props.push(expr.property.name);
+        }
+      }
+    } else if (expr.type === 'LogicalExpression' || expr.type === 'BinaryExpression') {
+      props.push(...findItemMemberProperties(expr.left));
+      props.push(...findItemMemberProperties(expr.right));
+    } else if (expr.type === 'ConditionalExpression') {
+      props.push(...findItemMemberProperties(expr.test));
+      props.push(...findItemMemberProperties(expr.consequent));
+      props.push(...findItemMemberProperties(expr.alternate));
+    } else if (expr.type === 'TemplateLiteral') {
+      for (const sub of expr.expressions || []) {
+        props.push(...findItemMemberProperties(sub));
+      }
+    }
+    return props;
   }
 
+  let usesItemAsComponent = false;
   recast.types.visit(callback, {
+    visitJSXOpeningElement(pathNode) {
+      const name = pathNode.node.name;
+      if (name?.type === 'JSXMemberExpression') {
+        if (name.object?.type === 'Identifier' && name.object.name === itemParam) {
+          usesItemAsComponent = true;
+        }
+      }
+      this.traverse(pathNode);
+    },
     visitJSXExpressionContainer(pathNode) {
-      const property = memberProperty(pathNode.node.expression);
-      if (property) {
+      const properties = findItemMemberProperties(pathNode.node.expression);
+      for (const property of properties) {
         const parent = pathNode.parent?.node || pathNode.parent?.value;
         if (parent?.type === 'JSXAttribute') {
           const attribute = parent.name?.name;
@@ -290,7 +378,7 @@ function collectItemFieldUsage(callback, itemParam) {
     },
   });
 
-  return usage;
+  return { usage, usesItemAsComponent };
 }
 
 function classNameOf(node) {
@@ -592,13 +680,14 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
         bindings.get(mapInfo.objectName)?.kind === 'array'
       ) {
         const arr = bindings.get(mapInfo.objectName);
-        const itemUsage = collectItemFieldUsage(mapInfo.callback, mapInfo.itemParam);
+        const { usage: itemUsage, usesItemAsComponent } = collectItemFieldUsage(mapInfo.callback, mapInfo.itemParam);
         const objectItems = arr.items.every((item) => item.type === 'object');
         const boundProperties = [...itemUsage.keys()];
         const convertible =
+          !usesItemAsComponent &&
           objectItems &&
           boundProperties.length > 0 &&
-          arr.items.every((item) => boundProperties.every((key) => key in item.value));
+          arr.items.some((item) => boundProperties.some((key) => key in item.value));
 
         candidates.push({
           ...baseMeta,
@@ -612,11 +701,18 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
             indexParam: mapInfo.indexParam,
             itemFields: [...itemUsage.entries()].map(([key, role]) => ({ key, role })),
             objectItems,
+            hasComponentRef: usesItemAsComponent,
           },
           confidence: convertible
             ? confidenceFor('collection', { staticCollection: true })
-            : 0.3,
-          reason: convertible ? 'static-array-map' : 'collection-shape-not-uniform',
+            : usesItemAsComponent
+              ? 0.2
+              : 0.82,
+          reason: usesItemAsComponent
+            ? 'collection-holds-component-ref'
+            : convertible
+              ? 'static-array-map'
+              : 'collection-shape-partial',
           fingerprint: fingerprintCandidate({ tag: name, kind: 'collection', size: arr.items.length }),
         });
       }
