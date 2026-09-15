@@ -1054,6 +1054,7 @@ if (command === 'init') {
     } else if (!arg.startsWith('-')) {
       targetInput = arg;
     }
+  }
   initProject(targetInput, { recipeName, dryRun, explain, legacy, telemetry, aiEnabled, aiDryRun }).catch((err) => {
     console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
     process.exit(1);
