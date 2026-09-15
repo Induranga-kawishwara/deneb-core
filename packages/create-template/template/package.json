@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/merge-platform-contract.js && next build",
     "lint": "eslint",
     "lab": "deneb lab .",
-    "validate": "deneb validate .",
+    "validate": "node scripts/merge-platform-contract.js && deneb validate .",
     "zip": "deneb zip .",
     "validate-and-zip": "deneb validate-and-zip .",
     "package:template": "deneb package .",

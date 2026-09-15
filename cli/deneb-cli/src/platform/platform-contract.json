@@ -1,0 +1,39 @@
+{
+  "_comment": "Platform-managed field paths for Fivora templates. These are written by the Fivora platform (AI agent, site builder) and must NEVER require data-preview-field-path HTML markers. The CLI merges these into every template's controlOnlyPaths automatically — templates do not need to declare them.",
+  "version": 1,
+  "platformControlledPaths": [
+    "__fivoraIntake.tone",
+    "__fivoraIntake.outputLanguage",
+    "__fivoraIntake.businessSummary",
+    "__fivoraIntake.additionalBusinessDetails",
+    "__fivoraIntake.referenceWebsiteUrl",
+    "additionalPages[*].id",
+    "additionalPages[*].route",
+    "common.currency",
+    "common.whatsappNumber",
+    "common.whatsapp",
+    "common.email",
+    "common.address",
+    "common.contactNumber",
+    "common.openingHours",
+    "common.newsletterTitle",
+    "common.newsletterDescription",
+    "contact.contactNumber",
+    "contact.googleMapLink",
+    "contact.whatsapp",
+    "products[*].id",
+    "products[*].isAvailable",
+    "products[*].measurement",
+    "products[*].unit",
+    "testimonials[*].id",
+    "categories[*].slug"
+  ],
+  "platformSiteDataKeys": [
+    "__fivoraIntake",
+    "additionalPages"
+  ],
+  "forbiddenNextConfigKeys": [
+    "outputFileTracingRoot",
+    "experimental.outputFileTracingRoot"
+  ]
+}

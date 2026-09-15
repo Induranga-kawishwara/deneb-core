@@ -5,6 +5,8 @@ const { readJsonSafe, writeJson, deepMerge, isPlainObject } = require('./fs-util
 const { ARC_VERSION, SCHEMA_VERSION } = require('./version.cjs');
 const { collectFontIdsFromSiteData, applyFontTheme } = require('./font-plan.cjs');
 const { humanLabel, classifyFieldType } = require('./field-paths.cjs');
+const PLATFORM_CONTRACT = require('../platform/platform-contract.json');
+
 const {
   enumerateContentPaths,
   canonicalizeMarkerPath,
@@ -294,9 +296,16 @@ function baseContent(projectName, routes) {
  * data-preview-field-path marker or be declared control-only. Control-only is
  * reserved for ids, internal flags, and the unrendered merchant baseline — not
  * as a dump for fields ARC planned but failed to bind.
+ *
+ * PLATFORM_CONTROLLED_PATHS: paths the Fivora AI/platform writes that templates
+ * must never render as inline editable HTML. Loaded from platform-contract.json
+ * so all templates benefit automatically without any template-side declaration.
  */
 const BASELINE_CONTROL_ONLY = /^(common\.(websiteTitle|shortDescription|logoUrl|headerCtaLabel|copyright|navLabels(\.[^.]+)?|business(\.[^.]+)*))$/;
 const SYSTEM_FIELD = /(^|\.)(id|key|slug|internalId|sku|_id)$/i;
+const PLATFORM_CONTROLLED_PATHS = new Set(
+  (PLATFORM_CONTRACT.platformControlledPaths || []).map(wildcardPath)
+);
 
 function slimListItems(items, itemFields) {
   const keys = (itemFields || []).map((field) => field.key).filter(Boolean);
@@ -314,13 +323,24 @@ function slimListItems(items, itemFields) {
 }
 
 function isAllowedControlOnly(path) {
-  return BASELINE_CONTROL_ONLY.test(path) || SYSTEM_FIELD.test(path);
+  return (
+    BASELINE_CONTROL_ONLY.test(path) ||
+    SYSTEM_FIELD.test(path) ||
+    PLATFORM_CONTROLLED_PATHS.has(wildcardPath(path))
+  );
 }
 
 function computeControlOnlyPaths(content, boundPaths, declared = []) {
   const inventory = enumerateContentPaths(content);
   const bound = new Set([...(boundPaths || [])].map(wildcardPath));
   const controlOnly = new Set();
+
+  // Auto-inject all platform-contract paths — templates never need to declare these.
+  // The platform writes them to site-data.json; templates must not render them inline.
+  for (const platformPath of PLATFORM_CONTRACT.platformControlledPaths || []) {
+    const canonical = canonicalizeMarkerPath(platformPath);
+    if (canonical) controlOnly.add(canonical);
+  }
 
   for (const declaredPath of declared) {
     const canonical = canonicalizeMarkerPath(declaredPath);
