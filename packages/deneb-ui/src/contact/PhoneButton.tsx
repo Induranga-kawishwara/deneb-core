@@ -15,7 +15,7 @@ export function PhoneButton({
   variant = 'primary',
   ...rest
 }: PhoneButtonProps) {
-  const number = phoneNumber || value;
+  const number = phoneNumber ?? value;
 
   if (!number && !fieldPath) return null;
 

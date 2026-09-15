@@ -6,6 +6,7 @@ const { parseSource } = require('./ast.cjs');
 const { collectDesignSnapshot } = require('./semantic.cjs');
 const { getDeep } = require('./manifest.cjs');
 const { walkFiles, isJsxFile, rel } = require('./fs-utils.cjs');
+const { enumerateContentPaths, isControlOnly, wildcardPath } = require('./fivora-contract.cjs');
 
 function validateAstFiles(files) {
   const results = [];
@@ -143,18 +144,57 @@ function countOverlap(a, b) {
   return n;
 }
 
-function coverageMetrics({ analyses, plan, appliedCount, skippedDynamic, alreadyEditable }) {
+function coverageMetrics({
+  analyses,
+  plan,
+  appliedCount,
+  skippedDynamic,
+  alreadyEditable,
+  content,
+  controlOnlyPaths,
+  pathCoverage,
+  uncoveredVisibleText,
+}) {
   const detected = analyses.reduce((n, a) => n + (a.candidates || []).filter((c) => c.kind !== 'decoration' && c.kind !== 'already-editable').length, 0);
   const skippedLow = plan.skipped.filter((s) => s.reason === 'low-confidence' || (s.confidence || 0) < 0.6).length;
   const transformed = appliedCount;
-  const coverage = detected === 0 ? 100 : Math.round((transformed / detected) * 1000) / 10;
+  const transformCoverage = detected === 0 ? 100 : Math.round((transformed / detected) * 1000) / 10;
+
+  const inventory = content ? enumerateContentPaths(content) : { concreteFields: new Set() };
+  const fieldMarkers = pathCoverage?.fieldMarkers || new Set();
+  const covers = (markerSet, path) =>
+    markerSet.has(path) || [...markerSet].some((marker) => wildcardPath(marker) === wildcardPath(path));
+
+  let visualRequired = 0;
+  let visualCovered = 0;
+  for (const path of inventory.concreteFields) {
+    if (isControlOnly(path, controlOnlyPaths || [])) continue;
+    visualRequired += 1;
+    if (covers(fieldMarkers, path)) visualCovered += 1;
+  }
+  const uncovered = Array.isArray(uncoveredVisibleText) ? uncoveredVisibleText.length : Number(uncoveredVisibleText) || 0;
+  let visualCoverage = 100;
+  if (visualRequired === 0) {
+    visualCoverage = uncovered === 0 ? 100 : Math.max(0, Math.round((1 / (1 + uncovered)) * 1000) / 10);
+  } else {
+    visualCoverage = Math.round((visualCovered / visualRequired) * 1000) / 10;
+    if (uncovered > 0) {
+      visualCoverage = Math.min(visualCoverage, Math.round((visualCovered / (visualRequired + uncovered)) * 1000) / 10);
+    }
+  }
+
   return {
     detectedEditableCandidates: detected,
     safelyTransformed: transformed,
     alreadyEditable,
     skippedDynamic,
     skippedLowConfidence: skippedLow,
-    editableCoverage: Math.min(100, coverage),
+    transformCoverage: Math.min(100, transformCoverage),
+    visualCovered,
+    visualRequired,
+    uncoveredVisibleText: uncovered,
+    visualCoverage: Math.min(100, visualCoverage),
+    editableCoverage: Math.min(100, visualCoverage),
   };
 }
 

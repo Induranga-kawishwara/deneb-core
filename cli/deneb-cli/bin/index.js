@@ -187,6 +187,18 @@ function detectPages(projectDir) {
               continue;
             }
             if (!foundRoutes.has('/' + routeName)) {
+              const pageFile = ['page.tsx', 'page.jsx', 'page.js']
+                .map((name) => path.join(cDir, routeName, name))
+                .find((file) => fs.existsSync(file));
+              const pagesFile = ['tsx', 'jsx', 'js']
+                .map((ext) => path.join(cDir, `${routeName}.${ext}`))
+                .find((file) => fs.existsSync(file));
+              if (!pageFile && !pagesFile && path.basename(cDir) !== 'pages' && path.basename(cDir) !== 'src') {
+                continue;
+              }
+              if (!pageFile && path.basename(cDir) !== 'pages' && !cDir.endsWith(`${path.sep}pages`)) {
+                continue;
+              }
               foundRoutes.add('/' + routeName);
               const label = routeName
                 .replace(/[-_]/g, ' ')

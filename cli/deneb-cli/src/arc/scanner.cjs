@@ -277,8 +277,50 @@ function scanPagesRouterRoutes(pagesDir, projectDir) {
  * ever declares routes it actually found.
  */
 function keepExportableRoutes(routes) {
-  const exportable = routes.filter((route) => !route.dynamic);
-  return exportable.length ? exportable : routes;
+  const exportable = routes.filter((route) => !route.dynamic && (route.file || route.inferred));
+  return exportable.length ? exportable : routes.filter((route) => route.inferred);
+}
+
+function resolvePageFileOnDisk(projectDir, page) {
+  if (!page) return null;
+  if (page.file && fs.existsSync(path.join(projectDir, page.file))) return page.file.replace(/\\/g, '/');
+  const route = String(page.route || '').replace(/^\//, '').replace(/\/+$/, '');
+  const id = page.id === 'home' ? '' : page.id;
+  const segments = route || id || '';
+  const candidates = [];
+  if (!segments || page.id === 'home' || page.route === '/') {
+    candidates.push(
+      'src/app/page.tsx',
+      'src/app/page.jsx',
+      'src/app/page.js',
+      'app/page.tsx',
+      'app/page.jsx',
+      'app/page.js',
+      'pages/index.tsx',
+      'pages/index.jsx',
+      'pages/index.js',
+      'src/pages/index.tsx',
+      'src/pages/index.jsx',
+      'src/pages/index.js',
+    );
+  }
+  if (segments) {
+    for (const base of ['src/app', 'app']) {
+      for (const name of ['page.tsx', 'page.jsx', 'page.js']) {
+        candidates.push(`${base}/${segments}/${name}`);
+      }
+    }
+    for (const base of ['pages', 'src/pages']) {
+      for (const ext of ['tsx', 'jsx', 'js']) {
+        candidates.push(`${base}/${segments}.${ext}`);
+        candidates.push(`${base}/${segments}/index.${ext}`);
+      }
+    }
+  }
+  for (const relative of candidates) {
+    if (fs.existsSync(path.join(projectDir, relative))) return relative.replace(/\\/g, '/');
+  }
+  return null;
 }
 
 function detectLanguage(sourceFiles) {
@@ -610,4 +652,6 @@ module.exports = {
   resolveImportSpecifier,
   extractImportSpecifiers,
   parseTsconfig,
+  keepExportableRoutes,
+  resolvePageFileOnDisk,
 };

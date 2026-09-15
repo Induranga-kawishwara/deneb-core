@@ -259,9 +259,27 @@ function applyTransformToElement(pathNode, transform) {
     return;
   }
   if (transform.operation === 'style-bind') {
-    if (transform.styleKind === 'grid' || transform.styleKind === 'card') return;
+    if (transform.styleKind === 'grid') {
+      const container = findAncestorJsxElement(pathNode) || node;
+      ensureStyleAttrs(container, transform.stylePath, 'grid');
+      return;
+    }
+    if (transform.styleKind === 'card') {
+      ensureStyleAttrs(node, transform.stylePath, 'card');
+      return;
+    }
     ensureStyleAttrs(node, transform.stylePath, transform.styleKind || 'text');
   }
+}
+
+function findAncestorJsxElement(pathNode) {
+  let current = pathNode.parent;
+  while (current) {
+    const candidate = current.node || current.value;
+    if (candidate?.type === 'JSXElement') return candidate;
+    current = current.parentPath || current.parent;
+  }
+  return null;
 }
 
 function inferButtonKind(tag) {
@@ -339,6 +357,7 @@ function applyCollectionTransform(ast, transform, isClient = false) {
   }
 
   markItemFields(callback, { listPath, binding, indexName });
+  markComponentRefItemsStatic(callback, binding);
 
   const container = findListContainer(mapCall);
   if (container && !hasJsxAttribute(container, 'data-preview-list-path')) {
@@ -355,7 +374,7 @@ function applyCollectionTransform(ast, transform, isClient = false) {
     );
   }
 
-  return bindArrayDeclaration(ast, mapCall, listPath, isClient);
+  return bindArrayDeclaration(ast, mapCall, listPath, isClient, Boolean(transform.hasComponentRef));
 }
 
 function findMapCall(ast, loc) {
@@ -414,11 +433,61 @@ function markItemFields(callback, { listPath, binding, indexName }) {
       );
       if (textChild && !hasJsxAttribute(node, 'data-preview-field-path')) {
         const property = itemMemberName(textChild.expression, binding);
-        node.openingElement.attributes.push(
-          jsxTemplatePathAttr('data-preview-field-path', listPath, indexName, `.${property}`)
-        );
+        const tagName = getJsxName(node);
+        if (BROAD_CONTENT_CONTAINERS.has(tagName) || BROAD_CONTENT_CONTAINERS.has(String(tagName).toLowerCase())) {
+          wrapItemFieldInSpan(node, textChild, listPath, indexName, property);
+        } else {
+          node.openingElement.attributes.push(
+            jsxTemplatePathAttr('data-preview-field-path', listPath, indexName, `.${property}`)
+          );
+        }
       }
 
+      this.traverse(pathNode);
+    },
+  });
+}
+
+function wrapItemFieldInSpan(node, textChild, listPath, indexName, property) {
+  const nextChildren = [];
+  for (const child of node.children || []) {
+    if (child === textChild) {
+      nextChildren.push(
+        b.jsxElement(
+          b.jsxOpeningElement(
+            b.jsxIdentifier('span'),
+            [jsxTemplatePathAttr('data-preview-field-path', listPath, indexName, `.${property}`)],
+            false
+          ),
+          b.jsxClosingElement(b.jsxIdentifier('span')),
+          [child],
+          false
+        )
+      );
+    } else {
+      nextChildren.push(child);
+    }
+  }
+  node.children = nextChildren;
+}
+
+function markComponentRefItemsStatic(callback, binding) {
+  recast.types.visit(callback, {
+    visitJSXElement(pathNode) {
+      const name = pathNode.node.openingElement && pathNode.node.openingElement.name;
+      if (
+        name &&
+        name.type === 'JSXMemberExpression' &&
+        name.object &&
+        (name.object.type === 'Identifier' || name.object.type === 'JSXIdentifier') &&
+        name.object.name === binding
+      ) {
+        if (!hasJsxAttribute(pathNode.node, 'data-preview-static') && !hasJsxAttribute(pathNode.node, 'data-preview-field-path')) {
+          pathNode.node.openingElement.attributes.push(
+            b.jsxAttribute(b.jsxIdentifier('data-preview-static'), b.stringLiteral('component-ref'))
+          );
+        }
+      }
       this.traverse(pathNode);
     },
   });
@@ -474,7 +543,7 @@ function findEnclosingFunction(pathNode) {
   return null;
 }
 
-function bindArrayDeclaration(ast, mapCallPath, listPath, isClient = false) {
+function bindArrayDeclaration(ast, mapCallPath, listPath, isClient = false, mergeDefaultRefs = false) {
   const arrayName = mapCallPath.node.callee.object?.name;
   if (!arrayName) return false;
   let bound = false;
@@ -502,7 +571,9 @@ function bindArrayDeclaration(ast, mapCallPath, listPath, isClient = false) {
             const localDecl = b.variableDeclaration('const', [
               b.variableDeclarator(
                 b.identifier(arrayName),
-                siteDataListBinding(listPath.split('.'), b.identifier(defaultName))
+                mergeDefaultRefs
+                  ? mergeDefaultItemRefsBinding(listPath.split('.'), defaultName)
+                  : siteDataListBinding(listPath.split('.'), b.identifier(defaultName))
               ),
             ]);
             const hookIdx = body.findIndex((stmt) => recast.print(stmt).code.includes('useSiteData'));
@@ -524,6 +595,28 @@ function bindArrayDeclaration(ast, mapCallPath, listPath, isClient = false) {
   });
 
   return bound;
+}
+
+function mergeDefaultItemRefsBinding(pathParts, defaultName) {
+  const listExpr = siteDataListBinding(pathParts, b.identifier(defaultName));
+  return b.callExpression(
+    b.memberExpression(listExpr, b.identifier('map'), false),
+    [
+      b.arrowFunctionExpression(
+        [b.identifier('item'), b.identifier('index')],
+        b.objectExpression([
+          b.spreadElement(
+            b.logicalExpression(
+              '??',
+              b.memberExpression(b.identifier(defaultName), b.identifier('index'), true),
+              b.objectExpression([])
+            )
+          ),
+          b.spreadElement(b.identifier('item')),
+        ])
+      ),
+    ]
+  );
 }
 
 function fileAlreadyUsesSiteDataHook(ast) {
@@ -714,6 +807,9 @@ function applyFilePlan(filePlan, profile) {
 
   // Sanitize any conflicting data-preview-static on elements with editable markers
   sanitizeContradictoryMarkers(ast);
+  healBroadContainerMarkers(ast);
+  healEmptyStateConditionals(ast);
+  healHiddenPreviewMarkers(ast);
 
   // Page keys are stamped in a separate route-driven pass so App Router and
   // Pages Router projects are handled by the same logic.
@@ -998,8 +1094,7 @@ function sanitizeContradictoryMarkers(ast) {
 }
 
 function sanitizeContradictoryMarkersInSource(code, relativeFile) {
-  if (!code.includes('data-preview-static')) return { code, updated: false };
-  if (!code.includes('data-preview-field-path') && !code.includes('data-preview-list-path') && !code.includes('data-preview-item-path')) {
+  if (!code.includes('data-preview-static') && !code.includes('data-preview-field-path')) {
     return { code, updated: false };
   }
   let ast;
@@ -1008,9 +1103,200 @@ function sanitizeContradictoryMarkersInSource(code, relativeFile) {
   } catch {
     return { code, updated: false };
   }
-  const count = sanitizeContradictoryMarkers(ast);
-  if (count === 0) return { code, updated: false };
-  return { code: printSource(ast, code), updated: true, count };
+  const cleaned = sanitizeContradictoryMarkers(ast);
+  const healedBroad = healBroadContainerMarkers(ast);
+  const healedEmpty = healEmptyStateConditionals(ast);
+  const healedHidden = healHiddenPreviewMarkers(ast);
+  if (cleaned === 0 && healedBroad === 0 && healedEmpty === 0 && healedHidden === 0) return { code, updated: false };
+  return { code: printSource(ast, code), updated: true, count: cleaned + healedBroad + healedEmpty + healedHidden };
+}
+
+function healBroadContainerMarkers(ast) {
+  let healed = 0;
+  recast.types.visit(ast, {
+    visitJSXElement(pathNode) {
+      const node = pathNode.node;
+      const tag = getJsxName(node);
+      const lower = String(tag || '').toLowerCase();
+      if (!BROAD_CONTENT_CONTAINERS.has(tag) && !BROAD_CONTENT_CONTAINERS.has(lower)) {
+        this.traverse(pathNode);
+        return;
+      }
+      const fieldAttr = findJsxAttribute(node, 'data-preview-field-path');
+      if (!fieldAttr) {
+        this.traverse(pathNode);
+        return;
+      }
+
+      const fieldValue = fieldAttr.value;
+      node.openingElement.attributes = (node.openingElement.attributes || []).filter(
+        (attr) =>
+          !(
+            attr.type === 'JSXAttribute' &&
+            attr.name &&
+            (attr.name.name === 'data-preview-field-path' ||
+              attr.name.name === 'data-preview-style-target' ||
+              attr.name.name === 'data-preview-style-type')
+          )
+      );
+
+      const leaf = findFirstLeafChild(node);
+      if (leaf && !hasJsxAttribute(leaf, 'data-preview-field-path')) {
+        leaf.openingElement.attributes.push(
+          b.jsxAttribute(b.jsxIdentifier('data-preview-field-path'), fieldValue)
+        );
+        healed++;
+      } else {
+        const span = b.jsxElement(
+          b.jsxOpeningElement(
+            b.jsxIdentifier('span'),
+            [b.jsxAttribute(b.jsxIdentifier('data-preview-field-path'), fieldValue)],
+            false
+          ),
+          b.jsxClosingElement(b.jsxIdentifier('span')),
+          node.children || [],
+          false
+        );
+        node.children = [span];
+        healed++;
+      }
+      this.traverse(pathNode);
+    },
+  });
+  return healed;
+}
+
+function findFirstLeafChild(node) {
+  const leafTags = new Set(['span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'label', 'img', 'button', 'a', 'strong', 'em', 'small']);
+  for (const child of node.children || []) {
+    if (child && child.type === 'JSXElement') {
+      const name = getJsxName(child);
+      if (leafTags.has(name) || leafTags.has(String(name).toLowerCase())) return child;
+      const nested = findFirstLeafChild(child);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+function healEmptyStateConditionals(ast) {
+  let healed = 0;
+
+  function jsxHasPreviewMarker(node) {
+    if (!node) return false;
+    if (node.type === 'JSXElement') {
+      if (
+        hasJsxAttribute(node, 'data-preview-field-path') ||
+        hasJsxAttribute(node, 'data-preview-list-path') ||
+        hasJsxAttribute(node, 'data-preview-item-path')
+      ) {
+        return true;
+      }
+      return (node.children || []).some((child) => jsxHasPreviewMarker(child));
+    }
+    if (node.type === 'JSXFragment') {
+      return (node.children || []).some((child) => jsxHasPreviewMarker(child));
+    }
+    if (node.type === 'ParenthesizedExpression') return jsxHasPreviewMarker(node.expression);
+    return false;
+  }
+
+  recast.types.visit(ast, {
+    visitLogicalExpression(pathNode) {
+      const expr = pathNode.node;
+      if (expr.operator === '&&' && jsxHasPreviewMarker(expr.right)) {
+        pathNode.replace(expr.right);
+        healed++;
+        return false;
+      }
+      this.traverse(pathNode);
+    },
+    visitJSXExpressionContainer(pathNode) {
+      const expr = pathNode.node.expression;
+      if (!expr) {
+        this.traverse(pathNode);
+        return;
+      }
+      if (expr.type === 'LogicalExpression' && expr.operator === '&&' && jsxHasPreviewMarker(expr.right)) {
+        pathNode.node.expression = expr.right;
+        healed++;
+        return false;
+      }
+      if (
+        expr.type === 'ConditionalExpression' &&
+        jsxHasPreviewMarker(expr.consequent) &&
+        (isNullish(expr.alternate) || isNullish(expr.consequent))
+      ) {
+        pathNode.node.expression = jsxHasPreviewMarker(expr.consequent) && !isNullish(expr.consequent)
+          ? expr.consequent
+          : expr.alternate;
+        healed++;
+        return false;
+      }
+      this.traverse(pathNode);
+    },
+  });
+  return healed;
+}
+
+function isNullish(node) {
+  if (!node) return true;
+  if (node.type === 'NullLiteral') return true;
+  if (node.type === 'Literal' && (node.value === null || node.value === false || node.value === undefined)) return true;
+  if (node.type === 'BooleanLiteral' && node.value === false) return true;
+  if (node.type === 'Identifier' && (node.name === 'undefined' || node.name === 'null')) return true;
+  return false;
+}
+
+function healHiddenPreviewMarkers(ast) {
+  let healed = 0;
+  recast.types.visit(ast, {
+    visitJSXOpeningElement(pathNode) {
+      const attrs = pathNode.node.attributes || [];
+      const hasEditable = attrs.some(
+        (attr) =>
+          attr.type === 'JSXAttribute' &&
+          attr.name &&
+          (attr.name.name === 'data-preview-field-path' ||
+            attr.name.name === 'data-preview-list-path' ||
+            attr.name.name === 'data-preview-item-path')
+      );
+      if (!hasEditable) {
+        this.traverse(pathNode);
+        return;
+      }
+      const classAttr = attrs.find((attr) => attr.type === 'JSXAttribute' && attr.name && (attr.name.name === 'className' || attr.name.name === 'class'));
+      let classText = '';
+      if (classAttr && classAttr.value) {
+        if (classAttr.value.type === 'StringLiteral' || classAttr.value.type === 'Literal') classText = String(classAttr.value.value || '');
+        else if (classAttr.value.type === 'JSXExpressionContainer' && classAttr.value.expression) {
+          const expr = classAttr.value.expression;
+          if (expr.type === 'StringLiteral' || expr.type === 'Literal') classText = String(expr.value || '');
+          if (expr.type === 'TemplateLiteral') classText = (expr.quasis || []).map((q) => q.value.cooked || q.value.raw || '').join(' ');
+        }
+      }
+      const hiddenAttr = attrs.some(
+        (attr) => attr.type === 'JSXAttribute' && attr.name && (attr.name.name === 'hidden' || (attr.name.name === 'aria-hidden' && recast.print(attr).code.includes('true')))
+      );
+      if (hiddenAttr || /(^|\s)hidden(\s|$)/.test(classText)) {
+        pathNode.node.attributes = attrs.filter(
+          (attr) =>
+            !(
+              attr.type === 'JSXAttribute' &&
+              attr.name &&
+              (attr.name.name === 'data-preview-field-path' ||
+                attr.name.name === 'data-preview-list-path' ||
+                attr.name.name === 'data-preview-item-path' ||
+                attr.name.name === 'data-preview-style-target' ||
+                attr.name.name === 'data-preview-style-type')
+            )
+        );
+        healed++;
+      }
+      this.traverse(pathNode);
+    },
+  });
+  return healed;
 }
 
 module.exports = {
@@ -1024,4 +1310,7 @@ module.exports = {
   inferPageKey,
   sanitizeContradictoryMarkers,
   sanitizeContradictoryMarkersInSource,
+  healBroadContainerMarkers,
+  healEmptyStateConditionals,
+  healHiddenPreviewMarkers,
 };

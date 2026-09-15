@@ -139,11 +139,7 @@ export function SocialButton({
   ...rest
 }: SocialButtonProps) {
   const derivedFieldPath = fieldPath || `common.business.social.${platform}`;
-  const hasFieldPath = Boolean(fieldPath);
-  const targetUrl = url || href || (hasFieldPath ? '#' : '');
-
-  // Don't render broken button if no valid URL and no fieldPath
-  if (!targetUrl) return null;
+  const targetUrl = url ?? href ?? '#';
 
   const config = PLATFORM_CONFIG[platform] || PLATFORM_CONFIG.x;
   const iconSize = size === 'sm' ? 16 : size === 'lg' ? 22 : 18;

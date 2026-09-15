@@ -8,6 +8,9 @@
  * locally rather than at upload time.
  */
 
+const recast = require('recast');
+const { parseSource, getJsxName, hasJsxAttribute, collectJsxText } = require('./ast.cjs');
+
 const MARKER_ATTRIBUTE_TO_KIND = {
   'data-preview-field-path': 'field',
   'data-preview-list-path': 'list',
@@ -513,8 +516,71 @@ function auditPreviewRuntime(sources) {
 /**
  * Finds meaningful visible JSX text that is neither bound to a field nor marked
  * static. Strict mode treats these as errors in the exported HTML.
+ * Prefers an AST walk so TypeScript generics and nested tags are not misread.
  */
 function findUncoveredVisibleText(code, filePath) {
+  let ast;
+  try {
+    ast = parseSource(code, filePath);
+  } catch {
+    return findUncoveredVisibleTextRegex(code, filePath);
+  }
+
+  const findings = [];
+  recast.types.visit(ast, {
+    visitJSXElement(pathNode) {
+      const node = pathNode.node;
+      const tag = getJsxName(node);
+      const lower = String(tag || '').toLowerCase();
+      if (!tag || lower === 'option' || lower === 'script' || lower === 'style') {
+        this.traverse(pathNode);
+        return;
+      }
+      if (
+        hasJsxAttribute(node, 'data-preview-field-path') ||
+        hasJsxAttribute(node, 'data-preview-static')
+      ) {
+        this.traverse(pathNode);
+        return;
+      }
+      if (ancestorHasStaticMarker(pathNode)) {
+        this.traverse(pathNode);
+        return;
+      }
+      const text = collectJsxText(node);
+      if (isMeaningfulUncoveredText(text)) {
+        findings.push({
+          tag,
+          text,
+          filePath,
+          line: node.loc?.start?.line || 1,
+        });
+      }
+      this.traverse(pathNode);
+    },
+  });
+  return findings;
+}
+
+function ancestorHasStaticMarker(pathNode) {
+  let current = pathNode.parent;
+  while (current) {
+    const node = current.node || current.value;
+    if (node && node.type === 'JSXElement' && hasJsxAttribute(node, 'data-preview-static')) return true;
+    current = current.parentPath || current.parent;
+  }
+  return false;
+}
+
+function isMeaningfulUncoveredText(text) {
+  const value = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!value || value.length <= 2 || !/\p{L}/u.test(value)) return false;
+  if (!/^[\p{L}\p{N}"'(¡¿#$€£]/u.test(value)) return false;
+  if (/^(?:true|false|null|undefined)$/i.test(value)) return false;
+  return true;
+}
+
+function findUncoveredVisibleTextRegex(code, filePath) {
   const findings = [];
   const source = String(code);
   const elementPattern = /<\s*([a-zA-Z][a-zA-Z0-9.:-]*)((?:[^<>{}]|\{[^{}]*\})*?)>([^<>{}]*)</g;
@@ -525,19 +591,170 @@ function findUncoveredVisibleText(code, filePath) {
     const text = (match[3] || '').replace(/\s+/g, ' ').trim();
     const offset = match.index ?? 0;
 
-    // A `<` preceded by an identifier character is a TypeScript generic
-    // (forwardRef<HTMLButtonElement, Props>), never a JSX element.
     if (/[\w$)\]]/.test(source[offset - 1] || '')) continue;
     if (tag.toLowerCase() === 'option') continue;
-    if (!text || text.length <= 2 || !/\p{L}/u.test(text)) continue;
-    if (!/^[\p{L}\p{N}"'(¡¿#$€£]/u.test(text)) continue;
-    if (/^(?:true|false|null|undefined)$/i.test(text)) continue;
+    if (!isMeaningfulUncoveredText(text)) continue;
     if (/\bdata-preview-(?:field-path|static)\b/.test(attrs)) continue;
 
     findings.push({ tag, text, filePath, line: lineNumberAt(source, offset) });
   }
 
   return findings;
+}
+
+function auditEmptyStateSource(code, filePath) {
+  const errors = [];
+  const source = String(code);
+  const andPattern =
+    /\{([^{}]{0,120}?)\s*&&\s*\(?\s*<\s*([a-zA-Z][\w.:-]*)([^>]*data-preview-(?:field-path|list-path|item-path)[^>]*)>/g;
+  for (const match of source.matchAll(andPattern)) {
+    errors.push(
+      `${filePath}:${lineNumberAt(source, match.index ?? 0)} editable marker is gated behind "${String(match[1]).trim()} &&". Keep the target mounted when its value is empty, false, or zero.`
+    );
+  }
+  const ternaryPattern =
+    /\{([^{}]{0,80}?)\s*\?\s*<\s*([a-zA-Z][\w.:-]*)([^>]*data-preview-(?:field-path|list-path|item-path)[^>]*)>[\s\S]{0,200}?\?\s*(?:null|false|undefined)/g;
+  for (const match of source.matchAll(ternaryPattern)) {
+    errors.push(
+      `${filePath}:${lineNumberAt(source, match.index ?? 0)} editable marker unmounts on a falsy ternary. Keep the target mounted when its value is empty.`
+    );
+  }
+  return errors;
+}
+
+function auditSelectOptions(editorSchema, pages = []) {
+  const errors = [];
+  const declaredPageIds = new Set((pages || []).map((page) => page?.id).filter(Boolean));
+
+  function checkSelect(path, options) {
+    if (!Array.isArray(options) || !options.some((option) => typeof option === 'string' && option.trim())) {
+      errors.push(
+        `editorSchema select field "${path}" must declare at least one non-empty option for strict visual editing.`
+      );
+      return;
+    }
+    if (!declaredPageIds.size) return;
+    if (!/(?:destination|action|targetpage|buttonaction|pagekey)/i.test(path)) return;
+    for (const option of options) {
+      const opt = typeof option === 'string' ? option.trim() : '';
+      if (opt && opt !== 'none' && opt !== 'external' && !declaredPageIds.has(opt)) {
+        errors.push(
+          `editorSchema select field "${path}" declares destination option "${opt}" which is not in fivora-template.json pages[].`
+        );
+      }
+    }
+  }
+
+  function walk(path, node) {
+    if (!node) return;
+    if (node.type === 'select') {
+      checkSelect(path, node.options);
+      return;
+    }
+    if (node.type === 'object') {
+      for (const field of node.fields || []) walk(appendPath(path, field.key), field);
+      return;
+    }
+    if (node.type !== 'list') return;
+    const itemPath = `${wildcardPath(path)}[*]`;
+    if (node.itemField?.type === 'select') checkSelect(itemPath, node.itemField.options);
+    for (const field of node.fields || []) walk(appendPath(itemPath, field.key), field);
+  }
+
+  for (const section of editorSchema?.sections || []) walk(section.path, section);
+  return errors;
+}
+
+function auditListBounds(editorSchema, content) {
+  const errors = [];
+
+  function validBound(value) {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+
+  function readValue(path) {
+    let value = content || {};
+    for (const part of String(path).split('.')) {
+      if (!part || !isPlainObject(value)) return undefined;
+      value = value[part];
+    }
+    return value;
+  }
+
+  function walkSchema(path, node) {
+    if (!node) return;
+    if (node.type === 'object') {
+      for (const field of node.fields || []) walkSchema(appendPath(path, field.key), field);
+      return;
+    }
+    if (node.type !== 'list') return;
+    const minItems = validBound(node.minItems);
+    const maxItems = validBound(node.maxItems);
+    if (node.minItems !== undefined && minItems === null) {
+      errors.push(`editorSchema list "${path}" minItems must be a non-negative safe integer.`);
+    }
+    if (node.maxItems !== undefined && maxItems === null) {
+      errors.push(`editorSchema list "${path}" maxItems must be a non-negative safe integer.`);
+    }
+    const effectiveMinimum = minItems ?? (node.required ? 1 : 0);
+    if (maxItems !== null && effectiveMinimum > maxItems) {
+      errors.push(
+        `editorSchema list "${path}" requires at least ${effectiveMinimum} item(s) but maxItems is ${maxItems}.`
+      );
+    }
+    const items = Array.isArray(readValue(path)) ? readValue(path) : [];
+    if (maxItems !== null && items.length > maxItems) {
+      errors.push(
+        `site-data.json content list "${path}" contains ${items.length} items, exceeding editorSchema maxItems ${maxItems}.`
+      );
+    }
+    const itemPath = `${wildcardPath(path)}[*]`;
+    for (const field of node.fields || []) walkSchema(appendPath(itemPath, field.key), field);
+  }
+
+  for (const section of editorSchema?.sections || []) walkSchema(section.path, section);
+  return errors;
+}
+
+function auditStaticMarkerAuthorship(code, filePath) {
+  if (!/\.[cm]?[jt]s$/i.test(filePath) || /\.(tsx|jsx)$/i.test(filePath)) return [];
+  const mutation =
+    /\b(?:setAttribute|setAttributeNS|toggleAttribute)\s*\(\s*['"`]data-preview-static['"`]/.exec(code) ||
+    /\b(?:writeFile|writeFileSync)\s*\([\s\S]{0,200}data-preview-static/.exec(code);
+  if (!mutation) return [];
+  return [
+    `${filePath}:${lineNumberAt(code, mutation.index || 0)} programmatically injects data-preview-static. Author each intentional static annotation directly on the smallest source element.`,
+  ];
+}
+
+function auditRouteOwnedMarkerCoverage({ editorSchema, pages, markers, controlOnlyPaths }) {
+  const errors = [];
+  const pagesById = new Map((pages || []).map((page) => [page.id, page]));
+  const sections = (editorSchema?.sections || [])
+    .map((section) => ({ section, canonicalPath: canonicalizeMarkerPath(section.path) }))
+    .filter((entry) => entry.canonicalPath);
+
+  for (const marker of markers || []) {
+    if (marker.kind === 'page' || marker.kind === 'item') continue;
+    const canonical = canonicalizeMarkerPath(marker.value);
+    if (!canonical) continue;
+    if (marker.kind === 'field' && isControlOnly(canonical, controlOnlyPaths)) continue;
+    const owner = sections
+      .filter((entry) => {
+        const sectionPath = wildcardPath(entry.canonicalPath);
+        const markerPath = wildcardPath(canonical);
+        return markerPath === sectionPath || markerPath.startsWith(`${sectionPath}.`) || markerPath.startsWith(`${sectionPath}[`);
+      })
+      .sort((left, right) => right.canonicalPath.length - left.canonicalPath.length)[0];
+    if (!owner?.section.pageKey) continue;
+    const page = pagesById.get(owner.section.pageKey);
+    if (!page) {
+      errors.push(
+        `editorSchema section "${owner.section.path}" assigns ${marker.kind} "${canonical}" to unknown manifest page "${owner.section.pageKey}".`
+      );
+    }
+  }
+  return errors;
 }
 
 module.exports = {
@@ -553,6 +770,11 @@ module.exports = {
   auditSchemaUniqueness,
   auditPageCoverage,
   auditPreviewRuntime,
+  auditEmptyStateSource,
+  auditSelectOptions,
+  auditListBounds,
+  auditStaticMarkerAuthorship,
+  auditRouteOwnedMarkerCoverage,
   findUncoveredVisibleText,
   canonicalizeMarkerPath,
   wildcardPath,
