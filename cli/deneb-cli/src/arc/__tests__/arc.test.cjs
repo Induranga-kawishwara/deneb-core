@@ -1112,3 +1112,106 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
+test('collections with nested arrays, objects, and TS as const convert to editable list contracts', () => {
+  const code = `
+const phones = [
+  {
+    name: 'iPhone 16 Pro Max',
+    brand: 'Apple',
+    subtitle: 'Grade 5 Titanium' as const,
+    price: 1199,
+    storageOptions: ['256GB', '512GB', '1TB'],
+    colors: [{ name: 'Desert Titanium', hex: '#bba795' }],
+  },
+  {
+    name: 'Galaxy S25 Ultra',
+    brand: 'Samsung',
+    subtitle: 'Armor Titanium' as const,
+    price: 1299,
+    storageOptions: ['256GB', '512GB'],
+    colors: [{ name: 'Titanium Gray', hex: '#5e6166' }],
+  },
+];
+
+export function FeaturedPhones() {
+  return (
+    <div className="phones-grid">
+      {phones.map((phone, idx) => (
+        <div key={phone.name} className="phone-card">
+          <h4>{phone.brand}</h4>
+          <h3>{phone.name}</h3>
+          <p>{phone.subtitle}</p>
+          <span>Rs {phone.price}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+`;
+
+  const profile = { framework: 'nextjs', router: 'next-app', appDir: 'src/app', language: 'typescript' };
+  const analysis = analyzeFile({
+    code,
+    relativeFile: 'src/components/FeaturedPhones.tsx',
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'home',
+    componentMeta: { name: 'FeaturedPhones', role: 'shop' },
+  });
+
+  const collectionCandidate = analysis.candidates.find((c) => c.kind === 'collection');
+  assert.ok(collectionCandidate, 'collection with nested arrays and TS as const must be detected');
+  assert.equal(collectionCandidate.extra.objectItems, true);
+  assert.ok(collectionCandidate.confidence >= 0.8, 'collection must have high confidence');
+
+  const plan = planTransformations({
+    profile,
+    analyses: [analysis],
+  });
+
+  assert.equal(plan.files.length, 1);
+  const collectionTransform = plan.files[0].transformations.find((t) => t.fieldType === 'list');
+  assert.ok(collectionTransform, 'collection must be planned as list field');
+  assert.equal(collectionTransform.listField, 'home.phones');
+  assert.ok(collectionTransform.itemFields.some((f) => f.key === 'name'));
+  assert.ok(collectionTransform.itemFields.some((f) => f.key === 'price'));
+});
+
+test('proceed to order button is recognized as WhatsApp order split-action contract', () => {
+  const code = `
+export function CartDrawer() {
+  return (
+    <div className="cart-footer">
+      <button type="button" className="btn-primary w-full py-4 font-bold">
+        Proceed to Order · RS 1299
+      </button>
+    </div>
+  );
+}
+`;
+
+  const profile = { framework: 'nextjs', router: 'next-app', appDir: 'src/app', language: 'typescript' };
+  const analysis = analyzeFile({
+    code,
+    relativeFile: 'src/components/CartDrawer.tsx',
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'home',
+    componentMeta: { name: 'CartDrawer', role: 'cart' },
+  });
+
+  const actionCandidate = analysis.candidates.find((c) => c.kind === 'split-action-contract');
+  assert.ok(actionCandidate, 'proceed to order must be recognized as split-action-contract');
+  assert.equal(actionCandidate.extra.action, 'whatsapp');
+
+  const plan = planTransformations({
+    profile,
+    analyses: [analysis],
+  });
+
+  const filePlan = plan.files[0];
+  const splitAction = filePlan.transformations.find((t) => t.operation === 'split-action-contract');
+  assert.ok(splitAction, 'split action must be planned');
+  assert.match(splitAction.urlField, /whatsapp/i);
+});
+

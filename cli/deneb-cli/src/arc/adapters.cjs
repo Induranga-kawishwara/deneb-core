@@ -193,7 +193,11 @@ function classifyActionIntent(text, href) {
   const h = String(href || '').trim().toLowerCase();
 
   // 1. WhatsApp
-  if (/wa\.me|whatsapp/i.test(h) || /\b(?:whatsapp|wa\.me)\b/i.test(t) || /order on whatsapp|chat on whatsapp|message on whatsapp/i.test(t)) {
+  if (
+    /wa\.me|whatsapp/i.test(h) ||
+    /\b(?:whatsapp|wa\.me)\b/i.test(t) ||
+    /order on whatsapp|chat on whatsapp|message on whatsapp|whatsapp order|order via whatsapp|proceed to order|proceed to checkout|complete order/i.test(t)
+  ) {
     return {
       action: 'whatsapp',
       defaultUrl: /^https?:\/\//i.test(h) && !h.includes('#') ? href : 'https://wa.me/1234567890',

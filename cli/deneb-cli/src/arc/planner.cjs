@@ -177,8 +177,16 @@ function planTransformations({ profile, analyses, recipe }) {
         }));
         transform.items = candidate.value.map((item) => item.value);
         transform.itemParam = extra.itemParam;
-        transform.indexParam = extra.indexParam;
-        if (!transform.itemFields.length || !extra.objectItems) transform.decision = 'skip';
+        if (!transform.itemFields.length && extra.objectItems && candidate.value?.length > 0) {
+          const sample = candidate.value[0]?.value || {};
+          transform.itemFields = Object.keys(sample)
+            .filter((k) => typeof sample[k] === 'string' || typeof sample[k] === 'number')
+            .map((k) => ({
+              key: k,
+              type: typeof sample[k] === 'number' ? 'number' : /image|photo|avatar/i.test(k) ? 'image' : /url|link/i.test(k) ? 'url' : 'text',
+            }));
+        }
+        if (!transform.itemFields.length || !extra.objectItems || extra.hasComponentRef) transform.decision = 'skip';
       } else {
         transform.field = buildFieldPath({
           scope,
