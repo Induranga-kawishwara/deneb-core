@@ -233,8 +233,15 @@ function detectPages(projectDir) {
     }
   }
 
-  const hasContact = pages.some((p) => p.id === 'contact' || p.route === '/contact');
-  if (!hasContact) {
+  const contactExistsOnDisk = candidateDirs.some((cDir) =>
+    fs.existsSync(path.join(cDir, 'contact.tsx')) ||
+    fs.existsSync(path.join(cDir, 'contact.jsx')) ||
+    fs.existsSync(path.join(cDir, 'contact.js')) ||
+    fs.existsSync(path.join(cDir, 'contact', 'page.tsx')) ||
+    fs.existsSync(path.join(cDir, 'contact', 'page.jsx')) ||
+    fs.existsSync(path.join(cDir, 'contact', 'page.js'))
+  );
+  if (contactExistsOnDisk && !pages.some((p) => p.id === 'contact' || p.route === '/contact')) {
     pages.push({ id: 'contact', label: 'Contact', route: '/contact', required: true });
   }
 

@@ -167,6 +167,12 @@ function validateGeneratedCode(code, filename) {
     errors.push('Missing data-preview-field-path markers — the component has no editable fields.');
   }
 
+  // 2b. data-preview-field-path cannot be placed on broad containers
+  const broadMatch = code.match(/<(div|section|article|aside|header|footer|nav|main|form|ul|ol|table|thead|tbody|tr)\b[^>]*\bdata-preview-field-path\s*=/i);
+  if (broadMatch) {
+    errors.push(`data-preview-field-path cannot be placed on broad <${broadMatch[1]}> content containers. Put the marker on the exact visible text, media, link, or control element (like <span>, <p>, <h1>, <a>, <button>, or <EditableText>).`);
+  }
+
   // 3. Must have data-preview-item-path on the root wrapper
   if (!code.includes('data-preview-item-path')) {
     errors.push('Missing data-preview-item-path on root wrapper element.');
