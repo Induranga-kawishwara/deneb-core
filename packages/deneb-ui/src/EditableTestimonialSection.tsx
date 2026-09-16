@@ -54,8 +54,8 @@ function StarSvg({ filled = true, size = 16 }: { filled?: boolean; size?: number
       style={{
         width: `${size}px`,
         height: `${size}px`,
-        fill: filled ? '#fa7014' : '#dadce0',
-        color: filled ? '#fa7014' : '#dadce0',
+        fill: filled ? '#fbbf24' : '#334155',
+        color: filled ? '#fbbf24' : '#334155',
         flexShrink: 0,
       }}
       aria-hidden="true"
@@ -127,7 +127,7 @@ function TestimonialCard({
   return (
     <div
       data-preview-item-path={`testimonials.testimonials[${index}]`}
-      className={`relative p-5 sm:p-7 lg:p-8 rounded-3xl bg-[#ffffff] border border-[#3d2114]/12 shadow-md hover:shadow-xl transition-all duration-300 flex flex-col justify-between space-y-5 min-w-0 ${cardClassName || ''}`.trim()}
+      className={`relative p-5 sm:p-7 lg:p-8 rounded-2xl bg-gradient-to-b from-slate-900/60 to-slate-950/80 border border-slate-800/80 hover:border-slate-700 shadow-md transition-all duration-300 flex flex-col justify-between space-y-5 min-w-0 ${cardClassName || ''}`.trim()}
     >
       <div className="space-y-4 min-w-0">
         {/* Category Tag & Rating Stars */}
@@ -135,16 +135,15 @@ function TestimonialCard({
           {Boolean(currentItem.tag) && (
             <span
               data-preview-field-path={`testimonials.testimonials[${index}].tag`}
-              className="px-2.5 py-1 rounded-full bg-[#f5ebe1] text-[#84431b] text-[10px] sm:text-[11px] uppercase tracking-wider font-extrabold border border-[#3d2114]/10 shrink-0"
+              className="px-2.5 py-1 rounded-full bg-slate-800/80 text-lime-400 text-[10px] sm:text-[11px] uppercase tracking-wider font-extrabold border border-lime-400/20 shrink-0"
             >
               {tagText}
             </span>
           )}
 
           <div
-            className="inline-flex items-center gap-1.5 p-1 -mr-1 rounded-lg cursor-pointer transition-all hover:bg-[#fa7014]/10 group ml-auto shrink-0"
+            className="inline-flex items-center gap-1.5 p-1 -mr-1 rounded-lg cursor-pointer transition-all hover:bg-amber-400/10 group ml-auto shrink-0"
             onClick={handleFocusRating}
-            title={`Rating: ${currentRating} of ${maxStars} (Click to edit)`}
           >
             <div className="flex items-center gap-[2px]" data-fivora-stars-row="true">
               {Array.from({ length: maxStars }).map((_, sIdx) => (
@@ -155,8 +154,7 @@ function TestimonialCard({
               ref={ratingRef}
               data-preview-field-path={`testimonials.testimonials[${index}].rating`}
               data-fivora-rating-text="true"
-              className="text-xs font-black text-[#fa7014] bg-[#fa7014]/10 px-1.5 py-0.5 rounded-md border border-[#fa7014]/20 group-hover:bg-[#fa7014]/20 transition-colors tabular-nums"
-              title="Star count (1-5)"
+              className="text-xs font-black text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded-md border border-amber-400/20 group-hover:bg-amber-400/20 transition-colors tabular-nums"
             >
               {currentRating}
             </span>
@@ -166,30 +164,30 @@ function TestimonialCard({
         {/* Quote Body */}
         <blockquote
           data-preview-field-path={`testimonials.testimonials[${index}].quote`}
-          className="font-serif-italic text-sm sm:text-base text-[#2b170e] leading-relaxed break-words"
+          className="font-serif-italic text-sm sm:text-base text-slate-300 leading-relaxed break-words"
         >
           &ldquo;{quoteText}&rdquo;
         </blockquote>
       </div>
 
       {/* Author Info */}
-      <div className="pt-4 border-t border-[#3d2114]/10 flex items-center gap-3 min-w-0">
+      <div className="pt-4 border-t border-slate-800/60 flex items-center gap-3 min-w-0">
         <img
           src={authorAvatar}
           alt={authorName}
           data-preview-field-path={`testimonials.testimonials[${index}].avatar`}
-          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-[#3d2114]/15 shadow-sm shrink-0"
+          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-slate-700 shadow-sm shrink-0"
         />
         <div className="min-w-0 flex-1">
           <h4
             data-preview-field-path={`testimonials.testimonials[${index}].author`}
-            className="font-heading font-black text-sm sm:text-base text-[#2b170e] truncate"
+            className="font-heading font-black text-sm sm:text-base text-white truncate"
           >
             {authorName}
           </h4>
           <p
             data-preview-field-path={`testimonials.testimonials[${index}].role`}
-            className="text-xs text-[#786154] font-medium leading-snug line-clamp-2"
+            className="text-xs text-slate-400 font-medium leading-snug line-clamp-2"
           >
             {authorRole}
           </p>
@@ -201,9 +199,9 @@ function TestimonialCard({
 
 export function EditableTestimonialSection({
   basePath = 'testimonials',
-  badge = 'WORDS OF ACCLAIM',
-  heading = 'WHAT THE CRITICS ARE SAYING',
-  subheading = 'Reflections from international cuppers, culinary masters, and dedicated regulars.',
+  badge = 'CRITIC ACCLAIM',
+  heading = 'What Connoisseurs Say',
+  subheading = 'Unfiltered sensory impressions and reviews from sommeliers, culinary critics, and world sensory judges.',
   testimonials = DEFAULT_TESTIMONIALS,
   maxStars = 5,
   className = '',
@@ -241,19 +239,19 @@ export function EditableTestimonialSection({
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto space-y-3 mb-10 sm:mb-14 px-2">
           {badge && (
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#ede0d4] text-[#3d2114] text-xs uppercase tracking-widest font-black border border-[#3d2114]/15">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-lime-400/10 text-lime-400 text-xs uppercase tracking-widest font-black border border-lime-400/20">
               <span data-preview-field-path={`testimonials.badge`}>{badge}</span>
             </div>
           )}
           <h2
             data-preview-field-path={`testimonials.heading`}
-            className="font-heading text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-black text-[#2b170e] tracking-tight"
+            className="font-heading text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight"
           >
             {heading}
           </h2>
           <p
             data-preview-field-path={`testimonials.subheading`}
-            className="text-xs sm:text-base text-[#5c493f] leading-relaxed max-w-2xl mx-auto"
+            className="text-xs sm:text-base text-slate-400 leading-relaxed max-w-2xl mx-auto"
           >
             {subheading}
           </p>
@@ -279,3 +277,5 @@ export function EditableTestimonialSection({
     </section>
   );
 }
+
+export type { TestimonialItem };
