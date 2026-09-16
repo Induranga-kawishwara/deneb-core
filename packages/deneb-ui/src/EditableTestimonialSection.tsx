@@ -237,7 +237,7 @@ export function EditableTestimonialSection({
       style={style}
       {...props}
     >
-      <div className="max-w-[1600px] mx-auto w-full">
+      <div className="w-full mx-auto">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto space-y-3 mb-10 sm:mb-14 px-2">
           {badge && (
