@@ -279,72 +279,124 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
 
     if (!endpoint) return;
 
-    const controller = new AbortController();
+    let stopped = false;
+    let activeController: AbortController | null = null;
+    let retryTimer: number | null = null;
+    let lastSuccessfulFetchAt = 0;
+    const retryDelays = [750, 2_000, 5_000];
 
-    fetch(endpoint, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((live) => {
-        if (!live || !isRecord(live)) return;
+    const applyLiveCatalog = (live: GenericRecord) => {
+      setSiteData((current) => {
+        const currentContent = isRecord(current.content) ? current.content : {};
+        const currentHome = isRecord(currentContent.home) ? currentContent.home : null;
 
-        setSiteData((current) => {
-          const currentContent = isRecord(current.content) ? current.content : {};
-          const currentHome = isRecord(currentContent.home) ? currentContent.home : null;
+        const nextProducts = Array.isArray(live.products)
+          ? live.products
+          : currentContent.products;
+        const nextServices = Array.isArray(live.services)
+          ? live.services
+          : currentContent.services;
 
-          const nextProducts = Array.isArray(live.products)
-            ? live.products
-            : currentContent.products;
-          const nextServices = Array.isArray(live.services)
-            ? live.services
-            : currentContent.services;
-
-          return {
-            ...current,
-            content: {
-              ...currentContent,
-              ...(nextProducts !== undefined ? { products: nextProducts } : {}),
-              ...(nextServices !== undefined ? { services: nextServices } : {}),
-              ...(currentHome
-                ? {
-                    home: {
-                      ...currentHome,
-                      ...(nextProducts !== undefined && 'products' in currentHome
-                        ? { products: nextProducts }
-                        : {}),
-                      ...(nextServices !== undefined && 'services' in currentHome
-                        ? { services: nextServices }
-                        : {}),
-                      ...(nextProducts !== undefined && 'featuredProducts' in currentHome
-                        ? { featuredProducts: nextProducts }
-                        : {}),
-                    },
-                  }
-                : {}),
-            },
-          } as T;
-        });
-
-        // Dynamic theme variable injection for instant color updates
-        if (isRecord(live.theme)) {
-          const rootStyle = document.documentElement.style;
-          if (typeof live.theme.primaryColor === "string") {
-            rootStyle.setProperty("--brand-primary", live.theme.primaryColor);
-          }
-          if (typeof live.theme.secondaryColor === "string") {
-            rootStyle.setProperty("--brand-secondary", live.theme.secondaryColor);
-          }
-          if (typeof live.theme.accentColor === "string") {
-            rootStyle.setProperty("--brand-accent", live.theme.accentColor);
-          }
-        }
-      })
-      .catch(() => {
-        // Gracefully keep pre-rendered static fallback if live API is unreachable
+        return {
+          ...current,
+          content: {
+            ...currentContent,
+            ...(nextProducts !== undefined ? { products: nextProducts } : {}),
+            ...(nextServices !== undefined ? { services: nextServices } : {}),
+            ...(currentHome
+              ? {
+                  home: {
+                    ...currentHome,
+                    ...(nextProducts !== undefined && 'products' in currentHome
+                      ? { products: nextProducts }
+                      : {}),
+                    ...(nextServices !== undefined && 'services' in currentHome
+                      ? { services: nextServices }
+                      : {}),
+                    ...(nextProducts !== undefined && 'featuredProducts' in currentHome
+                      ? { featuredProducts: nextProducts }
+                      : {}),
+                  },
+                }
+              : {}),
+          },
+        } as T;
       });
 
-    return () => controller.abort();
+      // Dynamic theme variable injection for instant color updates
+      if (isRecord(live.theme)) {
+        const rootStyle = document.documentElement.style;
+        if (typeof live.theme.primaryColor === "string") {
+          rootStyle.setProperty("--brand-primary", live.theme.primaryColor);
+        }
+        if (typeof live.theme.secondaryColor === "string") {
+          rootStyle.setProperty("--brand-secondary", live.theme.secondaryColor);
+        }
+        if (typeof live.theme.accentColor === "string") {
+          rootStyle.setProperty("--brand-accent", live.theme.accentColor);
+        }
+      }
+    };
+
+    const loadLiveCatalog = async (attempt = 0) => {
+      if (stopped) return;
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+
+      try {
+        const response = await fetch(endpoint, {
+          signal: controller.signal,
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) {
+          throw new Error(`Live catalog request failed with ${response.status}`);
+        }
+        const live: unknown = await response.json();
+        if (stopped || !isRecord(live)) return;
+        applyLiveCatalog(live);
+        lastSuccessfulFetchAt = Date.now();
+      } catch (error) {
+        if (
+          stopped ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
+          return;
+        }
+        const retryDelay = retryDelays[attempt];
+        if (retryDelay !== undefined) {
+          retryTimer = window.setTimeout(() => {
+            void loadLiveCatalog(attempt + 1);
+          }, retryDelay);
+        }
+      }
+    };
+
+    const refreshIfStale = () => {
+      if (
+        document.visibilityState === "visible" &&
+        Date.now() - lastSuccessfulFetchAt >= 30_000
+      ) {
+        if (retryTimer !== null) window.clearTimeout(retryTimer);
+        retryTimer = null;
+        void loadLiveCatalog();
+      }
+    };
+
+    void loadLiveCatalog();
+    window.addEventListener("focus", refreshIfStale);
+    window.addEventListener("online", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
+
+    return () => {
+      stopped = true;
+      activeController?.abort();
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      window.removeEventListener("focus", refreshIfStale);
+      window.removeEventListener("online", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
+    };
   }, [liveCatalogEndpoint, siteSlug, initialSiteData]);
 
   useEffect(() => {

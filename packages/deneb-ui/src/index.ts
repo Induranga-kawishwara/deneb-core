@@ -15,6 +15,7 @@ export * from './EditableProductCard';
 export * from './EditableProductGrid';
 export * from './EditableProductShowcase';
 export * from './EditableProductDetail';
+export * from './PlatformProductDetail';
 export * from './EditableCustomerReviews';
 export * from './EditableGoogleFeedback';
 export * from './EditableServiceCard';
@@ -121,4 +122,3 @@ export { PlatformAdditionalPages, AdditionalPagesNav } from './PlatformAdditiona
 export const DENEB_FRAMEWORK_NAME = 'DENEB UI';
 export const DENEB_FRAMEWORK_VERSION = '2.0.0';
 export const DENEB_AUTHOR = 'Chamika Gayashan & Induranga Kawishwara';
-

@@ -66,7 +66,12 @@ expectEqual('root template workspace name', rootLock.packages?.['templates/nextj
 
 // Dynamic Validation: Ensure every workspace in package-lock.json actually exists on disk
 for (const packageKey of Object.keys(rootLock.packages || {})) {
-  if (packageKey.startsWith('packages/') || packageKey.startsWith('cli/') || packageKey.startsWith('templates/')) {
+  const isWorkspaceEntry =
+    !packageKey.includes('/node_modules/') &&
+    (packageKey.startsWith('packages/') ||
+      packageKey.startsWith('cli/') ||
+      packageKey.startsWith('templates/'));
+  if (isWorkspaceEntry) {
     const fullPath = path.join(rootDir, packageKey);
     if (!fs.existsSync(fullPath) || !fs.existsSync(path.join(fullPath, 'package.json'))) {
       errors.push(`root lock still contains orphaned workspace ${JSON.stringify(packageKey)} that does not exist on disk`);
