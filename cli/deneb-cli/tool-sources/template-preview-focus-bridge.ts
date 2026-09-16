@@ -2330,7 +2330,95 @@ function fivoraPreviewFocusBridge(
     }
   }
 
-  function clearResolvedEditableTargets() {
+  
+  function updateDynamicStyles(emptyEditablePaths: string[], emptyCollectionPaths: string[]) {
+    // Dynamic styles are safe from hydration as we use classlists here.
+    // Wait, manipulating classList during hydration STILL causes mismatch.
+    // Instead we map by data-preview-field-path.
+    let styleEl = document.getElementById('fivora-dynamic-empty-styles');
+    if (!styleEl) {
+       styleEl = document.createElement('style');
+       styleEl.id = 'fivora-dynamic-empty-styles';
+       document.head.appendChild(styleEl);
+    }
+    
+    const rules: string[] = [];
+    
+    // For dynamically mapped elements that lack data attributes, 
+    // we generate a unique fivora-id and target it.
+    targetRegistry.getDynamicTargets().forEach((el, index) => {
+        const id = 'fivora-target-' + index;
+        if (!el.hasAttribute('data-fivora-id')) el.setAttribute('data-fivora-id', id);
+    });
+
+    const buildSelectors = (paths: string[]) => {
+       const selectors: string[] = [];
+       for (const path of paths) {
+          const escaped = CSS.escape(path);
+          selectors.push(`[data-preview-field-path="${escaped}"]`);
+          selectors.push(`[data-preview-list-path="${escaped}"]`);
+          
+          targetRegistry.findTargets(path).forEach(el => {
+             const fid = el.getAttribute('data-fivora-id');
+             if (fid) selectors.push(`[data-fivora-id="${CSS.escape(fid)}"]`);
+          });
+       }
+       return selectors.length > 0 ? selectors.join(', ') : null;
+    };
+    
+    const editableSelectors = buildSelectors(emptyEditablePaths);
+    if (editableSelectors) {
+       rules.push(`
+         ${editableSelectors} {
+            min-width: 7rem !important;
+            min-height: 1.25em !important;
+            outline: 1px dashed rgba(37, 99, 235, 0.28) !important;
+            outline-offset: 3px !important;
+         }
+         ${editableSelectors.replace(/,/g, ':empty::before,')} :empty::before {
+            content: "";
+            color: rgba(37, 99, 235, 0.78);
+            font: 500 12px/1.4 system-ui, sans-serif;
+            letter-spacing: normal;
+            text-transform: none;
+            white-space: nowrap;
+         }
+         ${editableSelectors.replace(/,/g, ':empty:hover::before,')} :empty:hover::before {
+            content: "Click to add text";
+         }
+       `);
+    }
+
+    const collectionSelectors = buildSelectors(emptyCollectionPaths);
+    if (collectionSelectors) {
+       rules.push(`
+         ${collectionSelectors} {
+            min-width: 10rem !important;
+            min-height: 3.5rem !important;
+            outline: 1px dashed rgba(37, 99, 235, 0.28) !important;
+            outline-offset: 3px !important;
+         }
+         ${collectionSelectors.replace(/,/g, ':empty::before,')} :empty::before {
+            content: "";
+            display: inline-flex;
+            align-items: center;
+            min-height: 3.5rem;
+            color: rgba(37, 99, 235, 0.78);
+            font: 500 12px/1.4 system-ui, sans-serif;
+            letter-spacing: normal;
+            text-transform: none;
+            white-space: nowrap;
+         }
+         ${collectionSelectors.replace(/,/g, ':empty:hover::before,')} :empty:hover::before {
+            content: "Click to add the first item";
+         }
+       `);
+    }
+    
+    styleEl.textContent = rules.join('\n');
+  }
+
+function clearResolvedEditableTargets() {
     document
       .querySelectorAll<HTMLElement>(`[${RESOLVED_PATH_ATTRIBUTE}]`)
       .forEach((element) => {
@@ -2346,7 +2434,7 @@ function fivoraPreviewFocusBridge(
     field: EditableField,
     remember = true,
   ) {
-    const existingPath = element.getAttribute(RESOLVED_PATH_ATTRIBUTE);
+    const existingPath = targetRegistry.getPath(element);
     const authoredPath =
       element.getAttribute('data-preview-field-path') ??
       element.getAttribute(LIST_PATH_ATTRIBUTE) ??
@@ -2650,7 +2738,7 @@ function fivoraPreviewFocusBridge(
       element.getAttribute('data-preview-field-path') ??
       element.getAttribute('data-content-path') ??
       element.getAttribute('data-field-path') ??
-      element.getAttribute(RESOLVED_PATH_ATTRIBUTE);
+      targetRegistry.getPath(element);
     if (explicitPath) {
       const explicitField = editableFields.find((field) =>
         pathVariants(field.path).includes(explicitPath),

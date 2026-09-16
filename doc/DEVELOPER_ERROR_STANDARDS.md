@@ -27,6 +27,7 @@ By following this standard:
 | **`DNB-ARR-003`** | **BLOCKING** | Visual Editing Contract | Empty-State Array Out-of-Range Elements | **Yes** (Array guard pattern) |
 | **`DNB-ACT-004`** | **BLOCKING** | Live Editing Bridge | Action URL vs Visible Text Label Collision | **Yes** (`deneb doctor --fix`) |
 | **`DNB-HID-005`** | **BLOCKING** | Visual Editing Contract | Forbidden Hidden Marker / Regex Collision | **Yes** (`deneb doctor --fix`) |
+| **`DNB-HYD-007`** | **BLOCKING** | React Hydration Contract | Visual Bridge Early DOM Mutation | **Yes** (Automated core upgrade) |
 | **`DNB-STC-006`** | **ADVISORY** | Visual Editing Contract | Broad Layout Container Marked Static | **Yes** (`deneb doctor --fix`) |
 | **`DNB-ANC-001`** | **BLOCKING** | Live Editing Bridge | Static Ancestor Covering Editable Children | **Yes** (`deneb doctor --fix`) |
 | **`DNB-EXP-001`** | **BLOCKING** | Next.js Build | Missing Static Export Configuration | **Yes** (`deneb doctor --fix`) |
@@ -155,6 +156,21 @@ By following this standard:
   - Replace `overflow-hidden` with `overflow-clip` on container cards.
   - Replace responsive `hidden md:block` with `[display:none] md:[display:block]` on elements containing or wrapping preview contracts.
   - Completely eliminate artificial `<span hidden ...>` markers.
+
+---
+
+### `[DNB-HYD-007]` React Hydration Mismatch via Bridge Injection
+
+- **Severity**: `BLOCKING`
+- **Fivora Ingestion Rule**: Fivora visual editing bridges must never inject `data-*` attributes directly into React-managed DOM elements during or before hydration. React 19 strictly compares server-rendered HTML attributes with the client DOM and throws hydration mismatch errors if external scripts pollute elements prematurely.
+- **Error Example**:
+  ```text
+  A tree hydrated but some attributes of the server rendered HTML didn't match the client properties.
+  - data-fivora-resolved-field-path="common.logoUrl"
+  ```
+- **Root Cause**: An outdated version of the local template lab bridge stamped preview annotations directly onto DOM elements.
+- **Automated Fix**: The CLI core and the ARC algorithm automatically enforce the OOP `TargetRegistry` pattern. No developer action is required beyond keeping the `@deneb-ui/cli` up to date.
+- **Code Standard**: All visual editing tracking attributes (e.g., `data-fivora-resolved-field-path`, `data-fivora-empty-editable`) are now maintained purely in memory via `WeakMap` or applied via dynamically injected CSS rules.
 
 ---
 
