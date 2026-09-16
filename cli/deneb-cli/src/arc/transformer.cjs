@@ -1107,8 +1107,7 @@ function injectPlatformAdditionalPages(ast, providerImport) {
           [],
           true
         );
-        const newline = b.jsxText('
-            ');
+        const newline = b.jsxText('\n            ');
         siblings.splice(idx + 1, 0, newline, platformElement);
         ensureImport(ast, providerImport || '@deneb-ui/ui', ['PlatformAdditionalPages']);
         injected = true;
