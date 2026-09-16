@@ -720,6 +720,13 @@ async function initProject(targetInput, options = {}) {
       addedCount++;
     }
   }
+  // Ensure Node 20 LTS platform engine compatibility
+  pkg.overrides = pkg.overrides || {};
+  if (!pkg.overrides['content-type']) {
+    pkg.overrides['content-type'] = '2.1.0';
+    pkg.overrides['@octokit/request'] = { 'content-type': '2.1.0' };
+  }
+
   fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
   if (addedCount > 0) {
     console.log(`\x1b[32m✔ Configured\x1b[0m DENEB scripts in package.json (lab, validate, zip, validate-and-zip, package:template, update:deneb)`);

@@ -1,0 +1,2651 @@
+{
+  "name": "mobile-shop",
+  "label": "mobile-shop",
+  "description": "Learned and saved recipe extracted from mobile-shop.",
+  "savedAt": "2026-09-16T06:46:23.481Z",
+  "signatures": {
+    "keywords": [
+      "mobile-shop",
+      "store",
+      "shop",
+      "product"
+    ],
+    "componentRoles": [
+      "Navbar",
+      "Hero",
+      "ProductGrid",
+      "ProductCard",
+      "Footer"
+    ]
+  },
+  "gridRules": {
+    "cardComponentNames": [
+      "ProductCard",
+      "Card",
+      "ItemCard",
+      "ShoeCard"
+    ],
+    "cardFields": [
+      {
+        "suffix": "Image",
+        "type": "image",
+        "label": "Image"
+      },
+      {
+        "suffix": "Badge",
+        "type": "text",
+        "label": "Badge"
+      },
+      {
+        "suffix": "Category",
+        "type": "text",
+        "label": "Category"
+      },
+      {
+        "suffix": "Name",
+        "type": "text",
+        "label": "Title"
+      },
+      {
+        "suffix": "Price",
+        "type": "text",
+        "label": "Price"
+      }
+    ],
+    "autoIndex": true,
+    "defaultCardPrefix": "product",
+    "withBasePathImages": true,
+    "safeNavigationButtons": true
+  },
+  "productDetailRules": {
+    "enabled": true,
+    "sectionPath": "product",
+    "sampleRoute": "/products/vanta-aero-x",
+    "galleryWithBasePath": true,
+    "noStaticOnEditableAncestors": true
+  },
+  "actionRules": {
+    "splitActionAndLabel": true,
+    "whatsappKeywords": [
+      "whatsapp",
+      "wa.me",
+      "order via whatsapp",
+      "chat on whatsapp"
+    ],
+    "actionFieldMapping": {
+      "whatsapp": {
+        "urlField": "whatsappCtaUrl",
+        "labelField": "whatsappCtaLabel"
+      },
+      "order": {
+        "urlField": "orderCtaUrl",
+        "labelField": "orderCtaLabel"
+      },
+      "promo": {
+        "urlField": "promoCtaUrl",
+        "labelField": "promoCtaLabel"
+      }
+    }
+  },
+  "socialRules": {
+    "platforms": [
+      "instagram",
+      "facebook",
+      "twitter",
+      "tiktok",
+      "youtube",
+      "linkedin"
+    ],
+    "targetPath": "common.footer"
+  },
+  "pages": [
+    {
+      "id": "home",
+      "label": "Home",
+      "route": "/",
+      "required": true
+    }
+  ],
+  "sections": [
+    {
+      "id": "common",
+      "path": "common",
+      "type": "object",
+      "label": "Shared Website Content",
+      "fields": [
+        {
+          "key": "websiteTitle",
+          "type": "text",
+          "label": "Website Title",
+          "required": true
+        },
+        {
+          "key": "shortDescription",
+          "type": "textarea",
+          "label": "Short Description"
+        },
+        {
+          "key": "logoUrl",
+          "type": "image",
+          "label": "Website Logo"
+        },
+        {
+          "key": "headerCtaLabel",
+          "type": "text",
+          "label": "Header Button Label"
+        },
+        {
+          "key": "navLabels",
+          "type": "object",
+          "label": "Navigation Labels",
+          "fields": [
+            {
+              "key": "home",
+              "type": "text",
+              "label": "Home Link"
+            },
+            {
+              "key": "contact",
+              "type": "text",
+              "label": "Contact Link"
+            }
+          ]
+        },
+        {
+          "key": "copyright",
+          "type": "text",
+          "label": "Copyright"
+        },
+        {
+          "key": "footer",
+          "type": "object",
+          "label": "Footer",
+          "fields": [
+            {
+              "key": "auraCellularLabel",
+              "type": "text",
+              "label": "Aura Cellular Label"
+            },
+            {
+              "key": "precisionEngineeringRetailLabel",
+              "type": "text",
+              "label": "Precision Engineering Retail Label"
+            },
+            {
+              "key": "description",
+              "type": "textarea",
+              "label": "Description"
+            },
+            {
+              "key": "certifiedOemLaboratoryLabel",
+              "type": "text",
+              "label": "Certified Oem Laboratory Label"
+            },
+            {
+              "key": "smartphoneShowroomSubheading",
+              "type": "text",
+              "label": "Smartphone Showroom Subheading"
+            },
+            {
+              "key": "iphone16ProProMax",
+              "type": "text",
+              "label": "Iphone16 Pro Pro Max"
+            },
+            {
+              "key": "iphone16ProProMax2",
+              "type": "text",
+              "label": "Iphone16 Pro Pro Max2"
+            },
+            {
+              "key": "samsungGalaxyS25UltraUrl",
+              "type": "text",
+              "label": "Samsung Galaxy S25 Ultra Url"
+            },
+            {
+              "key": "samsungGalaxyS25UltraLabel",
+              "type": "text",
+              "label": "Samsung Galaxy S25 Ultra Label"
+            },
+            {
+              "key": "googlePixel9ProXl",
+              "type": "text",
+              "label": "Google Pixel9 Pro Xl"
+            },
+            {
+              "key": "googlePixel9ProXl2",
+              "type": "text",
+              "label": "Google Pixel9 Pro Xl2"
+            },
+            {
+              "key": "certifiedRefurbishedGradeUrl",
+              "type": "text",
+              "label": "Certified Refurbished Grade Url"
+            },
+            {
+              "key": "certifiedRefurbishedGradeLabel",
+              "type": "text",
+              "label": "Certified Refurbished Grade Label"
+            },
+            {
+              "key": "magsafeKevlarAccessoriesUrl",
+              "type": "text",
+              "label": "Magsafe Kevlar Accessories Url"
+            },
+            {
+              "key": "magsafeKevlarAccessoriesLabel",
+              "type": "text",
+              "label": "Magsafe Kevlar Accessories Label"
+            },
+            {
+              "key": "tradeUpgradesUrl",
+              "type": "text",
+              "label": "Trade Upgrades Url"
+            },
+            {
+              "key": "tradeUpgradesLabel",
+              "type": "text",
+              "label": "Trade Upgrades Label"
+            },
+            {
+              "key": "repairLaboratorySubheading",
+              "type": "text",
+              "label": "Repair Laboratory Subheading"
+            },
+            {
+              "key": "oemScreenOledReplacementUrl",
+              "type": "text",
+              "label": "Oem Screen Oled Replacement Url"
+            },
+            {
+              "key": "oemScreenOledReplacementLabel",
+              "type": "text",
+              "label": "Oem Screen Oled Replacement Label"
+            },
+            {
+              "key": "highDensityBatterySwapsUrl",
+              "type": "text",
+              "label": "High Density Battery Swaps Url"
+            },
+            {
+              "key": "highDensityBatterySwapsLabel",
+              "type": "text",
+              "label": "High Density Battery Swaps Label"
+            },
+            {
+              "key": "usbCMicroSolderingUrl",
+              "type": "text",
+              "label": "Usb C Micro Soldering Url"
+            },
+            {
+              "key": "usbCMicroSolderingLabel",
+              "type": "text",
+              "label": "Usb C Micro Soldering Label"
+            },
+            {
+              "key": "cameraSensorRealignmentUrl",
+              "type": "text",
+              "label": "Camera Sensor Realignment Url"
+            },
+            {
+              "key": "cameraSensorRealignmentLabel",
+              "type": "text",
+              "label": "Camera Sensor Realignment Label"
+            },
+            {
+              "key": "ultrasonicLiquidIngressBathUrl",
+              "type": "text",
+              "label": "Ultrasonic Liquid Ingress Bath Url"
+            },
+            {
+              "key": "ultrasonicLiquidIngressBathLabel",
+              "type": "text",
+              "label": "Ultrasonic Liquid Ingress Bath Label"
+            },
+            {
+              "key": "hardwareDiagnosticToolUrl",
+              "type": "text",
+              "label": "Hardware Diagnostic Tool Url"
+            },
+            {
+              "key": "hardwareDiagnosticToolLabel",
+              "type": "text",
+              "label": "Hardware Diagnostic Tool Label"
+            },
+            {
+              "key": "flagshipLabHoursSubheading",
+              "type": "text",
+              "label": "Flagship Lab Hours Subheading"
+            },
+            {
+              "key": "450LexingtonAvenueSuite1200",
+              "type": "text",
+              "label": "450 Lexington Avenue Suite1200"
+            },
+            {
+              "key": "1800840AuraLabel",
+              "type": "tel",
+              "label": "1800840 Aura Label"
+            },
+            {
+              "key": "conciergeAuraMobileTechLabel",
+              "type": "text",
+              "label": "Concierge Aura Mobile Tech Label"
+            },
+            {
+              "key": "monFri900Am",
+              "type": "text",
+              "label": "Mon Fri900 Am"
+            },
+            {
+              "key": "saturday1000Am7",
+              "type": "text",
+              "label": "Saturday1000 Am7"
+            },
+            {
+              "key": "sunday1100Am5",
+              "type": "text",
+              "label": "Sunday1100 Am5"
+            },
+            {
+              "key": "auraCellularTechnologiesIncAll",
+              "type": "text",
+              "label": "Aura Cellular Technologies Inc All"
+            },
+            {
+              "key": "privacyPolicyUrl",
+              "type": "text",
+              "label": "Privacy Policy Url"
+            },
+            {
+              "key": "privacyPolicyLabel",
+              "type": "text",
+              "label": "Privacy Policy Label"
+            },
+            {
+              "key": "termsServiceUrl",
+              "type": "text",
+              "label": "Terms Service Url"
+            },
+            {
+              "key": "termsServiceLabel",
+              "type": "text",
+              "label": "Terms Service Label"
+            },
+            {
+              "key": "lifetimeWarrantyTermsUrl",
+              "type": "text",
+              "label": "Lifetime Warranty Terms Url"
+            },
+            {
+              "key": "lifetimeWarrantyTermsLabel",
+              "type": "text",
+              "label": "Lifetime Warranty Terms Label"
+            },
+            {
+              "key": "backTopLabel",
+              "type": "text",
+              "label": "Back Top Label"
+            },
+            {
+              "key": "auraCellularLabel2",
+              "type": "text",
+              "label": "Aura Cellular Label2"
+            },
+            {
+              "key": "backTopUrl",
+              "type": "text",
+              "label": "Back Top Url"
+            }
+          ]
+        },
+        {
+          "key": "header",
+          "type": "object",
+          "label": "Header",
+          "fields": [
+            {
+              "key": "auraLabel",
+              "type": "text",
+              "label": "Aura Label"
+            },
+            {
+              "key": "labLabel",
+              "type": "text",
+              "label": "Lab Label"
+            },
+            {
+              "key": "precisionCellularLabel",
+              "type": "text",
+              "label": "Precision Cellular Label"
+            },
+            {
+              "key": "bookRepairLabel",
+              "type": "text",
+              "label": "Book Repair Label"
+            },
+            {
+              "key": "repairLabel",
+              "type": "text",
+              "label": "Repair Label"
+            },
+            {
+              "key": "navigationLabel",
+              "type": "text",
+              "label": "Navigation Label"
+            },
+            {
+              "key": "shoppingBagLabel",
+              "type": "text",
+              "label": "Shopping Bag Label"
+            },
+            {
+              "key": "bookPriorityRepairNowLabel",
+              "type": "text",
+              "label": "Book Priority Repair Now Label"
+            },
+            {
+              "key": "auraPrecisionCellularLabel",
+              "type": "text",
+              "label": "Aura Precision Cellular Label"
+            },
+            {
+              "key": "monSat9am8pmLabel",
+              "type": "text",
+              "label": "Mon Sat9am8pm Label"
+            },
+            {
+              "key": "auraHomeUrl",
+              "type": "text",
+              "label": "Aura Home Url"
+            }
+          ]
+        },
+        {
+          "key": "NAV_ITEMS",
+          "type": "list",
+          "label": "N A V  I T E M S",
+          "itemLabel": "N A V  I T E M S",
+          "minItems": 0,
+          "maxItems": 12,
+          "fields": [
+            {
+              "key": "href",
+              "type": "url",
+              "label": "Href"
+            },
+            {
+              "key": "name",
+              "type": "text",
+              "label": "Name"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "home",
+      "path": "home",
+      "type": "object",
+      "label": "Home Content",
+      "fields": [
+        {
+          "key": "heading",
+          "type": "text",
+          "label": "Heading"
+        },
+        {
+          "key": "subtitle",
+          "type": "text",
+          "label": "Subtitle"
+        },
+        {
+          "key": "yourBagCurrentlyEmptySubheading",
+          "type": "text",
+          "label": "Your Bag Currently Empty Subheading"
+        },
+        {
+          "key": "description",
+          "type": "textarea",
+          "label": "Description"
+        },
+        {
+          "key": "browseFlagshipShowroomLabel",
+          "type": "text",
+          "label": "Browse Flagship Showroom Label"
+        },
+        {
+          "key": "subtotalLabel",
+          "type": "text",
+          "label": "Subtotal Label"
+        },
+        {
+          "key": "rsLabel",
+          "type": "text",
+          "label": "Rs Label"
+        },
+        {
+          "key": "insuredExpressDeliveryLabel",
+          "type": "text",
+          "label": "Insured Express Delivery Label"
+        },
+        {
+          "key": "freeLabel",
+          "type": "text",
+          "label": "Free Label"
+        },
+        {
+          "key": "cleanroom72PointCertificationLabel",
+          "type": "text",
+          "label": "Cleanroom72 Point Certification Label"
+        },
+        {
+          "key": "includedLabel",
+          "type": "text",
+          "label": "Included Label"
+        },
+        {
+          "key": "totalAmountLabel",
+          "type": "text",
+          "label": "Total Amount Label"
+        },
+        {
+          "key": "rsLabel2",
+          "type": "text",
+          "label": "Rs Label2"
+        },
+        {
+          "key": "proceedOrderRsLabel",
+          "type": "text",
+          "label": "Proceed Order Rs Label"
+        },
+        {
+          "key": "subtitle2",
+          "type": "text",
+          "label": "Subtitle2"
+        },
+        {
+          "key": "backBagItemsLabel",
+          "type": "text",
+          "label": "Back Bag Items Label"
+        },
+        {
+          "key": "totalPayableLabel",
+          "type": "text",
+          "label": "Total Payable Label"
+        },
+        {
+          "key": "fullName",
+          "type": "text",
+          "label": "Full Name"
+        },
+        {
+          "key": "eGMarcusVancePlaceholder",
+          "type": "text",
+          "label": "E G Marcus Vance Placeholder"
+        },
+        {
+          "key": "contactPhoneNumber",
+          "type": "text",
+          "label": "Contact Phone Number"
+        },
+        {
+          "key": "15550192834Placeholder",
+          "type": "tel",
+          "label": "15550192834 Placeholder"
+        },
+        {
+          "key": "deliveryStreetAddress",
+          "type": "text",
+          "label": "Delivery Street Address"
+        },
+        {
+          "key": "houseApartmentNumberStreetName",
+          "type": "text",
+          "label": "House Apartment Number Street Name"
+        },
+        {
+          "key": "cityState",
+          "type": "text",
+          "label": "City State"
+        },
+        {
+          "key": "eGNewYorkNy",
+          "type": "text",
+          "label": "E G New York Ny"
+        },
+        {
+          "key": "paymentOption",
+          "type": "text",
+          "label": "Payment Option"
+        },
+        {
+          "key": "cashCardDeliveryLabel",
+          "type": "text",
+          "label": "Cash Card Delivery Label"
+        },
+        {
+          "key": "inspectDeviceBeforePayingLabel",
+          "type": "text",
+          "label": "Inspect Device Before Paying Label"
+        },
+        {
+          "key": "directBankTransferLabel",
+          "type": "text",
+          "label": "Direct Bank Transfer Label"
+        },
+        {
+          "key": "instantInvoiceReceiptLabel",
+          "type": "text",
+          "label": "Instant Invoice Receipt Label"
+        },
+        {
+          "key": "processingOrderLabel",
+          "type": "text",
+          "label": "Processing Order Label"
+        },
+        {
+          "key": "confirmCompleteOrderRsLabel",
+          "type": "text",
+          "label": "Confirm Complete Order Rs Label"
+        },
+        {
+          "key": "100EncryptedAuthenticatedTransactionLabel",
+          "type": "text",
+          "label": "100 Encrypted Authenticated Transaction Label"
+        },
+        {
+          "key": "orderPlacedSuccessfullyLabel",
+          "type": "text",
+          "label": "Order Placed Successfully Label"
+        },
+        {
+          "key": "thankSubheading",
+          "type": "text",
+          "label": "Thank Subheading"
+        },
+        {
+          "key": "subtitle3",
+          "type": "text",
+          "label": "Subtitle3"
+        },
+        {
+          "key": "dispatchWindowLabel",
+          "type": "text",
+          "label": "Dispatch Window Label"
+        },
+        {
+          "key": "within24HoursLabel",
+          "type": "text",
+          "label": "Within24 Hours Label"
+        },
+        {
+          "key": "destinationLabel",
+          "type": "text",
+          "label": "Destination Label"
+        },
+        {
+          "key": "paymentLabel",
+          "type": "text",
+          "label": "Payment Label"
+        },
+        {
+          "key": "orderStatusLabel",
+          "type": "text",
+          "label": "Order Status Label"
+        },
+        {
+          "key": "confirmedReservedLabel",
+          "type": "text",
+          "label": "Confirmed Reserved Label"
+        },
+        {
+          "key": "continueBrowsingLabel",
+          "type": "text",
+          "label": "Continue Browsing Label"
+        },
+        {
+          "key": "hero",
+          "type": "object",
+          "label": "Hero",
+          "fields": [
+            {
+              "key": "flagshipSalesCertifiedPrecisionRepairs",
+              "type": "text",
+              "label": "Flagship Sales Certified Precision Repairs"
+            },
+            {
+              "key": "premiumPhonesLabel",
+              "type": "text",
+              "label": "Premium Phones Label"
+            },
+            {
+              "key": "expertRepairsLabel",
+              "type": "text",
+              "label": "Expert Repairs Label"
+            },
+            {
+              "key": "oneDestinationLabel",
+              "type": "text",
+              "label": "One Destination Label"
+            },
+            {
+              "key": "description",
+              "type": "textarea",
+              "label": "Description"
+            },
+            {
+              "key": "shopPhonesLabel",
+              "type": "text",
+              "label": "Shop Phones Label"
+            },
+            {
+              "key": "bookRepairLabel",
+              "type": "text",
+              "label": "Book Repair Label"
+            },
+            {
+              "key": "oemPartsLabel",
+              "type": "text",
+              "label": "Oem Parts Label"
+            },
+            {
+              "key": "subtitle",
+              "type": "text",
+              "label": "Subtitle"
+            },
+            {
+              "key": "25MinFixLabel",
+              "type": "text",
+              "label": "25 Min Fix Label"
+            },
+            {
+              "key": "subtitle2",
+              "type": "text",
+              "label": "Subtitle2"
+            },
+            {
+              "key": "lifetimeLabel",
+              "type": "text",
+              "label": "Lifetime Label"
+            },
+            {
+              "key": "subtitle3",
+              "type": "text",
+              "label": "Subtitle3"
+            },
+            {
+              "key": "auraLuxuryFlagshipSmartphonesImage",
+              "type": "image",
+              "label": "Aura Luxury Flagship Smartphones Image"
+            },
+            {
+              "key": "imageAlt",
+              "type": "text",
+              "label": "Image Alt"
+            },
+            {
+              "key": "subtitle4",
+              "type": "text",
+              "label": "Subtitle4"
+            },
+            {
+              "key": "subtitle5",
+              "type": "text",
+              "label": "Subtitle5"
+            },
+            {
+              "key": "subtitle6",
+              "type": "text",
+              "label": "Subtitle6"
+            },
+            {
+              "key": "subtitle7",
+              "type": "text",
+              "label": "Subtitle7"
+            },
+            {
+              "key": "limitedShowroomUpgradeBonusLabel",
+              "type": "text",
+              "label": "Limited Showroom Upgrade Bonus Label"
+            },
+            {
+              "key": "heading",
+              "type": "text",
+              "label": "Heading"
+            },
+            {
+              "key": "startsHereLabel",
+              "type": "text",
+              "label": "Starts Here Label"
+            },
+            {
+              "key": "description2",
+              "type": "textarea",
+              "label": "Description2"
+            },
+            {
+              "key": "exploreLatestPhonesLabel",
+              "type": "text",
+              "label": "Explore Latest Phones Label"
+            },
+            {
+              "key": "calculateTradeLabel",
+              "type": "text",
+              "label": "Calculate Trade Label"
+            },
+            {
+              "key": "auraUpgradeBannerPhonesImage",
+              "type": "image",
+              "label": "Aura Upgrade Banner Phones Image"
+            },
+            {
+              "key": "imageAlt2",
+              "type": "text",
+              "label": "Image Alt2"
+            },
+            {
+              "key": "shopPhonesUrl",
+              "type": "text",
+              "label": "Shop Phones Url"
+            },
+            {
+              "key": "exploreLatestPhonesUrl",
+              "type": "text",
+              "label": "Explore Latest Phones Url"
+            },
+            {
+              "key": "calculateTradeUrl",
+              "type": "text",
+              "label": "Calculate Trade Url"
+            }
+          ]
+        },
+        {
+          "key": "about",
+          "type": "object",
+          "label": "About",
+          "fields": [
+            {
+              "key": "certifiedAcrossIndustryLeadingMobile",
+              "type": "text",
+              "label": "Certified Across Industry Leading Mobile"
+            },
+            {
+              "key": "labCertifiedLabel",
+              "type": "text",
+              "label": "Lab Certified Label"
+            }
+          ]
+        },
+        {
+          "key": "BRANDS",
+          "type": "list",
+          "label": "B R A N D S",
+          "itemLabel": "B R A N D S",
+          "minItems": 0,
+          "maxItems": 12,
+          "fields": [
+            {
+              "key": "name",
+              "type": "text",
+              "label": "Name"
+            }
+          ]
+        },
+        {
+          "key": "faq",
+          "type": "object",
+          "label": "Faq",
+          "fields": [
+            {
+              "key": "transparencyAnswersLabel",
+              "type": "text",
+              "label": "Transparency Answers Label"
+            },
+            {
+              "key": "heading",
+              "type": "text",
+              "label": "Heading"
+            },
+            {
+              "key": "description",
+              "type": "textarea",
+              "label": "Description"
+            }
+          ]
+        },
+        {
+          "key": "FAQS",
+          "type": "list",
+          "label": "F A Q S",
+          "itemLabel": "F A Q S",
+          "minItems": 0,
+          "maxItems": 12,
+          "fields": [
+            {
+              "key": "q",
+              "type": "text",
+              "label": "Q"
+            },
+            {
+              "key": "a",
+              "type": "text",
+              "label": "A"
+            }
+          ]
+        },
+        {
+          "key": "phoneSilhouetteImage",
+          "type": "image",
+          "label": "Phone Silhouette Image"
+        },
+        {
+          "key": "imageAlt",
+          "type": "text",
+          "label": "Image Alt"
+        },
+        {
+          "key": "theNextStandardMobileCare",
+          "type": "text",
+          "label": "The Next Standard Mobile Care"
+        },
+        {
+          "key": "heading2",
+          "type": "text",
+          "label": "Heading2"
+        },
+        {
+          "key": "subtitle4",
+          "type": "text",
+          "label": "Subtitle4"
+        },
+        {
+          "key": "description2",
+          "type": "textarea",
+          "label": "Description2"
+        },
+        {
+          "key": "shopPhonesLabel",
+          "type": "text",
+          "label": "Shop Phones Label"
+        },
+        {
+          "key": "bookRepairLabel",
+          "type": "text",
+          "label": "Book Repair Label"
+        },
+        {
+          "key": "lifetimeScreenWarrantyLabel",
+          "type": "text",
+          "label": "Lifetime Screen Warranty Label"
+        },
+        {
+          "key": "noObligationFreeDiagnosticsLabel",
+          "type": "text",
+          "label": "No Obligation Free Diagnostics Label"
+        },
+        {
+          "key": "sameDayTurnaroundLabel",
+          "type": "text",
+          "label": "Same Day Turnaround Label"
+        },
+        {
+          "key": "testimonials",
+          "type": "object",
+          "label": "Testimonials",
+          "fields": [
+            {
+              "key": "clientExperiencesLabel",
+              "type": "text",
+              "label": "Client Experiences Label"
+            },
+            {
+              "key": "heading",
+              "type": "text",
+              "label": "Heading"
+            },
+            {
+              "key": "description",
+              "type": "textarea",
+              "label": "Description"
+            },
+            {
+              "key": "verifiedClientLabel",
+              "type": "text",
+              "label": "Verified Client Label"
+            },
+            {
+              "key": "subtitle",
+              "type": "text",
+              "label": "Subtitle"
+            }
+          ]
+        },
+        {
+          "key": "REVIEWS",
+          "type": "list",
+          "label": "R E V I E W S",
+          "itemLabel": "R E V I E W S",
+          "minItems": 0,
+          "maxItems": 12,
+          "fields": [
+            {
+              "key": "comment",
+              "type": "textarea",
+              "label": "Comment"
+            },
+            {
+              "key": "name",
+              "type": "text",
+              "label": "Name"
+            },
+            {
+              "key": "role",
+              "type": "text",
+              "label": "Role"
+            },
+            {
+              "key": "date",
+              "type": "text",
+              "label": "Date"
+            },
+            {
+              "key": "verifiedService",
+              "type": "text",
+              "label": "Verified Service"
+            }
+          ]
+        },
+        {
+          "key": "uncompromisingIntegrityLabel",
+          "type": "text",
+          "label": "Uncompromising Integrity Label"
+        },
+        {
+          "key": "heading3",
+          "type": "text",
+          "label": "Heading3"
+        },
+        {
+          "key": "description3",
+          "type": "textarea",
+          "label": "Description3"
+        },
+        {
+          "key": "STATS",
+          "type": "list",
+          "label": "S T A T S",
+          "itemLabel": "S T A T S",
+          "minItems": 0,
+          "maxItems": 12,
+          "fields": [
+            {
+              "key": "number",
+              "type": "text",
+              "label": "Number"
+            },
+            {
+              "key": "label",
+              "type": "text",
+              "label": "Label"
+            },
+            {
+              "key": "detail",
+              "type": "text",
+              "label": "Detail"
+            }
+          ]
+        },
+        {
+          "key": "certifiedPrecisionLabLabel",
+          "type": "text",
+          "label": "Certified Precision Lab Label"
+        },
+        {
+          "key": "schedulePriorityRepairSubheading",
+          "type": "text",
+          "label": "Schedule Priority Repair Subheading"
+        },
+        {
+          "key": "subtitle5",
+          "type": "text",
+          "label": "Subtitle5"
+        },
+        {
+          "key": "step1SelectManufacturer",
+          "type": "text",
+          "label": "Step1 Select Manufacturer"
+        },
+        {
+          "key": "selectExactModel",
+          "type": "text",
+          "label": "Select Exact Model"
+        },
+        {
+          "key": "continueDiagnosisLabel",
+          "type": "text",
+          "label": "Continue Diagnosis Label"
+        },
+        {
+          "key": "step2SelectPrimaryIssue",
+          "type": "text",
+          "label": "Step2 Select Primary Issue"
+        },
+        {
+          "key": "estLabel",
+          "type": "text",
+          "label": "Est Label"
+        },
+        {
+          "key": "deliveryPreference",
+          "type": "text",
+          "label": "Delivery Preference"
+        },
+        {
+          "key": "inStoreVipLab",
+          "type": "text",
+          "label": "In Store Vip Lab"
+        },
+        {
+          "key": "30MinExpressWhileWait",
+          "type": "text",
+          "label": "30 Min Express While Wait"
+        },
+        {
+          "key": "insuredCourierBox",
+          "type": "text",
+          "label": "Insured Courier Box"
+        },
+        {
+          "key": "free2WayPriorityLabel",
+          "type": "text",
+          "label": "Free2 Way Priority Label"
+        },
+        {
+          "key": "backLabel",
+          "type": "text",
+          "label": "Back Label"
+        },
+        {
+          "key": "continueDetailsLabel",
+          "type": "text",
+          "label": "Continue Details Label"
+        },
+        {
+          "key": "targetDeviceLabel",
+          "type": "text",
+          "label": "Target Device Label"
+        },
+        {
+          "key": "serviceLabel",
+          "type": "text",
+          "label": "Service Label"
+        },
+        {
+          "key": "fullName2",
+          "type": "text",
+          "label": "Full Name2"
+        },
+        {
+          "key": "eGMarcusVancePlaceholder2",
+          "type": "text",
+          "label": "E G Marcus Vance Placeholder2"
+        },
+        {
+          "key": "phoneNumber",
+          "type": "text",
+          "label": "Phone Number"
+        },
+        {
+          "key": "15550192834Placeholder2",
+          "type": "tel",
+          "label": "15550192834 Placeholder2"
+        },
+        {
+          "key": "emailAddress",
+          "type": "text",
+          "label": "Email Address"
+        },
+        {
+          "key": "marcusAuraTechPlaceholder",
+          "type": "text",
+          "label": "Marcus Aura Tech Placeholder"
+        },
+        {
+          "key": "preferredSlot",
+          "type": "text",
+          "label": "Preferred Slot"
+        },
+        {
+          "key": "devicePasswordNotesOptional",
+          "type": "text",
+          "label": "Device Password Notes Optional"
+        },
+        {
+          "key": "specificDamageNotesTouchUnresponsive",
+          "type": "textarea",
+          "label": "Specific Damage Notes Touch Unresponsive"
+        },
+        {
+          "key": "noUpfrontPaymentRequiredPay",
+          "type": "text",
+          "label": "No Upfront Payment Required Pay"
+        },
+        {
+          "key": "backLabel2",
+          "type": "text",
+          "label": "Back Label2"
+        },
+        {
+          "key": "securingSlotLabel",
+          "type": "text",
+          "label": "Securing Slot Label"
+        },
+        {
+          "key": "confirmPriorityRepairLabel",
+          "type": "text",
+          "label": "Confirm Priority Repair Label"
+        },
+        {
+          "key": "confirmPriorityRepairUrl",
+          "type": "text",
+          "label": "Confirm Priority Repair WhatsApp URL"
+        },
+        {
+          "key": "repairAppointmentConfirmedSubheading",
+          "type": "text",
+          "label": "Repair Appointment Confirmed Subheading"
+        },
+        {
+          "key": "subtitle6",
+          "type": "text",
+          "label": "Subtitle6"
+        },
+        {
+          "key": "aurLabel",
+          "type": "text",
+          "label": "Aur Label"
+        },
+        {
+          "key": "deviceLabel",
+          "type": "text",
+          "label": "Device Label"
+        },
+        {
+          "key": "repairLabel",
+          "type": "text",
+          "label": "Repair Label"
+        },
+        {
+          "key": "slotLabel",
+          "type": "text",
+          "label": "Slot Label"
+        },
+        {
+          "key": "warrantyLabel",
+          "type": "text",
+          "label": "Warranty Label"
+        },
+        {
+          "key": "lifetimeOemCoverageLabel",
+          "type": "text",
+          "label": "Lifetime Oem Coverage Label"
+        },
+        {
+          "key": "backShowroomLabel",
+          "type": "text",
+          "label": "Back Showroom Label"
+        },
+        {
+          "key": "12MonthGuaranteeLabel",
+          "type": "text",
+          "label": "12 Month Guarantee Label"
+        },
+        {
+          "key": "rsLabel3",
+          "type": "text",
+          "label": "Rs Label3"
+        },
+        {
+          "key": "rsLabel4",
+          "type": "text",
+          "label": "Rs Label4"
+        },
+        {
+          "key": "inStockTestedLabel",
+          "type": "text",
+          "label": "In Stock Tested Label"
+        },
+        {
+          "key": "finish",
+          "type": "text",
+          "label": "Finish"
+        },
+        {
+          "key": "capacity",
+          "type": "text",
+          "label": "Capacity"
+        },
+        {
+          "key": "addedOrderLabel",
+          "type": "text",
+          "label": "Added Order Label"
+        },
+        {
+          "key": "secureReservationRsLabel",
+          "type": "text",
+          "label": "Secure Reservation Rs Label"
+        },
+        {
+          "key": "oemCleanroomRestorationLabel",
+          "type": "text",
+          "label": "Oem Cleanroom Restoration Label"
+        },
+        {
+          "key": "heading4",
+          "type": "text",
+          "label": "Heading4"
+        },
+        {
+          "key": "description4",
+          "type": "textarea",
+          "label": "Description4"
+        },
+        {
+          "key": "repairedPristinePhoneImage",
+          "type": "image",
+          "label": "Repaired Pristine Phone Image"
+        },
+        {
+          "key": "imageAlt2",
+          "type": "text",
+          "label": "Image Alt2"
+        },
+        {
+          "key": "factoryRestoredOemLabel",
+          "type": "text",
+          "label": "Factory Restored Oem Label"
+        },
+        {
+          "key": "shatteredDamagedScreenImage",
+          "type": "image",
+          "label": "Shattered Damaged Screen Image"
+        },
+        {
+          "key": "imageAlt3",
+          "type": "text",
+          "label": "Image Alt3"
+        },
+        {
+          "key": "crackedDamagedLabel",
+          "type": "text",
+          "label": "Cracked Damaged Label"
+        },
+        {
+          "key": "dragLeftRightCompare",
+          "type": "text",
+          "label": "Drag Left Right Compare"
+        },
+        {
+          "key": "interactiveSelfDiagnosticLabel",
+          "type": "text",
+          "label": "Interactive Self Diagnostic Label"
+        },
+        {
+          "key": "heading5",
+          "type": "text",
+          "label": "Heading5"
+        },
+        {
+          "key": "description5",
+          "type": "textarea",
+          "label": "Description5"
+        },
+        {
+          "key": "diagnosticAssessmentLabel",
+          "type": "text",
+          "label": "Diagnostic Assessment Label"
+        },
+        {
+          "key": "laboratoryRootCauseLabel",
+          "type": "text",
+          "label": "Laboratory Root Cause Label"
+        },
+        {
+          "key": "turnaroundTimeLabel",
+          "type": "text",
+          "label": "Turnaround Time Label"
+        },
+        {
+          "key": "estRepairRangeLabel",
+          "type": "text",
+          "label": "Est Repair Range Label"
+        },
+        {
+          "key": "includesComplimentaryInteriorUltrasonicCleaning",
+          "type": "textarea",
+          "label": "Includes Complimentary Interior Ultrasonic Cleaning"
+        },
+        {
+          "key": "scheduleFixIssueLabel",
+          "type": "text",
+          "label": "Schedule Fix Issue Label"
+        },
+        {
+          "key": "effortlessRestorationsLabel",
+          "type": "text",
+          "label": "Effortless Restorations Label"
+        },
+        {
+          "key": "heading6",
+          "type": "text",
+          "label": "Heading6"
+        },
+        {
+          "key": "description6",
+          "type": "textarea",
+          "label": "Description6"
+        },
+        {
+          "key": "certifiedLaboratoryPrecisionLabel",
+          "type": "text",
+          "label": "Certified Laboratory Precision Label"
+        },
+        {
+          "key": "heading7",
+          "type": "text",
+          "label": "Heading7"
+        },
+        {
+          "key": "weLlBringItBack",
+          "type": "text",
+          "label": "We Ll Bring It Back"
+        },
+        {
+          "key": "description7",
+          "type": "textarea",
+          "label": "Description7"
+        },
+        {
+          "key": "engineeredPeripheralsLabel",
+          "type": "text",
+          "label": "Engineered Peripherals Label"
+        },
+        {
+          "key": "heading8",
+          "type": "text",
+          "label": "Heading8"
+        },
+        {
+          "key": "description8",
+          "type": "textarea",
+          "label": "Description8"
+        },
+        {
+          "key": "featuredProducts",
+          "type": "object",
+          "label": "Featured Products",
+          "fields": [
+            {
+              "key": "directShowroomVerifiedRefurbishedLabel",
+              "type": "text",
+              "label": "Direct Showroom Verified Refurbished Label"
+            },
+            {
+              "key": "heading",
+              "type": "text",
+              "label": "Heading"
+            },
+            {
+              "key": "description",
+              "type": "textarea",
+              "label": "Description"
+            }
+          ]
+        },
+        {
+          "key": "engineeredMoreTitaniumLab",
+          "type": "text",
+          "label": "Engineered More Titanium Lab"
+        },
+        {
+          "key": "showcaseExcellenceLabel",
+          "type": "text",
+          "label": "Showcase Excellence Label"
+        },
+        {
+          "key": "heading9",
+          "type": "text",
+          "label": "Heading9"
+        },
+        {
+          "key": "description9",
+          "type": "textarea",
+          "label": "Description9"
+        },
+        {
+          "key": "engineeredMoreFlagshipDeviceImage",
+          "type": "image",
+          "label": "Engineered More Flagship Device Image"
+        },
+        {
+          "key": "imageAlt4",
+          "type": "text",
+          "label": "Image Alt4"
+        },
+        {
+          "key": "clickInspectHardwareLabel",
+          "type": "text",
+          "label": "Click Inspect Hardware Label"
+        },
+        {
+          "key": "instantValueCalculatorLabel",
+          "type": "text",
+          "label": "Instant Value Calculator Label"
+        },
+        {
+          "key": "heading10",
+          "type": "text",
+          "label": "Heading10"
+        },
+        {
+          "key": "newPossibilitiesLabel",
+          "type": "text",
+          "label": "New Possibilities Label"
+        },
+        {
+          "key": "description10",
+          "type": "textarea",
+          "label": "Description10"
+        },
+        {
+          "key": "selectCurrentDeviceBrand",
+          "type": "text",
+          "label": "Select Current Device Brand"
+        },
+        {
+          "key": "exactModel",
+          "type": "text",
+          "label": "Exact Model"
+        },
+        {
+          "key": "physicalCondition",
+          "type": "text",
+          "label": "Physical Condition"
+        },
+        {
+          "key": "targetUpgradeGoal",
+          "type": "text",
+          "label": "Target Upgrade Goal"
+        },
+        {
+          "key": "msrpRs",
+          "type": "text",
+          "label": "Msrp Rs"
+        },
+        {
+          "key": "freeDataTransferSecureMilitary",
+          "type": "text",
+          "label": "Free Data Transfer Secure Military"
+        },
+        {
+          "key": "instantValuationLabel",
+          "type": "text",
+          "label": "Instant Valuation Label"
+        },
+        {
+          "key": "guaranteed14DaysLabel",
+          "type": "text",
+          "label": "Guaranteed14 Days Label"
+        },
+        {
+          "key": "estimatedTradeCreditLabel",
+          "type": "text",
+          "label": "Estimated Trade Credit Label"
+        },
+        {
+          "key": "subtitle7",
+          "type": "text",
+          "label": "Subtitle7"
+        },
+        {
+          "key": "targetUpgradeLabel",
+          "type": "text",
+          "label": "Target Upgrade Label"
+        },
+        {
+          "key": "retailPriceLabel",
+          "type": "text",
+          "label": "Retail Price Label"
+        },
+        {
+          "key": "rsLabel5",
+          "type": "text",
+          "label": "Rs Label5"
+        },
+        {
+          "key": "lessTradeCreditLabel",
+          "type": "text",
+          "label": "Less Trade Credit Label"
+        },
+        {
+          "key": "rsLabel6",
+          "type": "text",
+          "label": "Rs Label6"
+        },
+        {
+          "key": "yourNetUpgradeLabel",
+          "type": "text",
+          "label": "Your Net Upgrade Label"
+        },
+        {
+          "key": "rsLabel7",
+          "type": "text",
+          "label": "Rs Label7"
+        },
+        {
+          "key": "estimateLockedPasscodeTrLabel",
+          "type": "text",
+          "label": "Estimate Locked Passcode Tr Label"
+        },
+        {
+          "key": "lockEstimateUpgradeLabel",
+          "type": "text",
+          "label": "Lock Estimate Upgrade Label"
+        },
+        {
+          "key": "description11",
+          "type": "textarea",
+          "label": "Description11"
+        },
+        {
+          "key": "shopPhonesUrl",
+          "type": "text",
+          "label": "Shop Phones Url"
+        },
+        {
+          "key": "whatsappOrderUrl",
+          "type": "url",
+          "label": "WhatsApp Order URL / Account Number",
+          "required": false
+        },
+        {
+          "key": "specPins",
+          "type": "list",
+          "label": "Hardware Specification Pins",
+          "itemLabel": "Spec Pin",
+          "minItems": 0,
+          "maxItems": 10,
+          "fields": [
+            {
+              "key": "title",
+              "type": "text",
+              "label": "Title"
+            },
+            {
+              "key": "tag",
+              "type": "text",
+              "label": "Tag"
+            },
+            {
+              "key": "desc",
+              "type": "textarea",
+              "label": "Description"
+            }
+          ]
+        },
+        {
+          "key": "featuredPhones",
+          "type": "list",
+          "label": "Featured Phones",
+          "itemLabel": "Phone",
+          "minItems": 0,
+          "maxItems": 12,
+          "fields": [
+            {
+              "key": "brand",
+              "type": "text",
+              "label": "Brand"
+            },
+            {
+              "key": "name",
+              "type": "text",
+              "label": "Product Name"
+            },
+            {
+              "key": "subtitle",
+              "type": "text",
+              "label": "Subtitle"
+            },
+            {
+              "key": "badge",
+              "type": "text",
+              "label": "Badge"
+            },
+            {
+              "key": "image",
+              "type": "image",
+              "label": "Product Image"
+            },
+            {
+              "key": "condition",
+              "type": "text",
+              "label": "Condition"
+            },
+            {
+              "key": "price",
+              "type": "number",
+              "label": "Price"
+            }
+          ]
+        },
+        {
+          "key": "repairServices",
+          "type": "list",
+          "label": "Repair Services",
+          "itemLabel": "Service",
+          "minItems": 0,
+          "maxItems": 12,
+          "fields": [
+            {
+              "key": "time",
+              "type": "text",
+              "label": "Duration / Time"
+            },
+            {
+              "key": "title",
+              "type": "text",
+              "label": "Service Title"
+            },
+            {
+              "key": "tagline",
+              "type": "text",
+              "label": "Tagline"
+            },
+            {
+              "key": "desc",
+              "type": "textarea",
+              "label": "Description"
+            },
+            {
+              "key": "price",
+              "type": "number",
+              "label": "Price"
+            }
+          ]
+        },
+        {
+          "key": "repairProcessSteps",
+          "type": "list",
+          "label": "Repair Process Steps",
+          "itemLabel": "Process Step",
+          "minItems": 0,
+          "maxItems": 8,
+          "fields": [
+            {
+              "key": "step",
+              "type": "text",
+              "label": "Step Number"
+            },
+            {
+              "key": "title",
+              "type": "text",
+              "label": "Step Title"
+            },
+            {
+              "key": "desc",
+              "type": "textarea",
+              "label": "Description"
+            },
+            {
+              "key": "time",
+              "type": "text",
+              "label": "Duration"
+            },
+            {
+              "key": "durationLabel",
+              "type": "text",
+              "label": "Duration Label"
+            }
+          ]
+        },
+        {
+          "key": "estimatedCostLabel",
+          "type": "text",
+          "label": "Estimated Cost Label"
+        },
+        {
+          "key": "bookRepairCtaLabel",
+          "type": "text",
+          "label": "Book Repair CTA Label"
+        },
+        {
+          "key": "freeInsuredCourierLabel",
+          "type": "text",
+          "label": "Free Insured Courier Label"
+        },
+        {
+          "key": "orderCtaLabel",
+          "type": "text",
+          "label": "Order CTA Label"
+        },
+        {
+          "key": "whatsappOrderLabel",
+          "type": "text",
+          "label": "Whatsapp Order Label"
+        },
+        {
+          "key": "trustPillars",
+          "type": "list",
+          "label": "Trust Pillars",
+          "itemLabel": "Trust Pillar",
+          "minItems": 0,
+          "maxItems": 8,
+          "fields": [
+            {
+              "key": "title",
+              "type": "text",
+              "label": "Title"
+            },
+            {
+              "key": "desc",
+              "type": "textarea",
+              "label": "Description"
+            }
+          ]
+        },
+        {
+          "key": "diagnosticIssues",
+          "type": "list",
+          "label": "Diagnostic Issues",
+          "itemLabel": "Diagnostic Issue",
+          "minItems": 0,
+          "maxItems": 12,
+          "fields": [
+            {
+              "key": "id",
+              "type": "text",
+              "label": "ID"
+            },
+            {
+              "key": "title",
+              "type": "text",
+              "label": "Issue Title"
+            },
+            {
+              "key": "symptom",
+              "type": "textarea",
+              "label": "Symptom"
+            },
+            {
+              "key": "likelyCause",
+              "type": "textarea",
+              "label": "Likely Cause"
+            },
+            {
+              "key": "estimatedFixTime",
+              "type": "text",
+              "label": "Estimated Fix Time"
+            },
+            {
+              "key": "priceRange",
+              "type": "text",
+              "label": "Price Range"
+            },
+            {
+              "key": "urgency",
+              "type": "text",
+              "label": "Urgency Priority"
+            }
+          ]
+        },
+        {
+          "key": "accessories",
+          "type": "list",
+          "label": "Curated Accessories",
+          "itemLabel": "Accessory",
+          "minItems": 0,
+          "maxItems": 12,
+          "fields": [
+            {
+              "key": "id",
+              "type": "text",
+              "label": "ID"
+            },
+            {
+              "key": "name",
+              "type": "text",
+              "label": "Product Name"
+            },
+            {
+              "key": "subtitle",
+              "type": "text",
+              "label": "Subtitle / Specs"
+            },
+            {
+              "key": "price",
+              "type": "number",
+              "label": "Price"
+            },
+            {
+              "key": "badge",
+              "type": "text",
+              "label": "Badge"
+            },
+            {
+              "key": "image",
+              "type": "image",
+              "label": "Product Image"
+            }
+          ]
+        },
+        {
+          "key": "forYourDeviceLabel",
+          "type": "text",
+          "label": "For Your Device Label"
+        }
+      ],
+      "pageKey": "home"
+    }
+  ],
+  "defaults": {
+    "common": {
+      "websiteTitle": "mobile-shop",
+      "shortDescription": "A high-converting storefront built for the Fivora platform.",
+      "logoUrl": "/fivora-logo.png",
+      "headerCtaLabel": "Contact Us",
+      "copyright": "© 2026 mobile-shop. All rights reserved.",
+      "navLabels": {
+        "home": "Home",
+        "contact": "Contact"
+      },
+      "business": {
+        "phone": "",
+        "whatsapp": "",
+        "email": ""
+      },
+      "footer": {
+        "auraCellularLabel": "AURA CELLULAR",
+        "precisionEngineeringRetailLabel": "Precision Engineering & Retail",
+        "description": "The premier destination for flagship smartphone acquisitions, certified restorations, and cleanroom hardware repairs. Swiss-watch precision applied to modern mobile technology.",
+        "certifiedOemLaboratoryLabel": "Certified OEM Laboratory",
+        "smartphoneShowroomSubheading": "Smartphone Showroom",
+        "iphone16ProProMax": "#shop",
+        "iphone16ProProMax2": "iPhone 16 Pro & Pro Max",
+        "samsungGalaxyS25UltraUrl": "#shop",
+        "samsungGalaxyS25UltraLabel": "Samsung Galaxy S25 Ultra",
+        "googlePixel9ProXl": "#shop",
+        "googlePixel9ProXl2": "Google Pixel 9 Pro XL",
+        "certifiedRefurbishedGradeUrl": "#shop",
+        "certifiedRefurbishedGradeLabel": "Certified Refurbished (Grade A+)",
+        "magsafeKevlarAccessoriesUrl": "#accessories",
+        "magsafeKevlarAccessoriesLabel": "MagSafe Kevlar Accessories",
+        "tradeUpgradesUrl": "#tradein",
+        "tradeUpgradesLabel": "Trade-In & Upgrades",
+        "repairLaboratorySubheading": "Repair Laboratory",
+        "oemScreenOledReplacementUrl": "#repairs",
+        "oemScreenOledReplacementLabel": "OEM Screen & OLED Replacement",
+        "highDensityBatterySwapsUrl": "#repairs",
+        "highDensityBatterySwapsLabel": "High-Density Battery Swaps",
+        "usbCMicroSolderingUrl": "#repairs",
+        "usbCMicroSolderingLabel": "USB-C Micro-Soldering",
+        "cameraSensorRealignmentUrl": "#repairs",
+        "cameraSensorRealignmentLabel": "Camera & Sensor Realignment",
+        "ultrasonicLiquidIngressBathUrl": "#repairs",
+        "ultrasonicLiquidIngressBathLabel": "Ultrasonic Liquid Ingress Bath",
+        "hardwareDiagnosticToolUrl": "#diagnostic",
+        "hardwareDiagnosticToolLabel": "Hardware Diagnostic Tool",
+        "flagshipLabHoursSubheading": "Flagship Lab & Hours",
+        "450LexingtonAvenueSuite1200": "450 Lexington Avenue, Suite 1200, Manhattan, New York",
+        "1800840AuraLabel": "+1 (800) 840-AURA",
+        "conciergeAuraMobileTechLabel": "concierge@aura-mobile.tech",
+        "monFri900Am": "Mon - Fri: 9:00 AM – 8:00 PM",
+        "saturday1000Am7": "Saturday: 10:00 AM – 7:00 PM",
+        "sunday1100Am5": "Sunday: 11:00 AM – 5:00 PM",
+        "auraCellularTechnologiesIncAll": "© AURA Cellular Technologies Inc. All rights reserved.",
+        "privacyPolicyUrl": "#faq",
+        "privacyPolicyLabel": "Privacy Policy",
+        "termsServiceUrl": "#faq",
+        "termsServiceLabel": "Terms of Service",
+        "lifetimeWarrantyTermsUrl": "#faq",
+        "lifetimeWarrantyTermsLabel": "Lifetime Warranty Terms",
+        "backTopLabel": "Back to Top",
+        "auraCellularLabel2": "AURA CELLULAR",
+        "backTopUrl": "#hero"
+      },
+      "header": {
+        "auraLabel": "AURA",
+        "labLabel": "LAB",
+        "precisionCellularLabel": "Precision Cellular",
+        "bookRepairLabel": "Book a Repair",
+        "repairLabel": "Repair",
+        "navigationLabel": "Navigation",
+        "shoppingBagLabel": "Shopping Bag",
+        "bookPriorityRepairNowLabel": "Book Priority Repair Now",
+        "auraPrecisionCellularLabel": "AURA Precision Cellular",
+        "monSat9am8pmLabel": "Mon-Sat: 9AM - 8PM",
+        "auraHomeUrl": "#hero"
+      },
+      "NAV_ITEMS": [
+        {
+          "name": "Home",
+          "href": "#hero"
+        },
+        {
+          "name": "Shop",
+          "href": "#shop"
+        },
+        {
+          "name": "Repairs",
+          "href": "#repairs"
+        },
+        {
+          "name": "Services",
+          "href": "#diagnostic"
+        },
+        {
+          "name": "Trade-In",
+          "href": "#tradein"
+        },
+        {
+          "name": "About",
+          "href": "#about"
+        },
+        {
+          "name": "Contact",
+          "href": "#contact"
+        }
+      ]
+    },
+    "home": {
+      "confirmPriorityRepairLabel": "Confirm Priority Repair",
+      "confirmPriorityRepairUrl": "https://wa.me/15550192834",
+      "rsLabel": "RS",
+      "rsLabel2": "RS",
+      "aurLabel": "#AUR-",
+      "subtitle": "RS",
+      "heading": "Your Shopping Bag",
+      "yourBagCurrentlyEmptySubheading": "Your Bag is Currently Empty",
+      "description": "Explore our flagship phones, refurbished devices, and engineered accessories to add items to your order.",
+      "browseFlagshipShowroomLabel": "Browse Flagship Showroom",
+      "subtotalLabel": "Subtotal",
+      "insuredExpressDeliveryLabel": "Insured Express Delivery",
+      "freeLabel": "FREE",
+      "cleanroom72PointCertificationLabel": "Cleanroom 72-Point Certification",
+      "includedLabel": "INCLUDED",
+      "totalAmountLabel": "Total Amount",
+      "proceedOrderRsLabel": "Proceed to Order · RS",
+      "subtitle2": "Pay on Delivery or Bank Transfer. 14-day zero-risk returns.",
+      "backBagItemsLabel": "Back to Bag Items",
+      "totalPayableLabel": "Total Payable",
+      "fullName": "Full Name *",
+      "eGMarcusVancePlaceholder": "e.g. Marcus Vance",
+      "contactPhoneNumber": "Contact Phone Number *",
+      "15550192834Placeholder": "+1 (555) 019-2834",
+      "deliveryStreetAddress": "Delivery Street Address *",
+      "houseApartmentNumberStreetName": "House/Apartment number, street name, landmark...",
+      "cityState": "City / State *",
+      "eGNewYorkNy": "e.g. New York, NY",
+      "paymentOption": "Payment Option",
+      "cashCardDeliveryLabel": "Cash / Card on Delivery",
+      "inspectDeviceBeforePayingLabel": "Inspect device before paying",
+      "directBankTransferLabel": "Direct Bank Transfer",
+      "instantInvoiceReceiptLabel": "Instant invoice & receipt",
+      "processingOrderLabel": "Processing Your Order...",
+      "confirmCompleteOrderRsLabel": "Confirm & Complete Order · RS",
+      "100EncryptedAuthenticatedTransactionLabel": "100% Encrypted & Authenticated Transaction",
+      "orderPlacedSuccessfullyLabel": "Order Placed Successfully",
+      "thankSubheading": "Thank You, !",
+      "subtitle3": "Your order has been received by our laboratory dispatch center.",
+      "dispatchWindowLabel": "Dispatch Window:",
+      "within24HoursLabel": "Within 24 Hours",
+      "destinationLabel": "Destination:",
+      "paymentLabel": "Payment:",
+      "orderStatusLabel": "Order Status:",
+      "confirmedReservedLabel": "Confirmed & Reserved",
+      "continueBrowsingLabel": "Continue Browsing",
+      "hero": {
+        "flagshipSalesCertifiedPrecisionRepairs": "Flagship Sales · Certified Precision Repairs",
+        "premiumPhonesLabel": "Premium Phones.",
+        "expertRepairsLabel": "Expert Repairs.",
+        "oneDestinationLabel": "One Destination.",
+        "description": "Discover the latest smartphones, pristine certified refurbishments, and master-grade hardware repairs—executed with surgical precision and backed by technicians you can trust.",
+        "shopPhonesLabel": "Shop Phones",
+        "bookRepairLabel": "Book a Repair",
+        "oemPartsLabel": "OEM Parts",
+        "subtitle": "Original Grade Screens",
+        "25MinFixLabel": "25-Min Fix",
+        "subtitle2": "Express Walk-In Service",
+        "lifetimeLabel": "Lifetime",
+        "subtitle3": "Warranty on Repairs",
+        "auraLuxuryFlagshipSmartphonesImage": "/images/hero-phones.jpg",
+        "imageAlt": "AURA Luxury Flagship Smartphones",
+        "subtitle4": "Apple & Android Certified",
+        "subtitle5": "Class 100 Cleanroom Techs",
+        "subtitle6": "72-Point Inspection",
+        "subtitle7": "100% Battery Health Restored",
+        "limitedShowroomUpgradeBonusLabel": "Limited Showroom Upgrade Bonus",
+        "heading": "Your Next Upgrade",
+        "startsHereLabel": "Starts Here.",
+        "description2": "Receive an extra when trading up to any iPhone 16 Pro or Galaxy S25 Ultra this week. Includes complimentary data migration.",
+        "exploreLatestPhonesLabel": "Explore Latest Phones",
+        "calculateTradeLabel": "Calculate Trade-In",
+        "auraUpgradeBannerPhonesImage": "/images/hero-phones.jpg",
+        "imageAlt2": "AURA Upgrade Banner Phones",
+        "shopPhonesUrl": "#shop",
+        "exploreLatestPhonesUrl": "#shop",
+        "calculateTradeUrl": "#tradein"
+      },
+      "about": {
+        "certifiedAcrossIndustryLeadingMobile": "Certified Across Industry-Leading Mobile Ecosystems",
+        "labCertifiedLabel": "Lab Certified"
+      },
+      "BRANDS": [
+        {
+          "name": "Apple",
+          "subtitle": "Authorized Independent Repair Specialist"
+        },
+        {
+          "name": "Samsung",
+          "subtitle": "Galaxy Flagship & Foldable Lab"
+        },
+        {
+          "name": "Google",
+          "subtitle": "Pixel Precision Engineering"
+        },
+        {
+          "name": "OnePlus",
+          "subtitle": "Pro Warp-Speed Components"
+        },
+        {
+          "name": "Xiaomi",
+          "subtitle": "Ultra Camera Calibration"
+        },
+        {
+          "name": "Sony",
+          "subtitle": "Xperia Cinema 4K OLED"
+        },
+        {
+          "name": "Oppo",
+          "subtitle": "Find X SuperVOOC Systems"
+        }
+      ],
+      "faq": {
+        "transparencyAnswersLabel": "Transparency & Answers",
+        "heading": "Frequently Answered Questions.",
+        "description": "Everything you need to know about our repair warranties, turnaround timelines, and trade-in criteria."
+      },
+      "FAQS": [
+        {
+          "q": "How long does a standard phone repair take?",
+          "a": "Most common repairs—including iPhone and Samsung screen replacements, battery swaps, and charging port cleanings—are completed in 20 to 30 minutes in our on-site VIP laboratory. You can relax in our showroom lounge or explore nearby shops while we restore your device."
+        },
+        {
+          "q": "Do your repairs include a warranty?",
+          "a": "Yes. All OEM display replacements and logic repairs come with our Lifetime Parts & Labor Warranty. If your replacement panel ever malfunctions due to manufacturer defect (touch lag, dead pixels, or delamination), we will replace it immediately at zero cost. Batteries carry a 12-month full health guarantee."
+        },
+        {
+          "q": "Do I need to back up my phone before the repair?",
+          "a": "While our technicians employ non-invasive hardware protocols that preserve your personal data during screen and battery replacements, we always advise creating a recent iCloud or Google Drive backup for complete peace of mind. For motherboard and liquid-damage restorations, data preservation is our first priority."
+        },
+        {
+          "q": "Do you use genuine and OEM replacement parts?",
+          "a": "We strictly source Original Equipment Manufacturer (OEM) panels and high-density tier-1 batteries. Our displays preserve 100% color accuracy, True Tone calibration, 120Hz ProMotion/Dynamic AMOLED refresh rates, and biometric security features (Face ID / Ultrasonic fingerprint sensors)."
+        },
+        {
+          "q": "Can I trade in a phone that is damaged or non-functional?",
+          "a": "Yes, absolutely. We evaluate devices in all physical conditions—from flawless mint condition to shattered front glass, cracked camera modules, and dead logic boards. Even if your phone will not turn on, you can receive instant trade-in credit toward a new device or cash payment."
+        },
+        {
+          "q": "Do you successfully recover water-damaged smartphones?",
+          "a": "Yes. Our clinical laboratory features high-frequency ultrasonic chemical wash stations and thermal infrared diagnostic chambers. We neutralize internal electrolytic corrosion, replace damaged surface-mount capacitors, and boast an 88% data and hardware recovery rate on submerged devices."
+        }
+      ],
+      "phoneSilhouetteImage": "/images/showcase-phone.jpg",
+      "imageAlt": "Phone Silhouette",
+      "theNextStandardMobileCare": "The Next Standard in Mobile Care",
+      "heading2": "Your Phone Deserves Better.",
+      "subtitle4": "Upgrade it. Repair it. Protect it.",
+      "description2": "Experience precision engineering, authentic parts, and surgical craftsmanship designed to keep you seamlessly connected.",
+      "shopPhonesLabel": "Shop Phones",
+      "bookRepairLabel": "Book a Repair",
+      "lifetimeScreenWarrantyLabel": "Lifetime Screen Warranty",
+      "noObligationFreeDiagnosticsLabel": "No-Obligation Free Diagnostics",
+      "sameDayTurnaroundLabel": "Same-Day Turnaround",
+      "testimonials": {
+        "clientExperiencesLabel": "Client Experiences",
+        "heading": "Loved by Connoisseurs.",
+        "description": "Read authentic reviews from clients who demand perfection for their mobile devices.",
+        "verifiedClientLabel": "Verified Client",
+        "subtitle": "“”"
+      },
+      "REVIEWS": [
+        {
+          "name": "Alexander Sterling",
+          "role": "Creative Director",
+          "rating": 5,
+          "date": "3 days ago",
+          "verifiedService": "iPhone 16 Pro Max Screen Replacement",
+          "comment": "I was devastated when my new 16 Pro screen shattered on concrete. AURA restored it in literally 24 minutes. The True Tone, 120Hz ProMotion, and Face ID work with zero flaw. Truly luxury service.",
+          "device": "Apple Ecosystem"
+        },
+        {
+          "name": "Elena Rostova",
+          "role": "Architect",
+          "rating": 5,
+          "date": "1 week ago",
+          "verifiedService": "Purchased Certified Galaxy S24 Ultra",
+          "comment": "Bought a refurbished Grade A+ Galaxy S24 Ultra for my fieldwork. The condition is literally indistinguishable from brand new in box, and the battery cycle was at 100%. Highly recommended.",
+          "device": "Samsung Galaxy"
+        },
+        {
+          "name": "Dr. Michael Chen",
+          "role": "Orthopedic Surgeon",
+          "rating": 5,
+          "date": "2 weeks ago",
+          "verifiedService": "Water Damage & Logic Board Recovery",
+          "comment": "My phone fell into a lake during vacation with irreplaceable family photos not backed up to iCloud. Two other shops declared it dead. AURA ultrasonic-cleaned the PCB and recovered 100% of my data.",
+          "device": "Precision Data Lab"
+        }
+      ],
+      "uncompromisingIntegrityLabel": "Uncompromising Integrity",
+      "heading3": "Engineered for Trust.",
+      "description3": "We operate at the intersection of Swiss-watchmaker precision, clinical cleanroom environments, and hospitality-first customer care.",
+      "STATS": [
+        {
+          "number": "10K+",
+          "label": "Restorations Completed",
+          "detail": "Precision repairs across iPhone, Samsung Galaxy, and Pixel models."
+        },
+        {
+          "number": "4.9/5",
+          "label": "Verified Customer Rating",
+          "detail": "Over 2,400 glowing reviews across Google and Trustpilot."
+        },
+        {
+          "number": "25-Min",
+          "label": "Average Turnaround",
+          "detail": "Walk in with a cracked screen; walk out with a factory-pristine phone."
+        },
+        {
+          "number": "100%",
+          "label": "OEM Display Quality",
+          "detail": "Genuine panels preserving original color accuracy & True Tone."
+        }
+      ],
+      "trustPillars": [
+        {
+          "title": "Master IPC Technicians",
+          "desc": "Our laboratory specialists undergo 500+ hours of micro-soldering and cleanroom certification."
+        },
+        {
+          "title": "Lifetime Repair Warranty",
+          "desc": "Every OEM screen and logic repair is protected by our lifetime replacement backing."
+        },
+        {
+          "title": "Bank-Grade Data Security",
+          "desc": "No passcodes required for display repairs. We strictly adhere to zero-data-access privacy protocols."
+        },
+        {
+          "title": "Transparent Pricing Guarantee",
+          "desc": "Clear upfront pricing with no hidden charges or diagnostic fees. You only pay when fully satisfied."
+        }
+      ],
+      "certifiedPrecisionLabLabel": "Certified Precision Lab",
+      "schedulePriorityRepairSubheading": "Schedule Your Priority Repair",
+      "subtitle5": "Genuine OEM parts. Average turnaround under 30 minutes with Lifetime Warranty.",
+      "step1SelectManufacturer": "Step 1 · Select Manufacturer",
+      "selectExactModel": "Select Your Exact Model",
+      "continueDiagnosisLabel": "Continue to Diagnosis",
+      "step2SelectPrimaryIssue": "Step 2 · Select The Primary Issue for",
+      "estLabel": "Est.",
+      "deliveryPreference": "Delivery Preference",
+      "inStoreVipLab": "In-Store VIP Lab",
+      "30MinExpressWhileWait": "30-min express while you wait",
+      "insuredCourierBox": "Insured Courier Box",
+      "free2WayPriorityLabel": "Free 2-way priority label",
+      "backLabel": "Back",
+      "continueDetailsLabel": "Continue to Details",
+      "targetDeviceLabel": "Target Device:",
+      "serviceLabel": "Service:",
+      "fullName2": "Full Name *",
+      "eGMarcusVancePlaceholder2": "e.g. Marcus Vance",
+      "phoneNumber": "Phone Number *",
+      "15550192834Placeholder2": "+1 (555) 019-2834",
+      "emailAddress": "Email Address *",
+      "marcusAuraTechPlaceholder": "marcus@aura.tech",
+      "preferredSlot": "Preferred Slot",
+      "devicePasswordNotesOptional": "Device Password / Notes (Optional)",
+      "specificDamageNotesTouchUnresponsive": "Specific damage notes, touch unresponsive spots, or passcodes if hardware test authorized...",
+      "noUpfrontPaymentRequiredPay": "No upfront payment required. Pay only upon inspection & testing.",
+      "backLabel2": "Back",
+      "securingSlotLabel": "Securing Slot...",
+      "repairAppointmentConfirmedSubheading": "Repair Appointment Confirmed!",
+      "subtitle6": "Your ticket is active. Our master certified technician will be ready for your .",
+      "deviceLabel": "Device:",
+      "repairLabel": "Repair:",
+      "slotLabel": "Slot:",
+      "warrantyLabel": "Warranty:",
+      "lifetimeOemCoverageLabel": "Lifetime OEM Coverage",
+      "backShowroomLabel": "Back to Showroom",
+      "12MonthGuaranteeLabel": "· 12-Month Guarantee",
+      "rsLabel3": "RS",
+      "rsLabel4": "RS",
+      "inStockTestedLabel": "In Stock & Tested",
+      "finish": "Finish:",
+      "capacity": "Capacity",
+      "addedOrderLabel": "Added to Order",
+      "secureReservationRsLabel": "Secure Reservation · RS",
+      "oemCleanroomRestorationLabel": "OEM Cleanroom Restoration",
+      "heading4": "From Damaged to Like-New.",
+      "description4": "Drag the interactive slider below to inspect our flawless OLED replacement and aerospace frame realignments.",
+      "repairedPristinePhoneImage": "/images/screen-repaired.jpg",
+      "imageAlt2": "Repaired Pristine Phone",
+      "factoryRestoredOemLabel": "FACTORY RESTORED (OEM)",
+      "shatteredDamagedScreenImage": "/images/screen-cracked.jpg",
+      "imageAlt3": "Shattered Damaged Screen",
+      "crackedDamagedLabel": "CRACKED / DAMAGED",
+      "dragLeftRightCompare": "Drag left or right to compare",
+      "interactiveSelfDiagnosticLabel": "Interactive Self-Diagnostic",
+      "heading5": "Not Sure What’s Wrong?",
+      "description5": "Select your symptom below. Our interactive diagnostic system instantly estimates the root cause, turnaround time, and repair quote.",
+      "diagnosticAssessmentLabel": "Diagnostic Assessment",
+      "laboratoryRootCauseLabel": "Laboratory Root Cause:",
+      "turnaroundTimeLabel": "Turnaround Time",
+      "estRepairRangeLabel": "Est. Repair Range",
+      "includesComplimentaryInteriorUltrasonicCleaning": "Includes complimentary interior ultrasonic cleaning and new high-adhesion liquid seals.",
+      "scheduleFixIssueLabel": "Schedule Fix for This Issue",
+      "diagnosticIssues": [
+        {
+          "id": "cracked-screen",
+          "title": "Cracked Screen / OLED Lines",
+          "symptom": "Glass fracture, vertical green lines, or unresponsive touch zone",
+          "likelyCause": "OLED digitizer or front glass laminate failure",
+          "estimatedFixTime": "30 mins",
+          "priceRange": "RS 129 - RS 279",
+          "urgency": "Medium"
+        },
+        {
+          "id": "battery-drain",
+          "title": "Battery Drains Rapidly",
+          "symptom": "Drops by 20% in an hour, shuts down at 30%, or back glass feels swollen",
+          "likelyCause": "Lithium-ion chemical depletion / degraded cathode cycles",
+          "estimatedFixTime": "20 mins",
+          "priceRange": "RS 79 - RS 119",
+          "urgency": "High"
+        },
+        {
+          "id": "wont-charge",
+          "title": "Won’t Charge / Loose Cable",
+          "symptom": "Must hold cable at an angle, slow charging, or no power response",
+          "likelyCause": "Debris compaction, broken pin trace, or power IC short",
+          "estimatedFixTime": "35 mins",
+          "priceRange": "RS 69 - RS 119",
+          "urgency": "Medium"
+        },
+        {
+          "id": "camera-blur",
+          "title": "Camera Blurry / Shaking",
+          "symptom": "Camera buzzes loudly, cannot focus on text, or purple flare dots",
+          "likelyCause": "Optical image stabilization (OIS) actuator breakdown",
+          "estimatedFixTime": "45 mins",
+          "priceRange": "RS 89 - RS 169",
+          "urgency": "Low"
+        },
+        {
+          "id": "liquid-damage",
+          "title": "Water or Liquid Ingress",
+          "symptom": "Dropped in water, condensation in camera lens, or speaker distortion",
+          "likelyCause": "Capillary fluid ingress causing rapid electrolytic oxidation",
+          "estimatedFixTime": "2 hours",
+          "priceRange": "RS 119 - RS 199",
+          "urgency": "Critical"
+        },
+        {
+          "id": "overheating",
+          "title": "Device Overheating",
+          "symptom": "Gets unusually hot during idle state or camera shuts down automatically",
+          "likelyCause": "CPU thermal paste degradation or shorted power amplifier capacitor",
+          "estimatedFixTime": "45 mins",
+          "priceRange": "RS 79 - RS 149",
+          "urgency": "High"
+        }
+      ],
+      "effortlessRestorationsLabel": "Effortless Restorations",
+      "heading6": "Precision in 4 Simple Steps.",
+      "description6": "From initial symptom check to final testing, our streamlined process ensures maximum transparency and rapid turnaround.",
+      "repairProcessSteps": [
+        {
+          "step": "01",
+          "title": "Tell Us the Problem",
+          "desc": "Select your smartphone model and symptoms online or bring your device into our store.",
+          "time": "2 minutes",
+          "durationLabel": "Duration"
+        },
+        {
+          "step": "02",
+          "title": "Get Precision Diagnosis",
+          "desc": "Our certified engineers conduct a 24-point hardware inspection with zero guesswork.",
+          "time": "10 minutes",
+          "durationLabel": "Duration"
+        },
+        {
+          "step": "03",
+          "title": "Cleanroom Restoration",
+          "desc": "Surgical repair utilizing genuine OEM displays, batteries, and calibrated micro-soldering.",
+          "time": "20 - 30 minutes",
+          "durationLabel": "Duration"
+        },
+        {
+          "step": "04",
+          "title": "Restored & Tested",
+          "desc": "Collect your pristine phone with full waterproofing seals and Lifetime Warranty coverage.",
+          "time": "Same-day pickup",
+          "durationLabel": "Duration"
+        }
+      ],
+      "certifiedLaboratoryPrecisionLabel": "Certified Laboratory Precision",
+      "heading7": "Broken Phone?",
+      "weLlBringItBack": "We’ll Bring It Back.",
+      "description7": "From cracked OLED screens to board-level micro-soldering, our technicians provide fast, professional repairs using high-quality components and aerospace-grade tooling.",
+      "engineeredPeripheralsLabel": "Engineered Peripherals",
+      "heading8": "Curated Accessories.",
+      "description8": "Precision accessories crafted to protect, power, and complement your mobile device with uncompromising aesthetic elegance.",
+      "featuredProducts": {
+        "directShowroomVerifiedRefurbishedLabel": "Direct Showroom & Verified Refurbished",
+        "heading": "Upgrade Your Everyday.",
+        "description": "Brand new flagships and laboratory-certified refurbished devices. 100% genuine components, clean IMEI, and up to 12 months comprehensive warranty."
+      },
+      "engineeredMoreTitaniumLab": "ENGINEERED FOR MORE · TITANIUM LAB",
+      "showcaseExcellenceLabel": "Showcase of Excellence",
+      "heading9": "Engineered for More.",
+      "description9": "A symphony of aerospace-grade materials, groundbreaking silicon efficiency, and surgical repairability. Tested and certified in our precision laboratory.",
+      "engineeredMoreFlagshipDeviceImage": "/images/showcase-phone.jpg",
+      "imageAlt4": "Engineered For More Flagship Device",
+      "clickInspectHardwareLabel": "Click to Inspect Hardware",
+      "instantValueCalculatorLabel": "Instant Value Calculator",
+      "heading10": "Old Phone.",
+      "newPossibilitiesLabel": "New Possibilities.",
+      "description10": "Trade in your current device and put its maximum value directly toward your next upgrade. Same-day inspection and instant store credit guaranteed.",
+      "selectCurrentDeviceBrand": "Select Your Current Device Brand",
+      "exactModel": "Exact Model",
+      "physicalCondition": "Physical Condition",
+      "targetUpgradeGoal": "Target Upgrade Goal",
+      "msrpRs": "MSRP RS",
+      "freeDataTransferSecureMilitary": "Free data transfer and secure military-grade sanitization included.",
+      "instantValuationLabel": "Instant Valuation",
+      "guaranteed14DaysLabel": "Guaranteed for 14 Days",
+      "estimatedTradeCreditLabel": "Estimated Trade-In Credit",
+      "subtitle7": "For your ()",
+      "targetUpgradeLabel": "Target Upgrade:",
+      "retailPriceLabel": "Retail Price:",
+      "rsLabel5": "RS",
+      "lessTradeCreditLabel": "Less Trade-In Credit:",
+      "rsLabel6": "RS",
+      "yourNetUpgradeLabel": "Your Net Upgrade:",
+      "rsLabel7": "RS",
+      "estimateLockedPasscodeTrLabel": "Estimate Locked · Passcode #TR-",
+      "lockEstimateUpgradeLabel": "Lock In Estimate & Upgrade",
+      "description11": "Bring this estimate to our lab or mail your phone in our free prepaid return kit.",
+      "shopPhonesUrl": "#shop",
+      "whatsappOrderUrl": "https://wa.me/15550192834",
+      "specPins": [
+        {
+          "title": "Aerospace Grade 5 Titanium",
+          "tag": "01 // Precision",
+          "desc": "Precision micro-blasted enclosure offering the highest strength-to-weight ratio in mobile hardware."
+        },
+        {
+          "title": "48MP Quad-Pixel Optical System",
+          "tag": "03 // Precision",
+          "desc": "Sensor-shift optical stabilization with 5x telephoto optical zoom and next-generation portraits."
+        },
+        {
+          "title": "3nm Pro Silicon Matrix",
+          "tag": "02 // Precision",
+          "desc": "Up to 35% faster graphics with dedicated hardware-accelerated ray tracing and 16-core Neural Engine."
+        },
+        {
+          "title": "High Density Dual Cell Battery",
+          "tag": "04 // Precision",
+          "desc": "All-day endurance calibrated with intelligent thermal vapor-chambers and 45W MagFast charging."
+        }
+      ],
+      "featuredPhones": [
+        {
+          "brand": "Apple",
+          "name": "iPhone 16 Pro Max",
+          "subtitle": "Grade 5 Titanium · A18 Pro 3nm",
+          "badge": "Popular Flagship",
+          "image": "/images/showcase-phone.jpg",
+          "condition": "Brand New",
+          "price": 1199,
+          "freeInsuredCourierLabel": "Free Insured Courier",
+          "orderCtaLabel": "Order"
+        },
+        {
+          "brand": "Samsung",
+          "name": "Galaxy S25 Ultra",
+          "subtitle": "Armor Titanium · Snapdragon 8 Elite",
+          "badge": "AI Flagship",
+          "image": "/images/s24-ultra.jpg",
+          "condition": "Brand New",
+          "price": 1299,
+          "freeInsuredCourierLabel": "Free Insured Courier",
+          "orderCtaLabel": "Order"
+        },
+        {
+          "brand": "Google",
+          "name": "Pixel 9 Pro XL",
+          "subtitle": "Google Tensor G4 · Gemini Nano",
+          "badge": "Pro Optics",
+          "image": "/images/pixel-9.jpg",
+          "condition": "Brand New",
+          "price": 1099,
+          "freeInsuredCourierLabel": "Free Insured Courier",
+          "orderCtaLabel": "Order"
+        }
+      ],
+      "repairServices": [
+        {
+          "time": "30 mins",
+          "title": "Screen & OLED Replacement",
+          "tagline": "OEM Grade Displays · True Tone Calibration",
+          "desc": "Shattered glass, touch ghosting, or dead OLED pixels restored with factory-calibrated panels. Retains biometric FaceID and original refresh rates.",
+          "price": 119,
+          "estimatedCostLabel": "ESTIMATED COST",
+          "bookRepairCtaLabel": "Book Repair"
+        },
+        {
+          "time": "20 mins",
+          "title": "OEM Battery Replacement",
+          "tagline": "100% Maximum Capacity Restored",
+          "desc": "Solve rapid battery drain, unexpected shutdowns, and sluggish throttling. Installed with genuine high-density polymer cells and certified heat seals.",
+          "price": 79,
+          "estimatedCostLabel": "ESTIMATED COST",
+          "bookRepairCtaLabel": "Book Repair"
+        },
+        {
+          "time": "35 mins",
+          "title": "Charging Port & Micro-Soldering",
+          "tagline": "USB-C & Lightning Precision Lab",
+          "desc": "Loose cables, intermittent charging, or bent connector pins. We perform board-level micro-soldering and clean fast-charge circuits.",
+          "price": 69,
+          "estimatedCostLabel": "ESTIMATED COST",
+          "bookRepairCtaLabel": "Book Repair"
+        },
+        {
+          "time": "45 mins",
+          "title": "Camera Lens & Sensor Repair",
+          "tagline": "OIS Calibration & Sapphire Crystal Glass",
+          "desc": "Cracked exterior camera lens or blurry autofocus motors. We replace sapphire glass and align multi-camera optical image stabilizers.",
+          "price": 89,
+          "estimatedCostLabel": "ESTIMATED COST",
+          "bookRepairCtaLabel": "Book Repair"
+        },
+        {
+          "time": "2 hours",
+          "title": "Liquid & Water Damage Recovery",
+          "tagline": "Ultrasonic De-Oxidation Bath",
+          "desc": "Accidental pool drops or coffee spills. We perform ultrasonic board cleaning, corrosion removal, and critical micro-chip diagnostic probing.",
+          "price": 129,
+          "estimatedCostLabel": "ESTIMATED COST",
+          "bookRepairCtaLabel": "Book Repair"
+        },
+        {
+          "time": "40 mins",
+          "title": "Board Diagnostics & Software",
+          "tagline": "Bootloop, Firmware & NAND Recovery",
+          "desc": "Phones stuck on apple logo, bootloops, or corrupted OS partitions. Hardware-level NAND flashing and data preservation restoration.",
+          "price": 59,
+          "estimatedCostLabel": "ESTIMATED COST",
+          "bookRepairCtaLabel": "Book Repair"
+        }
+      ],
+      "estimatedCostLabel": "ESTIMATED COST",
+      "bookRepairCtaLabel": "Book Repair",
+      "freeInsuredCourierLabel": "Free Insured Courier",
+      "orderCtaLabel": "Order",
+      "whatsappOrderLabel": "Order via WhatsApp",
+      "accessories": [
+        {
+          "id": "acc-case-kevlar",
+          "name": "Aramid Carbon Fiber MagCase",
+          "brand": "Accessories",
+          "subtitle": "Aerospace Kevlar · 1.5mm Ultra Slim",
+          "price": 59,
+          "badge": "MagSafe Ready",
+          "image": "/images/accessories.jpg"
+        },
+        {
+          "id": "acc-gan-charger",
+          "name": "140W GaN Pro Dual Fast Charger",
+          "brand": "Accessories",
+          "subtitle": "Gallium Nitride 3rd Gen · 3x USB-C",
+          "price": 79,
+          "badge": "Fast Charge",
+          "image": "/images/accessories.jpg"
+        },
+        {
+          "id": "acc-wireless-dock",
+          "name": "3-in-1 Qi2 Magnetic Charging Stand",
+          "brand": "Accessories",
+          "subtitle": "15W Fast Wireless · Aircraft Aluminum",
+          "price": 109,
+          "badge": "Qi2 Certified",
+          "image": "/images/accessories.jpg"
+        },
+        {
+          "id": "acc-sapphire-shield",
+          "name": "9H Pure Sapphire Screen Shield (2-Pack)",
+          "brand": "Accessories",
+          "subtitle": "Zero Dust Precision Alignment Tray",
+          "price": 39,
+          "badge": "Lab Applied Free",
+          "image": "/images/accessories.jpg"
+        }
+      ],
+      "forYourDeviceLabel": "For your"
+    }
+  }
+}
