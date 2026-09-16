@@ -127,28 +127,28 @@ function TestimonialCard({
   return (
     <div
       data-preview-item-path={`testimonials.testimonials[${index}]`}
-      className={`relative p-7 sm:p-8 rounded-3xl bg-[#ffffff] border border-[#3d2114]/12 shadow-md hover:shadow-xl transition-all duration-300 flex flex-col justify-between space-y-6 ${cardClassName || ''}`.trim()}
+      className={`relative p-5 sm:p-7 lg:p-8 rounded-3xl bg-[#ffffff] border border-[#3d2114]/12 shadow-md hover:shadow-xl transition-all duration-300 flex flex-col justify-between space-y-5 min-w-0 ${cardClassName || ''}`.trim()}
     >
-      <div className="space-y-4">
+      <div className="space-y-4 min-w-0">
         {/* Category Tag & Rating Stars */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           {Boolean(currentItem.tag) && (
             <span
               data-preview-field-path={`testimonials.testimonials[${index}].tag`}
-              className="px-3 py-1 rounded-full bg-[#f5ebe1] text-[#84431b] text-[11px] uppercase tracking-wider font-extrabold border border-[#3d2114]/10"
+              className="px-2.5 py-1 rounded-full bg-[#f5ebe1] text-[#84431b] text-[10px] sm:text-[11px] uppercase tracking-wider font-extrabold border border-[#3d2114]/10 shrink-0"
             >
               {tagText}
             </span>
           )}
 
           <div
-            className="inline-flex items-center gap-2 p-1 -mr-1 rounded-lg cursor-pointer transition-all hover:bg-[#fa7014]/10 group ml-auto"
+            className="inline-flex items-center gap-1.5 p-1 -mr-1 rounded-lg cursor-pointer transition-all hover:bg-[#fa7014]/10 group ml-auto shrink-0"
             onClick={handleFocusRating}
             title={`Rating: ${currentRating} of ${maxStars} (Click to edit)`}
           >
             <div className="flex items-center gap-[2px]" data-fivora-stars-row="true">
               {Array.from({ length: maxStars }).map((_, sIdx) => (
-                <StarSvg key={sIdx} filled={sIdx < currentRating} size={16} />
+                <StarSvg key={sIdx} filled={sIdx < currentRating} size={14} />
               ))}
             </div>
             <span
@@ -166,30 +166,30 @@ function TestimonialCard({
         {/* Quote Body */}
         <blockquote
           data-preview-field-path={`testimonials.testimonials[${index}].quote`}
-          className="font-serif-italic text-base sm:text-lg text-[#2b170e] leading-relaxed"
+          className="font-serif-italic text-sm sm:text-base text-[#2b170e] leading-relaxed break-words"
         >
           &ldquo;{quoteText}&rdquo;
         </blockquote>
       </div>
 
       {/* Author Info */}
-      <div className="pt-4 border-t border-[#3d2114]/10 flex items-center gap-3.5">
+      <div className="pt-4 border-t border-[#3d2114]/10 flex items-center gap-3 min-w-0">
         <img
           src={authorAvatar}
           alt={authorName}
           data-preview-field-path={`testimonials.testimonials[${index}].avatar`}
-          className="w-12 h-12 rounded-full object-cover border border-[#3d2114]/15 shadow-sm"
+          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-[#3d2114]/15 shadow-sm shrink-0"
         />
-        <div>
+        <div className="min-w-0 flex-1">
           <h4
             data-preview-field-path={`testimonials.testimonials[${index}].author`}
-            className="font-heading font-black text-sm sm:text-base text-[#2b170e]"
+            className="font-heading font-black text-sm sm:text-base text-[#2b170e] truncate"
           >
             {authorName}
           </h4>
           <p
             data-preview-field-path={`testimonials.testimonials[${index}].role`}
-            className="text-xs text-[#786154] font-medium leading-snug"
+            className="text-xs text-[#786154] font-medium leading-snug line-clamp-2"
           >
             {authorRole}
           </p>
@@ -233,13 +233,13 @@ export function EditableTestimonialSection({
   return (
     <section
       data-design-section="testimonials"
-      className={`editable-testimonial-section w-full py-16 sm:py-24 px-4 sm:px-6 lg:px-10 ${className}`.trim()}
+      className={`editable-testimonial-section w-full py-12 sm:py-20 px-3 sm:px-6 lg:px-8 ${className}`.trim()}
       style={style}
       {...props}
     >
-      <div className="max-w-[1600px] mx-auto">
+      <div className="max-w-[1600px] mx-auto w-full">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto space-y-3 mb-12 sm:mb-16">
+        <div className="text-center max-w-3xl mx-auto space-y-3 mb-10 sm:mb-14 px-2">
           {badge && (
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#ede0d4] text-[#3d2114] text-xs uppercase tracking-widest font-black border border-[#3d2114]/15">
               <span data-preview-field-path={`testimonials.badge`}>{badge}</span>
@@ -253,7 +253,7 @@ export function EditableTestimonialSection({
           </h2>
           <p
             data-preview-field-path={`testimonials.subheading`}
-            className="text-xs sm:text-base text-[#5c493f] leading-relaxed"
+            className="text-xs sm:text-base text-[#5c493f] leading-relaxed max-w-2xl mx-auto"
           >
             {subheading}
           </p>
@@ -262,7 +262,7 @@ export function EditableTestimonialSection({
         {/* Testimonials Grid */}
         <div
           data-preview-list-path={`testimonials.testimonials`}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8"
+          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-7 [grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))] w-full"
         >
           {items.map((item, index) => (
             <TestimonialCard
