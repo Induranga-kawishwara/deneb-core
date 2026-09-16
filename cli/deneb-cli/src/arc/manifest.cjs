@@ -380,11 +380,15 @@ function computeControlOnlyPaths(content, boundPaths, declared = []) {
   const bound = new Set([...(boundPaths || [])].map(wildcardPath));
   const controlOnly = new Set();
 
-  // Auto-inject all platform-contract paths — templates never need to declare these.
-  // The platform writes them to site-data.json; templates must not render them inline.
+  // Auto-inject all platform-contract paths that exist in site data content —
+  // templates never need to declare these manually.
   for (const platformPath of PLATFORM_CONTRACT.platformControlledPaths || []) {
     const canonical = canonicalizeMarkerPath(platformPath);
-    if (canonical) controlOnly.add(canonical);
+    if (!canonical) continue;
+    const known = [...inventory.fieldPatterns, ...inventory.concreteFields].some(
+      (path) => wildcardPath(path) === wildcardPath(canonical)
+    );
+    if (known) controlOnly.add(canonical);
   }
 
   for (const declaredPath of declared) {
