@@ -150,6 +150,9 @@ export function isForbiddenTemplatePackagePath(entryName: string) {
   const hasGeneratedDirectory = segments.some((segment) =>
     FORBIDDEN_GENERATED_DIRECTORIES.has(segment),
   );
+  const hasDenebInternal = segments.some((segment) =>
+    segment === '.deneb' || segment.startsWith('.deneb-backup'),
+  );
   const isEnvironmentFile = fileName === '.env' || fileName.startsWith('.env.');
   const isNestedArchive = fileName.endsWith('.zip');
   const isLogFile = fileName.endsWith('.log');
@@ -160,6 +163,7 @@ export function isForbiddenTemplatePackagePath(entryName: string) {
     hasForbiddenDirectory ||
     hasYarnCache ||
     hasGeneratedDirectory ||
+    hasDenebInternal ||
     isEnvironmentFile ||
     isNestedArchive ||
     isLogFile ||
