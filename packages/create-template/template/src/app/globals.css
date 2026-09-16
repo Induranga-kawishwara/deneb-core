@@ -273,6 +273,37 @@ h3 {
   aspect-ratio: 16 / 10;
 }
 
+.product-section-header {
+  max-width: 44rem;
+  margin: 0 auto 2.5rem;
+  text-align: center;
+}
+
+.product-section-header > p {
+  margin: 0.75rem auto 0;
+  color: color-mix(in srgb, var(--page-text) 72%, transparent);
+}
+
+.product-detail-link {
+  display: inline-flex;
+  width: 100%;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: var(--brand-color);
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 800;
+  text-decoration: none;
+  transition: filter 160ms ease, transform 160ms ease;
+}
+
+.product-detail-link:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
 .contact-grid {
   display: grid;
   grid-template-columns: 1fr 1.35fr;

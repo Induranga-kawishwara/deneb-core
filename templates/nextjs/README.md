@@ -87,6 +87,8 @@ live lookup, retries, and fallback states:
 
 ```tsx
 // src/app/products/detail/page.tsx
+'use client';
+
 import { PlatformProductDetail } from '@deneb-ui/ui';
 
 export default function ProductDetailPage() {

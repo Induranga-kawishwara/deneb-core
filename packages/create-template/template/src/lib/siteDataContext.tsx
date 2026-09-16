@@ -17,6 +17,7 @@ export {
   PREVIEW_FOCUS_MESSAGE,
   LEGACY_PREVIEW_FOCUS_MESSAGE,
   PREVIEW_FIELD_ATTRIBUTE,
+  platformProductDetailHref,
 } from '@deneb-ui/ui';
 
 export type {

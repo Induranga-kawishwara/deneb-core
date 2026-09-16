@@ -440,7 +440,7 @@
             "label": "Product ID"
           },
           {
-            "key": "title",
+            "key": "name",
             "type": "text",
             "label": "Title",
             "required": true

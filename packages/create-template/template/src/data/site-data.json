@@ -167,7 +167,7 @@
     "products": [
       {
         "id": "prod-1",
-        "title": "Minimalist Ceramic Cup",
+        "name": "Minimalist Ceramic Cup",
         "description": "Handcrafted matte ceramic cup for your daily espresso or pour-over brew.",
         "price": 3200,
         "compareAtPrice": 4000,
@@ -179,7 +179,7 @@
       },
       {
         "id": "prod-2",
-        "title": "Artisan Linen Apron",
+        "name": "Artisan Linen Apron",
         "description": "Durable pure washed linen apron with deep front utility pockets.",
         "price": 5400,
         "compareAtPrice": 6200,
@@ -191,7 +191,7 @@
       },
       {
         "id": "prod-3",
-        "title": "Botanical Room Spray",
+        "name": "Botanical Room Spray",
         "description": "Natural essential oil room mist infused with wild lavender and cedarwood.",
         "price": 2800,
         "compareAtPrice": null,
