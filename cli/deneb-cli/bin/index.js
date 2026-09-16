@@ -468,6 +468,11 @@ function getComponentRegistry(importPkg) {
       component: 'EditableProductGrid',
       code: `'use client';\n\nimport { EditableProductGrid, ProductGrid, type EditableProductGridProps, type ProductGridItem } from '${importPkg}';\n\nexport { EditableProductGrid, ProductGrid, type EditableProductGridProps, type ProductGridItem };\n`,
     },
+    'product-showcase': {
+      file: 'ProductShowcase.tsx',
+      component: 'EditableProductShowcase',
+      code: `'use client';\n\nimport { EditableProductShowcase, ProductShowcase, type EditableProductShowcaseProps, type ProductShowcaseItem, type ProductShowcaseColor } from '${importPkg}';\n\nexport { EditableProductShowcase, ProductShowcase, type EditableProductShowcaseProps, type ProductShowcaseItem, type ProductShowcaseColor };\n`,
+    },
     'product-detail': {
       file: 'ProductDetail.tsx',
       component: 'EditableProductDetail',
@@ -527,6 +532,11 @@ function getComponentRegistry(importPkg) {
       file: 'WhatsAppButton.tsx',
       component: 'WhatsAppButton',
       code: `'use client';\n\nimport { WhatsAppButton, type WhatsAppButtonProps } from '${importPkg}';\n\nexport { WhatsAppButton, type WhatsAppButtonProps };\n`,
+    },
+    'whatsapp-order-button': {
+      file: 'WhatsAppOrderButton.tsx',
+      component: 'WhatsAppOrderButton',
+      code: `'use client';\n\nimport React from 'react';\nimport { useSiteData } from '${importPkg}';\nimport { MessageCircle } from 'lucide-react';\n\nexport interface WhatsAppOrderButtonProps {\n  product: { name: string; price?: string | number; brand?: string; condition?: string; [key: string]: any };\n  selectedColor?: string;\n  selectedStorage?: string;\n  className?: string;\n  showText?: boolean;\n}\n\nexport function WhatsAppOrderButton({\n  product,\n  selectedColor,\n  selectedStorage,\n  className = '',\n  showText = true,\n}: WhatsAppOrderButtonProps) {\n  const siteData = useSiteData();\n  const rawTarget =\n    siteData?.content?.home?.whatsappOrderUrl ||\n    siteData?.content?.home?.whatsappNumber ||\n    siteData?.content?.common?.business?.whatsapp ||\n    'https://wa.me/15550192834';\n  const orderLabel = siteData?.content?.home?.whatsappOrderLabel ?? 'Order via WhatsApp';\n\n  const handleWhatsAppClick = (e: React.MouseEvent) => {\n    e.stopPropagation();\n    const color = selectedColor || product.colors?.[0]?.name || 'Default';\n    const storage = selectedStorage || product.storageOptions?.[0] || 'Default';\n    const message = \`Hi, I would like to order the following product:\\n\\n*\${product.name}*\\nBrand: \${product.brand || 'Store'}\\nCondition: \${product.condition || 'New'}\\nColor: \${color}\\nStorage: \${storage}\\nPrice: Rs \${product.price}\\n\\nIs it available?\`;\n\n    let targetUrl = (rawTarget || '').trim();\n    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {\n      const cleanNum = targetUrl.replace(/[^0-9]/g, '');\n      targetUrl = \`https://wa.me/\${cleanNum || '15550192834'}\`;\n    }\n    const sep = targetUrl.includes('?') ? '&' : '?';\n    const url = \`\${targetUrl}\${sep}text=\${encodeURIComponent(message)}\`;\n    window.open(url, '_blank', 'noopener,noreferrer');\n  };\n\n  return (\n    <button type=\"button\" onClick={handleWhatsAppClick} className={className}>\n      <MessageCircle className=\"h-4 w-4\" />\n      {showText && (\n        <span data-preview-field-path=\"home.whatsappOrderLabel\" data-preview-style-target=\"home.whatsappOrderLabel\" data-preview-style-type=\"text\">\n          {orderLabel}\n        </span>\n      )}\n    </button>\n  );\n}\n`,
     },
     'phone-button': {
       file: 'PhoneButton.tsx',

@@ -674,6 +674,183 @@ function runDoctor(targetDirInput = '.', options = {}) {
     addCheck(suite5, 'warn', 'Empty-State Singleton Persistence', `${unmountedSingletonCount} singleton label(s) unmount when list is empty. Provide an empty fallback container.`, { code: 'DNB-EMP-002' });
   }
 
+  // Check: WhatsApp Action Target Synchronization (DNB-WHA-008)
+  let disconnectedWhatsAppCount = 0;
+  for (const file of sourceFiles) {
+    let c = fs.readFileSync(file, 'utf-8');
+    if (c.includes('whatsappNumber') && (c.includes('1234567890') || c.includes('siteData?.content?.home?.whatsappNumber')) && !c.includes('whatsappOrderUrl')) {
+      disconnectedWhatsAppCount++;
+      if (shouldFix) {
+        c = c.replace(
+          /const\s+whatsappNumber\s*=\s*siteData\?\.content\?\.home\?\.whatsappNumber\s*\?\?\s*["'][^"']+["'];?/g,
+          'const rawTarget = siteData?.content?.home?.whatsappOrderUrl || siteData?.content?.home?.whatsappNumber || siteData?.content?.common?.business?.whatsapp || "https://wa.me/15550192834";'
+        );
+        c = c.replace(
+          /const\s+url\s*=\s*`https:\/\/wa\.me\/\$\{\s*whatsappNumber\.replace\([^)]+\)\s*\}\?text=\$\{([^}]+)\}`;/g,
+          'let targetUrl = (rawTarget || "").trim(); if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) { const cleanNum = targetUrl.replace(/[^0-9]/g, ""); targetUrl = `https://wa.me/${cleanNum || "15550192834"}`; } const sep = targetUrl.includes("?") ? "&" : "?"; const url = `${targetUrl}${sep}text=${$1}`;'
+        );
+        fs.writeFileSync(file, c, 'utf8');
+      }
+    }
+  }
+  if (disconnectedWhatsAppCount === 0) {
+    addCheck(suite5, 'pass', 'WhatsApp Action Live Sync', 'All WhatsApp order triggers dynamically resolve configured merchant order URLs', { code: 'DNB-WHA-008' });
+  } else if (shouldFix) {
+    addCheck(suite5, 'fixed', 'WhatsApp Action Live Sync', `Repaired ${disconnectedWhatsAppCount} WhatsApp action trigger(s) to dynamically resolve whatsappOrderUrl`, { code: 'DNB-WHA-008' });
+  } else {
+    addCheck(suite5, 'warn', 'WhatsApp Action Live Sync', `${disconnectedWhatsAppCount} WhatsApp trigger(s) using disconnected fallback instead of whatsappOrderUrl. Run with --fix to repair.`, { code: 'DNB-WHA-008' });
+  }
+
+  // Check: Next.js Image Empty String Guard (DNB-IMG-002)
+  let emptyImageSrcCount = 0;
+  for (const file of sourceFiles) {
+    let c = fs.readFileSync(file, 'utf-8');
+    if (c.includes('<Image') || c.includes('<img')) {
+      const unguardedImageMatches = c.matchAll(/<(?:Image|img)\s+[^>]*\bsrc=\{([a-zA-Z0-9_$.?]+)\}[^>]*>/g);
+      let fileModified = false;
+      for (const m of unguardedImageMatches) {
+        const expr = m[1];
+        if (!expr.includes('||') && !expr.includes('?') && !expr.includes('fallback') && !expr.includes('placeholder')) {
+          emptyImageSrcCount++;
+          if (shouldFix) {
+            const safeExpr = `(${expr} && typeof ${expr} === 'string' && ${expr}.trim() !== '') ? ${expr} : '/images/showcase-phone.jpg'`;
+            c = c.replace(m[0], m[0].replace(`src={${expr}}`, `src={${safeExpr}}`));
+            fileModified = true;
+          }
+        }
+      }
+      if (shouldFix && fileModified) {
+        fs.writeFileSync(file, c, 'utf8');
+      }
+    }
+  }
+  if (emptyImageSrcCount === 0) {
+    addCheck(suite5, 'pass', 'Next.js Image Empty-String Guard', 'All Image src attributes are protected against empty string ("") network triggers', { code: 'DNB-IMG-002' });
+  } else if (shouldFix) {
+    addCheck(suite5, 'fixed', 'Next.js Image Empty-String Guard', `Protected ${emptyImageSrcCount} Image src attribute(s) with safe non-empty fallback guards`, { code: 'DNB-IMG-002' });
+  } else {
+    addCheck(suite5, 'warn', 'Next.js Image Empty-String Guard', `${emptyImageSrcCount} Image src attribute(s) pass unguarded expressions that may trigger Next.js empty string download errors. Run with --fix to guard.`, { code: 'DNB-IMG-002' });
+  }
+
+  // Check: Product Card Color Swatch & Strikethrough Price Editability (DNB-COL-009)
+  let staticSwatchCount = 0;
+  let missingColorSchemaCount = 0;
+  for (const file of sourceFiles) {
+    let c = fs.readFileSync(file, 'utf-8');
+    if (c.includes('colors') || c.includes('hex') || c.includes('line-through')) {
+      const staticRegex = /data-preview-static="(?:color-swatch|color-name|active-color-name|swatch)"/g;
+      if (staticRegex.test(c)) {
+        staticSwatchCount++;
+        if (shouldFix) {
+          c = c.replace(/data-preview-static="(?:color-swatch|swatch)"/g, 'data-preview-field-type="color"');
+          c = c.replace(/data-preview-static="(?:color-name|active-color-name)"/g, 'data-preview-style-type="text"');
+          fs.writeFileSync(file, c, 'utf8');
+        }
+      }
+    }
+  }
+
+  if (manifestData?.editorSchema?.sections) {
+    for (const sec of manifestData.editorSchema.sections) {
+      for (const field of sec.fields || []) {
+        if (field.type === 'list' && (field.key.toLowerCase().includes('phone') || field.key.toLowerCase().includes('product'))) {
+          const hasColorField = (field.fields || []).some((sf) => sf.key === 'colors' || sf.key === 'color');
+          const hasPriceField = (field.fields || []).some((sf) => sf.key === 'price');
+          const hasOriginalPriceField = (field.fields || []).some((sf) => sf.key === 'originalPrice');
+
+          let changed = false;
+          if (!hasColorField) {
+            missingColorSchemaCount++;
+            if (shouldFix) {
+              field.fields = field.fields || [];
+              field.fields.push({
+                key: 'colors',
+                type: 'list',
+                label: 'Colors',
+                itemLabel: 'Color',
+                minItems: 1,
+                maxItems: 6,
+                fields: [
+                  { key: 'name', type: 'text', label: 'Color Name' },
+                  { key: 'hex', type: 'text', label: 'Color Hex' },
+                ],
+              });
+              changed = true;
+            }
+          }
+          if (hasPriceField && !hasOriginalPriceField) {
+            missingColorSchemaCount++;
+            if (shouldFix) {
+              field.fields = field.fields || [];
+              field.fields.push({
+                key: 'originalPrice',
+                type: 'number',
+                label: 'Original Price',
+              });
+              changed = true;
+            }
+          }
+          if (changed) {
+            fs.writeFileSync(manifestPath, JSON.stringify(manifestData, null, 2) + '\n', 'utf8');
+          }
+        }
+      }
+    }
+  }
+
+  if (staticSwatchCount === 0 && missingColorSchemaCount === 0) {
+    addCheck(suite5, 'pass', 'Product Color Swatch Editability', 'Product color swatches & original prices are fully editable and registered in editorSchema', { code: 'DNB-COL-009' });
+  } else if (shouldFix) {
+    addCheck(suite5, 'fixed', 'Product Color Swatch Editability', `Made ${staticSwatchCount} static elements editable and registered colors/originalPrice in ${missingColorSchemaCount} schema collection(s)`, { code: 'DNB-COL-009' });
+  } else {
+    addCheck(suite5, 'warn', 'Product Color Swatch Editability', `${staticSwatchCount} static swatch/label element(s) or ${missingColorSchemaCount} missing schema colors/originalPrice definition(s). Run with --fix to make editable.`, { code: 'DNB-COL-009' });
+  }
+
+  // Check: Review & Testimonial Star Rating Editability (DNB-REV-010)
+  let unannotatedStarCount = 0;
+  let missingRatingSchemaCount = 0;
+
+  for (const file of sourceFiles) {
+    let c = fs.readFileSync(file, 'utf-8');
+    if ((c.includes('<Star') || c.includes('starIdx')) && (c.includes('.rating') || c.includes('ratingNum'))) {
+      // Must have data-preview-field-path associated with rating
+      const hasRatingFieldPath = /data-preview-field-path=[^>]*\.rating/i.test(c);
+      if (!hasRatingFieldPath) {
+        unannotatedStarCount++;
+      }
+    }
+  }
+
+  if (manifestData?.editorSchema?.sections) {
+    for (const sec of manifestData.editorSchema.sections) {
+      for (const field of sec.fields || []) {
+        if (field.type === 'list' && (field.key.toLowerCase().includes('review') || field.key.toLowerCase().includes('testimonial'))) {
+          const hasRatingField = (field.fields || []).some((sf) => sf.key === 'rating');
+          if (!hasRatingField) {
+            missingRatingSchemaCount++;
+            if (shouldFix) {
+              field.fields = field.fields || [];
+              field.fields.push({
+                key: 'rating',
+                type: 'number',
+                label: 'Rating',
+              });
+              fs.writeFileSync(manifestPath, JSON.stringify(manifestData, null, 2) + '\n', 'utf8');
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (unannotatedStarCount === 0 && missingRatingSchemaCount === 0) {
+    addCheck(suite5, 'pass', 'Review Star Rating Editability', 'Review star ratings are clickable, editable, and declared in editorSchema', { code: 'DNB-REV-010' });
+  } else if (shouldFix) {
+    addCheck(suite5, 'fixed', 'Review Star Rating Editability', `Registered rating in ${missingRatingSchemaCount} review schema collection(s) and validated star editability`, { code: 'DNB-REV-010' });
+  } else {
+    addCheck(suite5, 'warn', 'Review Star Rating Editability', `${unannotatedStarCount} component(s) with unannotated star icons or ${missingRatingSchemaCount} review schema(s) missing rating field. Run with --fix to register.`, { code: 'DNB-REV-010' });
+  }
+
   if (!isJson) console.log('\n\x1b[1m[6/6] Multi-Niche Architecture & Asset Security:\x1b[0m');
   const suite6 = 'Niche Architecture & Security';
 

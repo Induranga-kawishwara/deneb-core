@@ -98,6 +98,7 @@ export default function Page() {
 | :--- | :--- | :--- | :--- |
 | `ProductCard` | `EditableProductCard` | `data-preview-field-path`, `data-preview-item-path` | Product card with LKR/currency formatting, badge, & WhatsApp CTA |
 | `ProductGrid` | `EditableProductGrid` | `data-preview-list-path`, `data-preview-item-path` | Catalog grid with quick-view modal hook & filter integration |
+| `ProductShowcase` | `EditableProductShowcase` | `data-preview-field-path`, `data-preview-list-path`, `color` swatch | Flagship product showcase with color swatches, filter tabs, quick-view & WhatsApp order |
 | `ProductDetail` | `EditableProductDetail` | `data-preview-page-key`, `data-preview-field-path` | Full single-product view with gallery, specs, & inquiry actions |
 | `ProductQuickView` | `ProductQuickView` | `data-preview-field-path` | Instant lightbox modal product inspection with quantity counter |
 | `CartDrawer` | `EditableCartDrawer` | `data-preview-list-path`, `data-preview-item-path` | Slide-over cart drawer with 1-click unified WhatsApp order compilation |

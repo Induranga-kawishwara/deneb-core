@@ -1053,6 +1053,16 @@
               "key": "verifiedService",
               "type": "text",
               "label": "Verified Service"
+            },
+            {
+              "key": "rating",
+              "type": "number",
+              "label": "Rating"
+            },
+            {
+              "key": "device",
+              "type": "text",
+              "label": "Device"
             }
           ]
         },
@@ -1307,11 +1317,6 @@
           "label": "Rs Label3"
         },
         {
-          "key": "rsLabel4",
-          "type": "text",
-          "label": "Rs Label4"
-        },
-        {
           "key": "inStockTestedLabel",
           "type": "text",
           "label": "In Stock Tested Label"
@@ -1539,124 +1544,9 @@
           "label": "Click Inspect Hardware Label"
         },
         {
-          "key": "instantValueCalculatorLabel",
-          "type": "text",
-          "label": "Instant Value Calculator Label"
-        },
-        {
-          "key": "heading10",
-          "type": "text",
-          "label": "Heading10"
-        },
-        {
-          "key": "newPossibilitiesLabel",
-          "type": "text",
-          "label": "New Possibilities Label"
-        },
-        {
-          "key": "description10",
-          "type": "textarea",
-          "label": "Description10"
-        },
-        {
-          "key": "selectCurrentDeviceBrand",
-          "type": "text",
-          "label": "Select Current Device Brand"
-        },
-        {
-          "key": "exactModel",
-          "type": "text",
-          "label": "Exact Model"
-        },
-        {
-          "key": "physicalCondition",
-          "type": "text",
-          "label": "Physical Condition"
-        },
-        {
-          "key": "targetUpgradeGoal",
-          "type": "text",
-          "label": "Target Upgrade Goal"
-        },
-        {
-          "key": "msrpRs",
-          "type": "text",
-          "label": "Msrp Rs"
-        },
-        {
-          "key": "freeDataTransferSecureMilitary",
-          "type": "text",
-          "label": "Free Data Transfer Secure Military"
-        },
-        {
-          "key": "instantValuationLabel",
-          "type": "text",
-          "label": "Instant Valuation Label"
-        },
-        {
-          "key": "guaranteed14DaysLabel",
-          "type": "text",
-          "label": "Guaranteed14 Days Label"
-        },
-        {
-          "key": "estimatedTradeCreditLabel",
-          "type": "text",
-          "label": "Estimated Trade Credit Label"
-        },
-        {
           "key": "subtitle7",
           "type": "text",
           "label": "Subtitle7"
-        },
-        {
-          "key": "targetUpgradeLabel",
-          "type": "text",
-          "label": "Target Upgrade Label"
-        },
-        {
-          "key": "retailPriceLabel",
-          "type": "text",
-          "label": "Retail Price Label"
-        },
-        {
-          "key": "rsLabel5",
-          "type": "text",
-          "label": "Rs Label5"
-        },
-        {
-          "key": "lessTradeCreditLabel",
-          "type": "text",
-          "label": "Less Trade Credit Label"
-        },
-        {
-          "key": "rsLabel6",
-          "type": "text",
-          "label": "Rs Label6"
-        },
-        {
-          "key": "yourNetUpgradeLabel",
-          "type": "text",
-          "label": "Your Net Upgrade Label"
-        },
-        {
-          "key": "rsLabel7",
-          "type": "text",
-          "label": "Rs Label7"
-        },
-        {
-          "key": "estimateLockedPasscodeTrLabel",
-          "type": "text",
-          "label": "Estimate Locked Passcode Tr Label"
-        },
-        {
-          "key": "lockEstimateUpgradeLabel",
-          "type": "text",
-          "label": "Lock Estimate Upgrade Label"
-        },
-        {
-          "key": "description11",
-          "type": "textarea",
-          "label": "Description11"
         },
         {
           "key": "shopPhonesUrl",
@@ -1736,6 +1626,31 @@
               "key": "price",
               "type": "number",
               "label": "Price"
+            },
+            {
+              "key": "originalPrice",
+              "type": "number",
+              "label": "Original Price"
+            },
+            {
+              "key": "colors",
+              "type": "list",
+              "label": "Colors",
+              "itemLabel": "Color",
+              "minItems": 1,
+              "maxItems": 6,
+              "fields": [
+                {
+                  "key": "name",
+                  "type": "text",
+                  "label": "Color Name"
+                },
+                {
+                  "key": "hex",
+                  "type": "text",
+                  "label": "Color Hex"
+                }
+              ]
             }
           ]
         },
@@ -1938,11 +1853,6 @@
               "label": "Product Image"
             }
           ]
-        },
-        {
-          "key": "forYourDeviceLabel",
-          "type": "text",
-          "label": "For Your Device Label"
         }
       ],
       "pageKey": "home"
