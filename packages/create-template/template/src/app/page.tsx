@@ -4,6 +4,7 @@ import {
   contentList,
   contentObject,
   contentText,
+  platformProductDetailHref,
   useSiteData,
   useProducts,
 } from '@/lib/siteDataContext';
@@ -199,6 +200,64 @@ export default function HomePage() {
                   defaultValue={contentText(feature.body)}
                 />
               </EditableCard>
+            );
+          }}
+        </EditableList>
+      </section>
+
+      <section
+        className="page-section"
+        data-design-section="home-products"
+      >
+        <div className="section-header product-section-header">
+          <EditableText
+            variant="h2"
+            size="3xl"
+            weight="bold"
+            align="center"
+            color="heading"
+            className="section-title"
+            data-preview-field-path="home.productsHeading"
+            defaultValue={contentText(home.productsHeading)}
+          />
+          <EditableText
+            variant="lead"
+            align="center"
+            color="muted"
+            data-preview-field-path="home.productsSummary"
+            defaultValue={contentText(home.productsSummary)}
+          />
+        </div>
+
+        <EditableList
+          data-preview-list-path="products"
+          items={products}
+          className="card-grid"
+          itemAs={false}
+        >
+          {(rawProduct, index, itemPath) => {
+            const product = contentObject(rawProduct);
+            const productId =
+              typeof product.id === 'string' || typeof product.id === 'number'
+                ? product.id
+                : null;
+
+            return (
+              <EditableProductCard
+                key={productId ?? index}
+                itemPath={itemPath}
+                product={product}
+                currency={contentText(product.currency) || 'LKR'}
+                actionSlot={
+                  <a
+                    href={platformProductDetailHref(productId)}
+                    className="product-detail-link"
+                    data-preview-static="Open the stable live product detail page"
+                  >
+                    View details
+                  </a>
+                }
+              />
             );
           }}
         </EditableList>
