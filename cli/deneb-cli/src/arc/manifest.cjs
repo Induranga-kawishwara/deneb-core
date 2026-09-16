@@ -330,6 +330,51 @@ function isAllowedControlOnly(path) {
   );
 }
 
+/**
+ * Ensures platform-managed editorSchema sections exist. These sections are required
+ * by the strict contract validator when their sub-paths appear in controlOnlyPaths.
+ * Template developers must never need to add these manually.
+ */
+function ensurePlatformSections(sections) {
+  // additionalPages: rendered visually by PlatformAdditionalPages component.
+  // label is editable; id and route are platform-controlled.
+  if (!sections.find((s) => s.id === 'additionalPages')) {
+    sections.push({
+      id: 'additionalPages',
+      path: 'additionalPages',
+      type: 'list',
+      label: 'Additional Pages',
+      minItems: 0,
+      maxItems: 20,
+      fields: [
+        { key: 'label', type: 'text', label: 'Page label', required: true },
+        { key: 'id', type: 'text', label: 'Page ID' },
+        { key: 'route', type: 'text', label: 'Page route' },
+      ],
+    });
+  }
+
+  // __fivoraIntake: AI intake data written by the platform. Never rendered in
+  // template HTML — always control-only. Section required so sub-paths can be
+  // declared in controlOnlyPaths without "unknown path" errors.
+  if (!sections.find((s) => s.id === '__fivoraIntake')) {
+    sections.push({
+      id: '__fivoraIntake',
+      path: '__fivoraIntake',
+      type: 'object',
+      label: 'AI Intake (Platform Managed)',
+      fields: [
+        { key: 'tone', type: 'text', label: 'Brand tone' },
+        { key: 'outputLanguage', type: 'text', label: 'Output language' },
+        { key: 'businessSummary', type: 'textarea', label: 'Business summary' },
+        { key: 'additionalBusinessDetails', type: 'textarea', label: 'Additional business details' },
+        { key: 'referenceWebsiteUrl', type: 'url', label: 'Reference website URL' },
+        { key: 'guidanceNotes', type: 'object', label: 'AI Guidance Notes' },
+      ],
+    });
+  }
+}
+
 function computeControlOnlyPaths(content, boundPaths, declared = []) {
   const inventory = enumerateContentPaths(content);
   const bound = new Set([...(boundPaths || [])].map(wildcardPath));
@@ -526,6 +571,14 @@ function buildSiteDataAndManifest({
   assignSectionPageKeys(editorSections, routes, markerRoutes);
   enrichSchemasFromContent(content, editorSections);
 
+  // Auto-inject platform-managed editorSchema sections if not already present.
+  // These sections are required so the validator accepts their controlOnlyPaths,
+  // but template developers should never need to add these manually.
+  ensurePlatformSections(editorSections);
+
+  // controlOnlyPaths: platform paths are auto-merged by platform-contract.json at
+  // validate/build time. We only emit template-specific paths here (currently none
+  // by default — templates add their own via controlOnlyPaths in fivora-template.json).
   const controlOnlyPaths = computeControlOnlyPaths(
     content,
     boundFieldPaths,

@@ -1046,9 +1046,77 @@ function instrumentLayoutSource(code, siteDataImport, providerImport = '@deneb-u
   }
 
   ensureProviderInitialData(ast, jsonIdent);
+  injectPlatformAdditionalPages(ast, providerImport);
   sanitizeDuplicateBindings(ast);
   const next = printSource(ast, code);
   return { code: next, updated: next !== code };
+}
+
+/**
+ * Injects <PlatformAdditionalPages /> into the layout JSX tree after <main>.
+ * This component handles all additionalPages visual-editing markers correctly
+ * so template developers never need to know the complex nesting rules.
+ *
+ * The injected pattern looks like:
+ *   <main>{children}</main>
+ *   <PlatformAdditionalPages />    ← injected (inside the SiteDataProvider/body)
+ *
+ * If PlatformAdditionalPages is already in the source, it's a no-op.
+ */
+function injectPlatformAdditionalPages(ast, providerImport) {
+  if (!ast) return;
+  // Already injected - skip
+  let alreadyPresent = false;
+  recast.types.visit(ast, {
+    visitJSXIdentifier(pathNode) {
+      if (pathNode.node.name === 'PlatformAdditionalPages') {
+        alreadyPresent = true;
+        return false;
+      }
+      this.traverse(pathNode);
+    },
+  });
+  if (alreadyPresent) return;
+
+  // Inject after the first <main> element in any JSX tree
+  let injected = false;
+  recast.types.visit(ast, {
+    visitJSXElement(pathNode) {
+      if (injected) return false;
+      const name = getJsxName(pathNode.node);
+      if (name === 'main') {
+        const parent = pathNode.parent;
+        if (!parent || !Array.isArray(parent.node.children)) {
+          this.traverse(pathNode);
+          return;
+        }
+        const siblings = parent.node.children;
+        const idx = siblings.indexOf(pathNode.node);
+        if (idx === -1) {
+          this.traverse(pathNode);
+          return;
+        }
+        // Build <PlatformAdditionalPages />
+        const platformElement = b.jsxElement(
+          b.jsxOpeningElement(
+            b.jsxIdentifier('PlatformAdditionalPages'),
+            [],
+            true // self-closing
+          ),
+          null,
+          [],
+          true
+        );
+        const newline = b.jsxText('
+            ');
+        siblings.splice(idx + 1, 0, newline, platformElement);
+        ensureImport(ast, providerImport || '@deneb-ui/ui', ['PlatformAdditionalPages']);
+        injected = true;
+        return false;
+      }
+      this.traverse(pathNode);
+    },
+  });
 }
 
 function ensureJsonModule(tsconfig) {
