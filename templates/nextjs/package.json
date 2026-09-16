@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.3.6",
-    "@types/node": "22.15.3",
+    "@types/node": "^20",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "eslint": "9.39.5",
@@ -34,6 +34,10 @@
     "autoprefixer": "^10.4.20"
   },
   "overrides": {
-    "sharp": "0.35.3"
+    "sharp": "0.35.3",
+    "content-type": "2.1.0",
+    "@octokit/request": {
+      "content-type": "2.1.0"
+    }
   }
 }
