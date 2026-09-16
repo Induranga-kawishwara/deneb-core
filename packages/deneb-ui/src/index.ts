@@ -110,6 +110,8 @@ export { EditableCartDrawer as CartDrawer } from './EditableCartDrawer';
 export { EditableFilterSidebar as FilterSidebar } from './EditableFilterSidebar';
 
 
+export { PlatformAdditionalPages, AdditionalPagesNav } from './PlatformAdditionalPages';
+
 /**
  * DENEB UI Framework Metadata
  * Developed by Chamika Gayashan & Induranga Kawishwara

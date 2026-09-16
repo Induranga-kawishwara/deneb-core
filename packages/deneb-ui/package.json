@@ -62,6 +62,12 @@
     "typescript": "^5.0.0"
   },
   "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
     "./platform-contract": "./platform-contract.json"
   }
 }
