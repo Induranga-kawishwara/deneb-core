@@ -433,7 +433,6 @@
         "type": "list",
         "label": "Products",
         "minItems": 0,
-        "maxItems": 24,
         "fields": [
           {
             "key": "id",
