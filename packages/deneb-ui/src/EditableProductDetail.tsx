@@ -4,7 +4,7 @@ import { resolveProductOptions, MeasurementUnit } from './utils/productOptions';
 import { createWhatsAppUrl } from './utils/urls';
 
 export interface ProductDetailItem {
-  id?: string;
+  id?: string | number;
   name?: string;
   title?: string;
   brand?: string;
@@ -16,7 +16,9 @@ export interface ProductDetailItem {
   badge?: string;
   featuredImage?: string;
   imageUrl?: string;
+  image?: string;
   gallery?: string[];
+  images?: string[];
   addToSelectionLabel?: string;
   specsTitle?: string;
   specs?: Array<{ label: string; value: string }>;

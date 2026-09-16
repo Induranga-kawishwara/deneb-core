@@ -100,6 +100,7 @@ export default function Page() {
 | `ProductGrid` | `EditableProductGrid` | `data-preview-list-path`, `data-preview-item-path` | Catalog grid with quick-view modal hook & filter integration |
 | `ProductShowcase` | `EditableProductShowcase` | `data-preview-field-path`, `data-preview-list-path`, `color` swatch | Flagship product showcase with color swatches, filter tabs, quick-view & WhatsApp order |
 | `ProductDetail` | `EditableProductDetail` | `data-preview-page-key`, `data-preview-field-path` | Full single-product view with gallery, specs, & inquiry actions |
+| `PlatformProductDetail` | `PlatformProductDetail` | `useProducts`, live catalog API | Stable static-export product page with URL lookup, retries, and fallback states |
 | `ProductQuickView` | `ProductQuickView` | `data-preview-field-path` | Instant lightbox modal product inspection with quantity counter |
 | `CartDrawer` | `EditableCartDrawer` | `data-preview-list-path`, `data-preview-item-path` | Slide-over cart drawer with 1-click unified WhatsApp order compilation |
 | `FilterSidebar` | `EditableFilterSidebar` | `data-preview-field-path`, `useSiteData` | Faceted catalog filter sidebar (categories, price range, sizes) |
@@ -159,6 +160,7 @@ export default function Page() {
 | :--- | :--- | :--- |
 | `SiteDataProvider` / `DenebDataProvider` | `SiteDataProvider` | Real-time backend catalog fetcher & `postMessage` preview state synchronizer |
 | `useProducts` | `SiteDataProvider` | React hook to access live synchronized products list (`content.products`) |
+| `usePlatformProductDetail` | `PlatformProductDetail` | Resolves `?id=` against live data and the catalog API for a custom detail design |
 | `useServices` | `SiteDataProvider` | React hook to access live synchronized services list (`content.services`) |
 | `useSiteCatalog` | `SiteDataProvider` | Returns `{ products, services, project, siteInstance, api }` in one call |
 | `useSiteApi` | `SiteDataProvider` | Returns official Fivora backend endpoints (`catalogUrl`, `contactUrl`, `analyticsUrl`) |
@@ -169,6 +171,51 @@ export default function Page() {
 | `FontLoader` | `fonts/FontLoader` | Google Fonts pre-fetch & dynamic injection engine |
 | `useDenebFonts` | `fonts/useDenebFonts` | Hook for checking active font definitions |
 | `CartProvider` / `useCart`| `cart/useCart` | Global cart state management with persistent storage |
+
+## Safe product detail routes for static exports
+
+Never link live products to `/products/${product.id}`. A product created after
+the template build has no matching static directory, so that URL can return a
+404. Export one stable page and pass the product ID in the query string.
+
+```tsx
+// src/app/products/detail/page.tsx
+import { PlatformProductDetail } from '@deneb-ui/ui';
+
+export default function ProductDetailPage() {
+  return <PlatformProductDetail />;
+}
+```
+
+Build product links with the matching helper:
+
+```tsx
+import { platformProductDetailHref } from '@deneb-ui/ui';
+
+<a href={platformProductDetailHref(product.id)}>View product</a>
+```
+
+For a template-specific design, keep the platform data behavior and replace
+only the renderer:
+
+```tsx
+import { PlatformProductDetail } from '@deneb-ui/ui';
+
+export default function ProductDetailPage() {
+  return (
+    <PlatformProductDetail
+      renderProduct={(product, { productIndex }) => (
+        <MyProductDetail product={product} index={productIndex} />
+      )}
+    />
+  );
+}
+```
+
+`PlatformProductDetail` reads `/products/detail/?id=PRODUCT_ID`, checks the
+reactive `SiteDataProvider` catalog, retries `api.catalogUrl`, and renders safe
+loading, network-error, and not-found states. `usePlatformProductDetail()` is
+also exported for developers who need complete control of the page markup.
 
 ---
 

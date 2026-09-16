@@ -344,6 +344,7 @@ export function validateTemplateVisualEditingContract(
   );
   validateStaticMarkerSourceAuthorship(input.artifacts, strictFindings);
   validatePreviewRuntimeCapability(input.artifacts, strictFindings);
+  validateLiveProductRouting(input.artifacts, strictFindings);
 
   warnings.push(
     ...extraction.unparseableAttributes.map(
@@ -1699,6 +1700,47 @@ function validatePreviewRuntimeCapability(
   if (!emitsReady) {
     findings.push(
       `Preview runtime source must call postMessage with "${PREVIEW_READY_MESSAGE}" after its live-data listener is ready.`,
+    );
+  }
+}
+
+function validateLiveProductRouting(
+  artifacts: TemplateVisualEditingArtifact[],
+  findings: string[],
+) {
+  const sourceArtifacts = artifacts.filter(
+    (artifact) => artifact.kind === 'source',
+  );
+  const legacyRoutePatterns = [
+    /\/products\/\$\{/m,
+    /['"`]\/products\/['"`]\s*\+\s*(?:encodeURIComponent\s*\()?/m,
+  ];
+
+  for (const artifact of sourceArtifacts) {
+    const match = legacyRoutePatterns
+      .map((pattern) => pattern.exec(artifact.content))
+      .find((candidate): candidate is RegExpExecArray => Boolean(candidate));
+    if (!match) continue;
+    findings.push(
+      `${artifact.filePath}:${lineNumberAt(artifact.content, match.index)} uses a build-time dynamic /products/:id URL. Live catalog items can be added after a static export, so product links must use the stable exported route /products/detail/?id=... and resolve the ID from the live catalog on the client.`,
+    );
+  }
+
+  const usesStableProductRoute = sourceArtifacts.some((artifact) =>
+    /\/products\/detail\/?(?:\?[^'"`\s]*)?/m.test(artifact.content),
+  );
+  if (!usesStableProductRoute) return;
+
+  const exportsStableProductRoute = artifacts.some(
+    (artifact) =>
+      artifact.kind === 'html' &&
+      /(?:^|\/)products\/detail\/(?:index\.)?html$/i.test(
+        artifact.filePath.replace(/\\/g, '/'),
+      ),
+  );
+  if (!exportsStableProductRoute) {
+    findings.push(
+      'Product links use /products/detail/?id=..., but the static export does not contain products/detail/index.html. Add a static detail page that reads the query ID and hydrates the matching item from the live catalog.',
     );
   }
 }

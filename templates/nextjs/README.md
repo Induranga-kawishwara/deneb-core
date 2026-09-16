@@ -79,6 +79,27 @@ When you run **`npm run lab`**, you can click directly on any element with a `da
 
 The root layout wraps your application with `<SiteDataProvider>`, which automatically connects to the Fivora backend (`api.catalogUrl`) on live sites and listens to live visual editing updates in the Lab.
 
+For product detail navigation in a static export, always use the stable exported
+page `/products/detail/?id=PRODUCT_ID`. Do not generate `/products/PRODUCT_ID`
+links for live catalog rows: products added after the build do not have a
+corresponding static directory and will 404. The package owns the URL parsing,
+live lookup, retries, and fallback states:
+
+```tsx
+// src/app/products/detail/page.tsx
+import { PlatformProductDetail } from '@deneb-ui/ui';
+
+export default function ProductDetailPage() {
+  return <PlatformProductDetail />;
+}
+```
+
+Use `platformProductDetailHref(product.id)` for card links. To preserve a
+template-specific visual design, pass `renderProduct={(product, context) =>
+<YourProductDetail product={product} index={context.productIndex} />}` or use
+the lower-level `usePlatformProductDetail()` hook. Always verify that the export
+contains `products/detail/index.html`.
+
 Import hooks from `@/lib/siteDataContext` or `@deneb-ui/ui`:
 
 ```tsx
