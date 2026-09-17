@@ -122,3 +122,31 @@ export { PlatformAdditionalPages, AdditionalPagesNav } from './PlatformAdditiona
 export const DENEB_FRAMEWORK_NAME = 'DENEB UI';
 export const DENEB_FRAMEWORK_VERSION = '2.0.0';
 export const DENEB_AUTHOR = 'Chamika Gayashan & Induranga Kawishwara';
+
+export {
+  THEME_PALETTES,
+  GLOBAL_FONT_OPTIONS,
+  FONT_PAIRINGS,
+  isDarkColor,
+  getAutoContrastTextColor,
+  toHexColor,
+  normalizeHexColor,
+  parseVisualCustomization,
+  customizationToTheme,
+  mergeVisualCustomizationIntoTheme,
+  generateThemeVariables,
+} from '@deneb-ui/core';
+export type {
+  ThemePalette,
+  FontPairing,
+  GlobalFontOption,
+  VisualCustomization,
+  VisualCustomizationColors,
+  VisualCustomizationTypography,
+  VisualCustomizationSpacing,
+  VisualCustomizationLayout,
+  VisualCustomizationComponents,
+  VisualCustomizationSectionOverride,
+  VisualCustomizationElementStyle,
+  TemplateThemeShape,
+} from '@deneb-ui/core';

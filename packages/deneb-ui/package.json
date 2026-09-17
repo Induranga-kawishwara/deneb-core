@@ -68,6 +68,10 @@
       "require": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./platform-contract": "./platform-contract.json"
+    "./platform-contract": "./platform-contract.json",
+    "./theme": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   }
 }

@@ -1,4 +1,5 @@
 import React from 'react';
+import { isDarkColor, getAutoContrastTextColor } from '@deneb-ui/core';
 import { ResponsiveBaseStyles } from './ResponsiveBaseStyles';
 
 export interface TemplateTheme {
@@ -168,20 +169,6 @@ export function getThemeCssProperties(theme?: TemplateTheme | null): React.CSSPr
     }
   }
 
-  const isDarkColor = (color?: unknown) => {
-    if (typeof color !== 'string' || !color) return false;
-    if (!color) return false;
-    const hex = color.trim().toLowerCase();
-    if (!/^#[0-9a-f]{3,6}$/.test(hex)) return false;
-    const fullHex =
-      hex.length === 4
-        ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
-        : hex;
-    const r = Number.parseInt(fullHex.slice(1, 3), 16);
-    const g = Number.parseInt(fullHex.slice(3, 5), 16);
-    const b = Number.parseInt(fullHex.slice(5, 7), 16);
-    return (r * 299 + g * 587 + b * 114) / 1000 < 130;
-  };
 
   const isDark = isDarkColor(theme?.backgroundColor);
   const bgColor = theme?.backgroundColor || (isDark ? '#0f172a' : '#ffffff');
@@ -193,7 +180,7 @@ export function getThemeCssProperties(theme?: TemplateTheme | null): React.CSSPr
 
   const primaryColor = theme?.primaryColor || '#2563eb';
   const buttonBg = String(theme?.buttonBackgroundColor || primaryColor || '#2563eb');
-  const autoButtonText = isDarkColor(buttonBg) ? '#ffffff' : '#0f172a';
+  const autoButtonText = getAutoContrastTextColor(buttonBg);
   const buttonText = String(theme?.buttonTextColor || autoButtonText);
   const buttonSecondaryBg = isDark
     ? 'rgba(255, 255, 255, 0.08)'
