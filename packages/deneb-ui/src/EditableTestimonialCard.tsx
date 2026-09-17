@@ -38,7 +38,7 @@ export function EditableTestimonialCard({
     border: '1px solid var(--card-border, var(--color-border, #f1f5f9))',
     borderRadius: '16px',
     padding: '2rem',
-    boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.04)',
+    boxShadow: 'var(--card-shadow, 0 4px 20px -2px rgba(0, 0, 0, 0.04))',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
@@ -51,7 +51,7 @@ export function EditableTestimonialCard({
       data-preview-item-path={itemPath}
       style={cardStyle}
       className={`editable-testimonial-card ${className}`.trim()}
-      {...(props as any)}
+      {...(props as Record<string, unknown>)}
     >
       <div>
         {/* Star Rating */}

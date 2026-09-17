@@ -17,6 +17,8 @@ export interface TemplateTheme {
   bodyFont?: string;
   borderRadius?: string;
   align?: 'left' | 'center' | 'right';
+  buttonBackgroundColor?: string;
+  buttonTextColor?: string;
   [key: string]: unknown;
 }
 
@@ -166,7 +168,8 @@ export function getThemeCssProperties(theme?: TemplateTheme | null): React.CSSPr
     }
   }
 
-  const isDarkColor = (color?: string) => {
+  const isDarkColor = (color?: unknown) => {
+    if (typeof color !== 'string' || !color) return false;
     if (!color) return false;
     const hex = color.trim().toLowerCase();
     if (!/^#[0-9a-f]{3,6}$/.test(hex)) return false;
@@ -188,15 +191,24 @@ export function getThemeCssProperties(theme?: TemplateTheme | null): React.CSSPr
   const cardBg = isDark ? '#111a2e' : '#ffffff';
   const cardBorder = isDark ? 'rgba(255, 255, 255, 0.09)' : '#e2e8f0';
 
+  const primaryColor = theme?.primaryColor || '#2563eb';
+  const buttonBg = String(theme?.buttonBackgroundColor || primaryColor || '#2563eb');
+  const autoButtonText = isDarkColor(buttonBg) ? '#ffffff' : '#0f172a';
+  const buttonText = String(theme?.buttonTextColor || autoButtonText);
+  const buttonSecondaryBg = isDark
+    ? 'rgba(255, 255, 255, 0.08)'
+    : (theme?.secondaryColor && !isDarkColor(theme.secondaryColor) ? theme.secondaryColor : '#f1f5f9');
+  const buttonSecondaryText = isDark ? '#f8fafc' : '#0f172a';
+
   return {
-    '--brand-color': theme?.primaryColor || '#2563eb',
-    '--brand-secondary': theme?.secondaryColor || '#0f172a',
+    '--brand-color': primaryColor,
+    '--brand-secondary': theme?.secondaryColor || (isDark ? '#1e293b' : '#0f172a'),
     '--brand-accent': theme?.accentColor || '#14b8a6',
     '--page-background': bgColor,
     '--page-text': textColor,
     '--heading-color': theme?.headingColor || (isDark ? '#ffffff' : theme?.secondaryColor || '#0f172a'),
     '--muted-text': mutedColor,
-    '--link-color': theme?.linkColor || theme?.primaryColor || '#2563eb',
+    '--link-color': theme?.linkColor || primaryColor,
     '--hero-min-height': theme?.heroMinHeight || '72vh',
     '--section-padding': theme?.sectionPadding || '5rem',
     '--base-size': theme?.baseSize || '16px',
@@ -205,8 +217,8 @@ export function getThemeCssProperties(theme?: TemplateTheme | null): React.CSSPr
     '--border-radius': theme?.borderRadius || '8px',
     '--content-align': theme?.align || 'left',
     // Canonical color system tokens for light & dark mode harmony
-    '--color-primary': theme?.primaryColor || '#2563eb',
-    '--color-secondary': theme?.secondaryColor || (isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9'),
+    '--color-primary': primaryColor,
+    '--color-secondary': buttonSecondaryBg,
     '--color-accent': theme?.accentColor || '#14b8a6',
     '--color-text': textColor,
     '--color-text-muted': mutedColor,
@@ -214,10 +226,25 @@ export function getThemeCssProperties(theme?: TemplateTheme | null): React.CSSPr
     '--color-surface': isDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
     '--card-bg': cardBg,
     '--card-border': cardBorder,
+    '--product-card-bg': cardBg,
+    '--product-card-border': cardBorder,
+    '--tag-bg': isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(241, 245, 249, 0.9)',
+    '--tag-color': mutedColor,
+    '--card-shadow': isDark ? '0 10px 25px -5px rgba(0, 0, 0, 0.4)' : '0 10px 25px -5px rgba(0, 0, 0, 0.05)',
     '--header-bg': isDark ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.82)',
     '--input-bg': isDark ? '#1e293b' : '#ffffff',
     '--input-border': isDark ? 'rgba(255, 255, 255, 0.15)' : '#cbd5e1',
     '--input-color': textColor,
+    // Dedicated Button Design Tokens
+    '--button-bg': buttonBg,
+    '--button-text': buttonText,
+    '--button-primary-bg': buttonBg,
+    '--button-primary-text': buttonText,
+    '--button-secondary-bg': buttonSecondaryBg,
+    '--button-secondary-text': buttonSecondaryText,
+    '--button-outline-border': isDark ? 'rgba(255, 255, 255, 0.22)' : 'currentColor',
+    '--button-outline-text': isDark ? '#f8fafc' : textColor,
+    '--button-ghost-text': isDark ? '#f8fafc' : textColor,
     fontFamily: theme?.bodyFont || 'Inter, sans-serif',
     ...customVars,
   } as React.CSSProperties;

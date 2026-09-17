@@ -11,7 +11,6 @@ export interface ProductItem {
   title?: string;
   brand?: string;
   price?: string | number;
-  compareAtPrice?: string | number;
   originalPrice?: string | number;
   currency?: string;
   description?: string;
@@ -24,7 +23,6 @@ export interface ProductItem {
   reviewsCount?: number | string;
   isNew?: boolean;
   isBestSeller?: boolean;
-  isAvailable?: boolean;
 
   // WhatsApp & CTA custom bindings per product
   whatsappNumber?: string;
@@ -237,13 +235,12 @@ export function EditableProductCard({
   const priceNum = typeof rawPrice === 'number' ? rawPrice : parseFloat(String(rawPrice || '').replace(/[^0-9.]/g, '')) || 0;
   const formattedPrice = hasPrice ? (typeof rawPrice === 'string' && rawPrice.includes('LKR') ? rawPrice : formatCurrency(priceNum, currency)) : '';
 
-  const comparePrice = product?.originalPrice ?? product?.compareAtPrice;
-  const originalPrice = comparePrice !== undefined && comparePrice !== null ? String(comparePrice) : '';
+  const originalPrice = product?.originalPrice !== undefined ? String(product.originalPrice) : '';
   const description = String(product?.description || '');
   const category = String(product?.category || '');
   const badge = String(product?.badge || '');
-  const imageUrl = String(product?.imageUrl || product?.image || '');
-  const isAvailable = product?.isAvailable !== false;
+  const fallbackImage = imageFallback || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80';
+  const imageUrl = String(product?.imageUrl || product?.image || fallbackImage);
 
   // Resolved phone number for WhatsApp
   const resolvedPhone = String(product?.whatsappNumber || whatsappNumber || '94770000000');
@@ -254,7 +251,6 @@ export function EditableProductCard({
 
   const handleWhatsAppClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isAvailable) return;
     const url = getProductWhatsAppUrl(
       { ...product, name, brand, price: formattedPrice },
       resolvedPhone,
@@ -270,7 +266,6 @@ export function EditableProductCard({
 
   const handleAddToCartClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isAvailable) return;
     const itemToAdd = {
       id: String(product?.id || name.toLowerCase().replace(/\s+/g, '-')),
       name,
@@ -291,12 +286,12 @@ export function EditableProductCard({
 
   const variantStyles: Record<ProductCardVariant, React.CSSProperties> = {
     'modern-glass': {
-      backgroundColor: 'var(--card-bg, rgba(255, 255, 255, 0.85))',
+      backgroundColor: 'var(--product-card-bg, var(--card-bg, var(--color-surface, rgba(255, 255, 255, 0.85))))',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
-      border: '1px solid var(--card-border, var(--color-border, rgba(226, 232, 240, 0.8)))',
+      border: '1px solid var(--product-card-border, var(--card-border, var(--color-border, rgba(226, 232, 240, 0.8))))',
       borderRadius: '16px',
-      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)',
+      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4)',
       overflow: 'hidden',
       transition: 'transform 0.25s ease, box-shadow 0.25s ease',
       display: 'flex',
@@ -373,25 +368,6 @@ export function EditableProductCard({
             />
           </div>
         )}
-        {!isAvailable && (
-          <span
-            data-preview-field-path={`${itemPath}.isAvailable`}
-            style={{
-              position: 'absolute',
-              right: '10px',
-              top: '10px',
-              zIndex: 10,
-              borderRadius: '999px',
-              backgroundColor: '#be123c',
-              color: '#ffffff',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              padding: '4px 10px',
-            }}
-          >
-            Out of Stock
-          </span>
-        )}
       </div>
 
       {/* Body Wrap */}
@@ -417,8 +393,8 @@ export function EditableProductCard({
                   fontSize: '0.75rem',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
-                  color: 'var(--brand-accent, #14b8a6)',
-                  fontWeight: 600,
+                  color: 'var(--brand-accent, #a3e635)',
+                  fontWeight: 700,
                   display: 'inline-block',
                 }}
               />
@@ -435,8 +411,8 @@ export function EditableProductCard({
                   fontWeight: 700,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  color: 'var(--muted-text, #64748b)',
-                  backgroundColor: 'var(--tag-bg, rgba(241, 245, 249, 0.9))',
+                  color: 'var(--tag-color, var(--muted-text, var(--color-muted, #64748b)))',
+                  backgroundColor: 'var(--tag-bg, var(--color-secondary, rgba(241, 245, 249, 0.9)))',
                   padding: '2px 8px',
                   borderRadius: '6px',
                 }}
@@ -454,7 +430,7 @@ export function EditableProductCard({
               fontSize: '1.125rem',
               fontWeight: 700,
               lineHeight: 1.35,
-              color: 'var(--heading-color, #0f172a)',
+              color: 'var(--heading-color, #ffffff)',
               marginBottom: '0.375rem',
             }}
           />
@@ -468,7 +444,7 @@ export function EditableProductCard({
               defaultValue={description}
               style={{
                 fontSize: '0.875rem',
-                color: 'var(--muted-text, #64748b)',
+                color: 'var(--muted-text, #94a3b8)',
                 lineHeight: 1.5,
                 marginBottom: '0.75rem',
                 display: '-webkit-box',
@@ -502,7 +478,7 @@ export function EditableProductCard({
                 style={{
                   fontSize: '1.3rem',
                   fontWeight: 800,
-                  color: 'var(--brand-color, #2563eb)',
+                  color: 'var(--brand-color, #ffffff)',
                   letterSpacing: '-0.02em',
                 }}
               />
@@ -536,24 +512,7 @@ export function EditableProductCard({
           ) : null}
 
           {/* Actions: Custom Action Slot OR Dual Buttons */}
-          {!isAvailable ? (
-            <div
-              data-preview-field-path={`${itemPath}.isAvailable`}
-              role="status"
-              style={{
-                width: '100%',
-                borderRadius: '10px',
-                backgroundColor: '#e2e8f0',
-                color: '#475569',
-                padding: '0.65rem 0.75rem',
-                textAlign: 'center',
-                fontSize: '0.8125rem',
-                fontWeight: 700,
-              }}
-            >
-              Out of Stock
-            </div>
-          ) : actionSlot ? (
+          {actionSlot ? (
             <div>{actionSlot}</div>
           ) : (
             <div
@@ -606,8 +565,8 @@ export function EditableProductCard({
                   onClick={handleAddToCartClick}
                   title="Add this product to shopping cart"
                   style={{
-                    backgroundColor: 'var(--brand-color, #2563eb)',
-                    color: '#ffffff',
+                    backgroundColor: 'var(--button-bg, var(--brand-color, #2563eb))',
+                    color: 'var(--button-text, #ffffff)',
                     border: 'none',
                     padding: '0.55rem 0.75rem',
                     borderRadius: '10px',
@@ -629,7 +588,7 @@ export function EditableProductCard({
                     id={`${itemPath}.addToCartButtonText`}
                     data-preview-field-path={`${itemPath}.addToCartButtonText`}
                     defaultValue={resolvedAddToCartText}
-                    style={{ color: '#ffffff', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                    style={{ color: 'var(--button-text, #ffffff)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                   />
                 </button>
               )}

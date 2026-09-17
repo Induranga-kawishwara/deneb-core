@@ -138,7 +138,9 @@ function saveRecipeFromProject(projectDir, recipeName = 'custom-storefront', opt
     productDetailRules: {
       enabled: true,
       sectionPath: 'product',
-      sampleRoute: '/products/vanta-aero-x',
+      detailRoute: '/products/detail',
+      sampleRoute: '/products/detail',
+      usePlatformDetail: true,
       galleryWithBasePath: true,
       noStaticOnEditableAncestors: true,
     },
@@ -155,7 +157,18 @@ function saveRecipeFromProject(projectDir, recipeName = 'custom-storefront', opt
       platforms: ['instagram', 'facebook', 'twitter', 'tiktok', 'youtube', 'linkedin'],
       targetPath: 'common.footer',
     },
-    pages: manifest.pages || [],
+    pages: (() => {
+      const existingPages = Array.isArray(manifest.pages) ? [...manifest.pages] : [];
+      const hasDetail = existingPages.some((p) => p.route === '/products/detail' || p.id === 'product-detail');
+      if (!hasDetail && existingPages.some((p) => (p.route || '').includes('/product'))) {
+        existingPages.push({
+          id: 'product-detail',
+          label: 'Live Product Detail',
+          route: '/products/detail',
+        });
+      }
+      return existingPages;
+    })(),
     sections: (manifest.editorSchema?.sections || []).map((s) => ({
       ...s,
       path: s.path || s.id,

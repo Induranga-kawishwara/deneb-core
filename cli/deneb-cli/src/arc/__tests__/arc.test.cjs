@@ -1423,4 +1423,53 @@ test('empty-state source audit flags gated preview markers', () => {
   assert.ok(errors.some((error) => error.includes('gated behind')));
 });
 
+test('healLegacyProductDetailLinks rewrites /products/${id} to platformProductDetailHref', () => {
+  const { parseSource, printSource } = require('../ast.cjs');
+  const { healLegacyProductDetailLinks } = require('../transformer.cjs');
+  const code = `
+export function ProductCard({ product }: { product: { id: string } }) {
+  return (
+    <a href={\`/products/\${product.id}\`}>
+      <span>View</span>
+    </a>
+  );
+}
+`;
+  const ast = parseSource(code, 'ProductCard.tsx');
+  const healed = healLegacyProductDetailLinks(ast);
+  assert.equal(healed, 1);
+  const out = printSource(ast);
+  assert.match(out, /platformProductDetailHref\(product\.id\)/);
+  assert.match(out, /from ['"]@deneb-ui\/ui['"]/);
+});
+
+test('saveRecipeFromProject learns calibrated fixes and registers live product detail route', () => {
+  const { saveRecipeFromProject, getRecipeByName } = require('../../tools/recipe-engine.cjs');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-recipe-test-'));
+  fs.writeFileSync(
+    path.join(tmpDir, 'fivora-template.json'),
+    JSON.stringify({
+      manifestVersion: 2,
+      name: 'Test Store',
+      pages: [{ id: 'home', route: '/' }, { id: 'products', route: '/products' }],
+      editorSchema: { version: 1, sections: [] },
+    })
+  );
+  const saveRes = saveRecipeFromProject(tmpDir, 'unit-test-store');
+  assert.equal(saveRes.recipe.name, 'unit-test-store');
+  assert.equal(saveRes.recipe.productDetailRules.detailRoute, '/products/detail');
+  assert.ok(saveRes.recipe.pages.some((p) => p.route === '/products/detail'));
+
+  const loaded = getRecipeByName('unit-test-store', tmpDir);
+  assert.ok(loaded);
+  assert.equal(loaded.name, 'unit-test-store');
+
+  // Clean up test artifacts
+  try {
+    if (fs.existsSync(saveRes.globalDest)) fs.unlinkSync(saveRes.globalDest);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  } catch {}
+});
+
+
 

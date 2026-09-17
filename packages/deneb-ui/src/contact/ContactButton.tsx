@@ -117,22 +117,23 @@ export function ContactButton({
 
   const variantStyles: Record<'primary' | 'secondary' | 'outline' | 'ghost' | 'whatsapp', React.CSSProperties> = {
     primary: {
-      backgroundColor: 'var(--color-primary, #0f172a)',
-      color: '#ffffff',
+      backgroundColor: 'var(--button-bg, var(--color-primary, #0f172a))',
+      color: 'var(--button-text, #ffffff)',
       boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
     },
     secondary: {
-      backgroundColor: 'var(--color-secondary, #f1f5f9)',
-      color: 'var(--color-text, #0f172a)',
+      backgroundColor: 'var(--button-secondary-bg, var(--color-secondary, #f1f5f9))',
+      color: 'var(--button-secondary-text, var(--color-text, #0f172a))',
+      border: '1px solid var(--button-secondary-border, var(--color-border, transparent))',
     },
     outline: {
       backgroundColor: 'transparent',
-      border: '1px solid var(--color-border, #e2e8f0)',
-      color: 'var(--color-text, #0f172a)',
+      border: '1px solid var(--button-outline-border, var(--color-border, #e2e8f0))',
+      color: 'var(--button-outline-text, var(--color-text, #0f172a))',
     },
     ghost: {
       backgroundColor: 'transparent',
-      color: 'var(--color-text, #0f172a)',
+      color: 'var(--button-ghost-text, var(--color-text, #0f172a))',
     },
     whatsapp: {
       backgroundColor: '#25D366',
