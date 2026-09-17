@@ -2,6 +2,7 @@
 
 export {
   SiteDataProvider,
+  ThemeStyles,
   useSiteData,
   useProducts,
   useServices,
@@ -28,4 +29,5 @@ export type {
   SiteInstanceData,
   ProductItem,
   ServiceItem,
+  TemplateTheme,
 } from '@deneb-ui/ui';
