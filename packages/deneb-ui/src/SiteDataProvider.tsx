@@ -518,6 +518,16 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
 
       if (isData && isRecord(event.data.siteData)) {
         applyIncomingSiteData(event.data.siteData);
+        try {
+          const target = parentOrigin && parentOrigin !== 'null' ? parentOrigin : '*';
+          const appliedFull = (event.data as Record<string, unknown>).full !== false;
+          window.parent.postMessage(
+            { type: 'FIVORA_PREVIEW_SITE_DATA_APPLIED', full: appliedFull },
+            target,
+          );
+        } catch {
+          // ignore
+        }
         return;
       }
 
