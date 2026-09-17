@@ -7,3 +7,4 @@ export * from './engine/domPatcher';
 export * from './engine/tokenResolver';
 export * from './engine/deepMerge';
 export * from './validation/styleSchemaValidator';
+export * from './theme';

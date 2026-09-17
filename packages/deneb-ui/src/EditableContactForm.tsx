@@ -181,10 +181,11 @@ export function EditableContactForm({
             width: '100%',
             padding: '0.75rem 1rem',
             borderRadius: '10px',
-            border: '1px solid #cbd5e1',
+            border: '1px solid var(--input-border, #cbd5e1)',
             fontSize: '0.95rem',
             outline: 'none',
-            backgroundColor: '#ffffff',
+            backgroundColor: 'var(--input-bg, #ffffff)',
+            color: 'var(--input-color, var(--page-text, inherit))',
             boxSizing: 'border-box',
           }}
         />
@@ -215,10 +216,11 @@ export function EditableContactForm({
             width: '100%',
             padding: '0.75rem 1rem',
             borderRadius: '10px',
-            border: '1px solid #cbd5e1',
+            border: '1px solid var(--input-border, #cbd5e1)',
             fontSize: '0.95rem',
             outline: 'none',
-            backgroundColor: '#ffffff',
+            backgroundColor: 'var(--input-bg, #ffffff)',
+            color: 'var(--input-color, var(--page-text, inherit))',
             boxSizing: 'border-box',
           }}
         />
@@ -284,10 +286,11 @@ export function EditableContactForm({
             width: '100%',
             padding: '0.75rem 1rem',
             borderRadius: '10px',
-            border: '1px solid #cbd5e1',
+            border: '1px solid var(--input-border, #cbd5e1)',
             fontSize: '0.95rem',
             outline: 'none',
-            backgroundColor: '#ffffff',
+            backgroundColor: 'var(--input-bg, #ffffff)',
+            color: 'var(--input-color, var(--page-text, inherit))',
             boxSizing: 'border-box',
             fontFamily: 'inherit',
           }}

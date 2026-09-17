@@ -34,8 +34,8 @@ export function EditableTestimonialCard({
   const rating = Number(item?.rating || 5);
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: 'var(--color-surface, #ffffff)',
-    border: '1px solid var(--color-border, #f1f5f9)',
+    backgroundColor: 'var(--card-bg, var(--color-surface, #ffffff))',
+    border: '1px solid var(--card-border, var(--color-border, #f1f5f9))',
     borderRadius: '16px',
     padding: '2rem',
     boxShadow: 'var(--card-shadow, 0 4px 20px -2px rgba(0, 0, 0, 0.04))',

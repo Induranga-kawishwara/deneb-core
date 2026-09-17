@@ -56,8 +56,8 @@ export function EditablePricingCard({
 
   const cardStyle: React.CSSProperties = {
     position: 'relative',
-    backgroundColor: popular ? '#ffffff' : 'rgba(255, 255, 255, 0.85)',
-    border: popular ? '2px solid var(--brand-color, #2563eb)' : '1px solid #e2e8f0',
+    backgroundColor: 'var(--card-bg, var(--color-surface, #ffffff))',
+    border: popular ? '2px solid var(--brand-color, #2563eb)' : '1px solid var(--card-border, var(--color-border, #e2e8f0))',
     borderRadius: '20px',
     padding: '2.5rem 2rem',
     boxShadow: popular

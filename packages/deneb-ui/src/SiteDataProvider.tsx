@@ -99,6 +99,54 @@ export function isRecord(value: unknown): value is GenericRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+export function isDarkColor(color?: unknown): boolean {
+  if (typeof color !== "string" || !color) return false;
+  const hex = color.trim().toLowerCase();
+  if (!/^#[0-9a-f]{3,6}$/.test(hex)) return false;
+  const fullHex =
+    hex.length === 4
+      ? "#" + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3]
+      : hex;
+  const r = Number.parseInt(fullHex.slice(1, 3), 16);
+  const g = Number.parseInt(fullHex.slice(3, 5), 16);
+  const b = Number.parseInt(fullHex.slice(5, 7), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 < 130;
+}
+
+export function syncThemeToDocument(theme: unknown) {
+  if (typeof document === "undefined" || !isRecord(theme)) return;
+  const rootStyle = document.documentElement.style;
+  if (typeof theme.primaryColor === "string") {
+    rootStyle.setProperty("--brand-primary", theme.primaryColor);
+    rootStyle.setProperty("--brand-color", theme.primaryColor);
+    rootStyle.setProperty("--color-primary", theme.primaryColor);
+    const isPrimaryDark = isDarkColor(theme.primaryColor);
+    const autoBtnText = isPrimaryDark ? "#ffffff" : "#0f172a";
+    rootStyle.setProperty("--button-bg", String(theme.buttonBackgroundColor || theme.primaryColor));
+    rootStyle.setProperty("--button-text", String(theme.buttonTextColor || autoBtnText));
+  }
+  if (typeof theme.secondaryColor === "string") {
+    rootStyle.setProperty("--brand-secondary", theme.secondaryColor);
+  }
+  if (typeof theme.accentColor === "string") {
+    rootStyle.setProperty("--brand-accent", theme.accentColor);
+    rootStyle.setProperty("--color-accent", theme.accentColor);
+  }
+  if (typeof theme.backgroundColor === "string") {
+    const isDark = isDarkColor(theme.backgroundColor);
+    document.documentElement.classList.toggle("dark", isDark);
+    document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+    rootStyle.colorScheme = isDark ? "dark" : "light";
+    rootStyle.setProperty("--page-background", theme.backgroundColor);
+    rootStyle.setProperty("--card-bg", isDark ? "#111a2e" : "#ffffff");
+    rootStyle.setProperty("--product-card-bg", isDark ? "#111a2e" : "#ffffff");
+    rootStyle.setProperty("--color-surface", isDark ? "rgba(255,255,255,0.05)" : "#ffffff");
+    rootStyle.setProperty("--color-secondary", isDark ? "rgba(255,255,255,0.08)" : "#f1f5f9");
+    rootStyle.setProperty("--button-secondary-bg", isDark ? "rgba(255,255,255,0.08)" : "#f1f5f9");
+    rootStyle.setProperty("--button-secondary-text", isDark ? "#f8fafc" : "#0f172a");
+  }
+}
+
 export function mergeSiteData(
   current: unknown,
   incoming: unknown,
@@ -325,16 +373,7 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
 
       // Dynamic theme variable injection for instant color updates
       if (isRecord(live.theme)) {
-        const rootStyle = document.documentElement.style;
-        if (typeof live.theme.primaryColor === "string") {
-          rootStyle.setProperty("--brand-primary", live.theme.primaryColor);
-        }
-        if (typeof live.theme.secondaryColor === "string") {
-          rootStyle.setProperty("--brand-secondary", live.theme.secondaryColor);
-        }
-        if (typeof live.theme.accentColor === "string") {
-          rootStyle.setProperty("--brand-accent", live.theme.accentColor);
-        }
+        syncThemeToDocument(live.theme);
       }
     };
 
@@ -405,6 +444,15 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
     const applyIncomingSiteData = (incoming: unknown) => {
       if (!isRecord(incoming)) return;
       setSiteData((current) => mergeSiteData(current, incoming) as T);
+      try {
+        const inc = incoming as GenericRecord;
+        const theme = (isRecord(inc.template) && isRecord((inc.template as GenericRecord).structure))
+          ? (inc.template as GenericRecord).structure?.theme
+          : inc.theme;
+        if (theme) syncThemeToDocument(theme);
+      } catch {
+        // Best-effort
+      }
       try {
         (window as unknown as Record<string, unknown>)[SITE_DATA_GLOBAL_KEY] =
           incoming;

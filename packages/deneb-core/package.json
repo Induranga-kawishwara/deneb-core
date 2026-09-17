@@ -12,6 +12,10 @@
     "./install-fonts": {
       "types": "./dist/fonts/installProject.d.ts",
       "default": "./dist/fonts/installProject.js"
+    },
+    "./theme": {
+      "types": "./dist/theme/index.d.ts",
+      "default": "./dist/theme/index.js"
     }
   },
   "publishConfig": {
@@ -32,7 +36,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "npm run build && node --test src/fonts/__tests__/fonts.test.cjs",
+    "test": "npm run build && node --test src/fonts/__tests__/fonts.test.cjs src/theme/__tests__/theme.test.cjs",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

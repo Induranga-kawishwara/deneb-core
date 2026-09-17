@@ -560,37 +560,37 @@ export function EditableButton({
 
   const variantStyles: Record<string, React.CSSProperties> = {
     primary: {
-      backgroundColor: 'var(--brand-color, #2563eb)',
-      color: '#ffffff',
+      backgroundColor: 'var(--button-bg, var(--brand-color, #2563eb))',
+      color: 'var(--button-text, #ffffff)',
       border: 'none',
       boxShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.35)',
     },
     secondary: {
-      backgroundColor: 'var(--brand-secondary, #0f172a)',
-      color: '#ffffff',
-      border: 'none',
+      backgroundColor: 'var(--button-secondary-bg, var(--color-secondary, var(--brand-secondary, #0f172a)))',
+      color: 'var(--button-secondary-text, var(--color-text, #ffffff))',
+      border: '1px solid var(--button-secondary-border, var(--color-border, transparent))',
     },
     accent: {
       backgroundColor: 'var(--brand-accent, #14b8a6)',
-      color: '#ffffff',
+      color: 'var(--button-accent-text, #ffffff)',
       border: 'none',
     },
     outline: {
       backgroundColor: 'transparent',
-      color: 'var(--page-text, #0f172a)',
-      border: '1.5px solid currentColor',
+      color: 'var(--button-outline-text, var(--color-text, var(--page-text, #0f172a)))',
+      border: '1.5px solid var(--button-outline-border, var(--color-border, currentColor))',
     },
     ghost: {
       backgroundColor: 'transparent',
-      color: 'var(--page-text, #0f172a)',
+      color: 'var(--button-ghost-text, var(--color-text, var(--page-text, #0f172a)))',
       border: 'none',
     },
     glass: {
-      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+      backgroundColor: 'var(--glass-bg, rgba(255, 255, 255, 0.15))',
       backdropFilter: 'blur(12px)',
       WebkitBackdropFilter: 'blur(12px)',
-      color: 'var(--page-text, #0f172a)',
-      border: '1px solid rgba(255, 255, 255, 0.4)',
+      color: 'var(--color-text, var(--page-text, #0f172a))',
+      border: '1px solid var(--card-border, rgba(255, 255, 255, 0.2))',
     },
   };
 
