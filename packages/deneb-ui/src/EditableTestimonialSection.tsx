@@ -126,7 +126,7 @@ function TestimonialCard({
   return (
     <div
       data-preview-item-path={`testimonials.testimonials[${index}]`}
-      className={`relative p-5 sm:p-7 lg:p-8 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 hover:border-slate-300 shadow-sm hover:shadow-md dark:bg-gradient-to-b dark:from-slate-900/70 dark:to-slate-950/90 dark:border-slate-800/80 dark:hover:border-slate-700 dark:shadow-xl transition-all duration-300 flex flex-col justify-between space-y-5 min-w-0 ${cardClassName || ''}`.trim()}
+      className={`relative p-5 sm:p-7 lg:p-8 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 hover:border-slate-300 shadow-sm hover:shadow-md dark:bg-gradient-to-b dark:from-slate-900/70 dark:to-slate-950/90 dark:border-slate-800/80 dark:hover:border-slate-700 dark:shadow-xl transition-[transform,box-shadow] duration-200 flex flex-col justify-between space-y-5 min-w-0 ${cardClassName || ''}`.trim()}
     >
       <div className="space-y-4 min-w-0">
         {/* Category Tag & Rating Stars */}
@@ -229,17 +229,20 @@ export function EditableTestimonialSection({
     });
   }, [testimonials]);
 
+  const hasCustomPy = /(^|\s)(p|py|pt)-/.test(className);
+  const defaultPadding = hasCustomPy ? '' : 'py-6 sm:py-8';
+
   return (
     <section
       data-preview-page-key={basePath}
       data-design-section={basePath}
-      className={`editable-testimonial-section w-full py-12 sm:py-20 px-3 sm:px-6 lg:px-8 ${className}`.trim()}
+      className={`editable-testimonial-section w-full ${defaultPadding} px-3 sm:px-6 lg:px-8 ${className}`.trim()}
       style={style}
       {...props}
     >
       <div className="w-full mx-auto">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto space-y-3 mb-10 sm:mb-14 px-2">
+        <div className="text-center max-w-3xl mx-auto space-y-3 mb-6 sm:mb-8 px-2">
           {badge && (
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 dark:bg-slate-800/80 dark:text-lime-400 dark:border-lime-400/20 text-xs uppercase tracking-widest font-black shadow-sm">
               <span data-preview-field-path={`testimonials.badge`}>{badge}</span>

@@ -159,7 +159,7 @@ function FeedbackCard({
   return (
     <div
       data-preview-item-path={`feedback.feedbacks[${index}]`}
-      className={`p-6 sm:p-7 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 hover:border-slate-300 shadow-sm hover:shadow-md dark:bg-gradient-to-b dark:from-slate-900/70 dark:to-slate-950/90 dark:border-slate-800/80 dark:hover:border-slate-700 dark:shadow-xl transition-all duration-300 flex flex-col justify-between space-y-4 ${cardClassName || ''}`.trim()}
+      className={`p-6 sm:p-7 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 hover:border-slate-300 shadow-sm hover:shadow-md dark:bg-gradient-to-b dark:from-slate-900/70 dark:to-slate-950/90 dark:border-slate-800/80 dark:hover:border-slate-700 dark:shadow-xl transition-[transform,box-shadow] duration-200 flex flex-col justify-between space-y-4 ${cardClassName || ''}`.trim()}
     >
       <div className="space-y-3.5">
         {/* Author Profile Bar */}
@@ -274,17 +274,19 @@ export function EditableGoogleFeedback({
   ...props
 }: EditableGoogleFeedbackProps) {
   const items = Array.isArray(feedbacks) && feedbacks.length > 0 ? feedbacks : DEFAULT_FEEDBACKS;
+  const hasCustomPy = /(^|\s)(p|py|pt)-/.test(className);
+  const defaultPadding = hasCustomPy ? '' : 'py-6 sm:py-8';
 
   return (
     <section
       data-preview-page-key={basePath}
-      className={`editable-google-feedback w-full py-12 sm:py-20 ${className}`.trim()}
+      className={`editable-google-feedback w-full ${defaultPadding} ${className}`.trim()}
       style={style}
       {...props}
     >
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10">
         {/* Section Header & Google Rating Badge */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 sm:mb-14">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-6 sm:mb-8">
           <div className="max-w-2xl space-y-3">
             {/* Google Rating Pill Badge */}
             <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-100 border border-slate-200 dark:bg-slate-900/80 dark:border-slate-800 shadow-sm">
