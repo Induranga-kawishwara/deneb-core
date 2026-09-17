@@ -20,6 +20,8 @@ export interface TemplateTheme {
   align?: 'left' | 'center' | 'right';
   buttonBackgroundColor?: string;
   buttonTextColor?: string;
+  dark?: Partial<TemplateTheme>;
+  light?: Partial<TemplateTheme>;
   [key: string]: unknown;
 }
 
@@ -162,16 +164,15 @@ export function getThemeCssProperties(theme?: TemplateTheme | null): React.CSSPr
 
   if (theme) {
     for (const [key, val] of Object.entries(theme)) {
-      if (typeof val === 'string' || typeof val === 'number') {
+      if (key !== 'dark' && key !== 'light' && (typeof val === 'string' || typeof val === 'number')) {
         const cssVarName = `--${key.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`;
         customVars[cssVarName] = String(val);
       }
     }
   }
 
-
   const isDark = isDarkColor(theme?.backgroundColor);
-  const bgColor = theme?.backgroundColor || (isDark ? '#0f172a' : '#ffffff');
+  const bgColor = theme?.backgroundColor || (isDark ? '#090d1a' : '#ffffff');
   const textColor = theme?.textColor || (isDark ? '#f8fafc' : '#0f172a');
   const mutedColor = theme?.mutedTextColor || (isDark ? 'rgba(248, 250, 252, 0.7)' : '#64748b');
   const borderColor = isDark ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0';
@@ -244,10 +245,17 @@ export interface ThemeStylesProps {
   defaultAccent?: string;
   defaultBg?: string;
   defaultText?: string;
+  /**
+   * Automatically generate opposite mode selectors (.dark / .light or [data-theme="..."])
+   * so templates with theme switchers transition without writing manual CSS.
+   * Default: true.
+   */
+  enableDualMode?: boolean;
 }
 
 /**
  * Automatically injects standard and custom fivora theme variables into the document.
+ * Supports light-only, dark-only, and dual-mode (light & dark toggle) templates.
  */
 export function ThemeStyles({
   theme,
@@ -256,18 +264,64 @@ export function ThemeStyles({
   defaultAccent = '#14b8a6',
   defaultBg = '#ffffff',
   defaultText = '#0f172a',
+  enableDualMode = true,
 }: ThemeStylesProps) {
   const styleProps = getThemeCssProperties(theme);
-  const cssLines = Object.entries(styleProps)
+  const baseLines = Object.entries(styleProps)
     .filter(([key]) => key.startsWith('--'))
     .map(([key, value]) => `  ${key}: ${value};`)
     .join('\n');
 
-  const css = `
+  let css = `
     :root {
-${cssLines}
+${baseLines}
     }
   `;
+
+  if (enableDualMode) {
+    const isDarkBase = isDarkColor(theme?.backgroundColor);
+    if (isDarkBase) {
+      // Base theme is dark. Generate light mode rules for .light or [data-theme="light"]
+      const lightTheme: TemplateTheme = {
+        ...theme,
+        backgroundColor: '#ffffff',
+        textColor: '#0f172a',
+        mutedTextColor: '#64748b',
+        ...(theme?.light || {}),
+      };
+      const lightProps = getThemeCssProperties(lightTheme);
+      const lightLines = Object.entries(lightProps)
+        .filter(([key]) => key.startsWith('--'))
+        .map(([key, value]) => `  ${key}: ${value};`)
+        .join('\n');
+
+      css += `
+    .light, [data-theme="light"] {
+${lightLines}
+    }
+      `;
+    } else {
+      // Base theme is light. Generate dark mode rules for .dark or [data-theme="dark"]
+      const darkTheme: TemplateTheme = {
+        ...theme,
+        backgroundColor: '#090d1a',
+        textColor: '#f8fafc',
+        mutedTextColor: 'rgba(248, 250, 252, 0.7)',
+        ...(theme?.dark || {}),
+      };
+      const darkProps = getThemeCssProperties(darkTheme);
+      const darkLines = Object.entries(darkProps)
+        .filter(([key]) => key.startsWith('--'))
+        .map(([key, value]) => `  ${key}: ${value};`)
+        .join('\n');
+
+      css += `
+    .dark, [data-theme="dark"] {
+${darkLines}
+    }
+      `;
+    }
+  }
 
   return (
     <>

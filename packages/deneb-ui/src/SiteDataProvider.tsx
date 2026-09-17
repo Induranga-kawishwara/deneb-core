@@ -18,6 +18,7 @@ import { FontLoader } from './fonts/FontLoader';
 import { ResponsiveBaseStyles } from './ResponsiveBaseStyles';
 import type { ProductItem } from './EditableProductCard';
 import type { ServiceItem } from './EditableServiceCard';
+import { ThemeStyles } from './ThemeStyles';
 
 export const DENEB_PREVIEW_DATA_MESSAGE = 'DENEB_PREVIEW_SITE_DATA';
 export const PREVIEW_DATA_MESSAGE = 'FIVORA_PREVIEW_SITE_DATA';
@@ -587,6 +588,7 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
   const value = useMemo(() => siteData as SiteData, [siteData]);
   return (
     <SiteDataContext.Provider value={value}>
+      <ThemeStyles theme={(value as GenericRecord)?.theme as any} />
       <FontLoader />
       <ResponsiveBaseStyles />
       <DenebComponentStyles />
