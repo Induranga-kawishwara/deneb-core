@@ -135,30 +135,61 @@ function normalizeProductForDetail(
   product: ProductDetailItem,
   siteData: SiteData,
 ): ProductDetailItem {
-  const image =
-    (typeof product.featuredImage === 'string' && product.featuredImage) ||
-    (typeof product.imageUrl === 'string' && product.imageUrl) ||
-    (typeof product.image === 'string' && product.image) ||
+  const customData = isRecord(product.customData) ? product.customData : {};
+  // Public catalog rows keep template-specific variants in customData. Flatten
+  // them for custom renderers while preserving explicit top-level fields.
+  const mergedProduct = {
+    ...customData,
+    ...product,
+  } as ProductDetailItem;
+  const name =
+    (typeof mergedProduct.name === 'string' && mergedProduct.name) ||
+    (typeof mergedProduct.title === 'string' && mergedProduct.title) ||
     undefined;
-  const images = Array.isArray(product.gallery)
-    ? product.gallery
-    : Array.isArray(product.images)
-      ? (product.images as string[])
-      : undefined;
+  const image =
+    (typeof mergedProduct.featuredImage === 'string' && mergedProduct.featuredImage) ||
+    (typeof mergedProduct.imageUrl === 'string' && mergedProduct.imageUrl) ||
+    (typeof mergedProduct.image === 'string' && mergedProduct.image) ||
+    undefined;
+  const images = Array.isArray(mergedProduct.gallery)
+    ? mergedProduct.gallery
+    : Array.isArray(mergedProduct.images)
+      ? (mergedProduct.images as string[])
+      : Array.isArray(mergedProduct.additionalImages)
+        ? (mergedProduct.additionalImages as unknown[]).filter(
+            (value): value is string => typeof value === 'string' && Boolean(value.trim()),
+          )
+        : undefined;
+  const compareAtPrice =
+    mergedProduct.compareAtPrice ?? mergedProduct.originalPrice;
   const shop = isRecord(siteData.shop) ? siteData.shop : {};
   const merchant = isRecord(siteData.merchant) ? siteData.merchant : {};
   const whatsappNumber =
-    (typeof product.whatsappNumber === 'string' && product.whatsappNumber) ||
+    (typeof mergedProduct.whatsappNumber === 'string' && mergedProduct.whatsappNumber) ||
     (typeof shop.whatsapp === 'string' && shop.whatsapp) ||
     (typeof shop.whatsappNumber === 'string' && shop.whatsappNumber) ||
     (typeof merchant.whatsapp === 'string' && merchant.whatsapp) ||
     undefined;
 
   return {
-    ...product,
-    ...(image && !product.featuredImage ? { featuredImage: image } : {}),
-    ...(images && !product.gallery ? { gallery: images } : {}),
-    ...(whatsappNumber && !product.whatsappNumber ? { whatsappNumber } : {}),
+    ...mergedProduct,
+    ...(name
+      ? {
+          name,
+          title:
+            typeof mergedProduct.title === 'string' && mergedProduct.title
+              ? mergedProduct.title
+              : name,
+        }
+      : {}),
+    ...(image
+      ? { featuredImage: image, imageUrl: image, image }
+      : {}),
+    ...(images ? { gallery: images, images } : {}),
+    ...(compareAtPrice !== undefined
+      ? { compareAtPrice, originalPrice: compareAtPrice }
+      : {}),
+    ...(whatsappNumber ? { whatsappNumber } : {}),
   };
 }
 

@@ -491,6 +491,13 @@ async function auditTemplateDependencies(
   );
   const combinedCode = fileContents.join('\n');
 
+  
+  if (combinedCode.includes('next/font/google')) {
+    throw new Error(
+      'Template package contains "next/font/google" imports (e.g. in layout.tsx). In Fivora preview sandboxes and offline builds, next/font/google causes build failures (ETIMEDOUT) because external Google Fonts cannot be fetched at compile time. Replace next/font/google with DENEB self-hosted fonts by running "deneb fonts install .".',
+    );
+  }
+
   for (const item of heavyCheckList) {
     if (deps.includes(item.name) && !item.pattern.test(combinedCode)) {
       reporter.warn(

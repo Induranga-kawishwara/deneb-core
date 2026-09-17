@@ -344,7 +344,12 @@ export function validateTemplateVisualEditingContract(
   );
   validateStaticMarkerSourceAuthorship(input.artifacts, strictFindings);
   validatePreviewRuntimeCapability(input.artifacts, strictFindings);
-  validateLiveProductRouting(input.artifacts, strictFindings);
+  validateLiveProductRouting(
+    input.artifacts,
+    input.contentDefaults,
+    input.editorSchema,
+    strictFindings,
+  );
 
   warnings.push(
     ...extraction.unparseableAttributes.map(
@@ -1706,6 +1711,8 @@ function validatePreviewRuntimeCapability(
 
 function validateLiveProductRouting(
   artifacts: TemplateVisualEditingArtifact[],
+  contentDefaults: Record<string, unknown> | null,
+  editorSchema: TemplateEditorSchema | null,
   findings: string[],
 ) {
   const sourceArtifacts = artifacts.filter(
@@ -1726,10 +1733,72 @@ function validateLiveProductRouting(
     );
   }
 
-  const usesStableProductRoute = sourceArtifacts.some((artifact) =>
-    /\/products\/detail\/?(?:\?[^'"`\s]*)?/m.test(artifact.content),
+  const hasProductCatalog =
+    Array.isArray(contentDefaults?.products) ||
+    Boolean(
+      editorSchema?.sections.some(
+        (section) =>
+          section.path === 'products' || section.path.startsWith('products['),
+      ),
+    ) ||
+    sourceArtifacts.some((artifact) =>
+      /data-preview-(?:list|item|field)-path\s*=\s*(?:["']products|\{\s*`products)/m.test(
+        artifact.content,
+      ),
+    );
+  const usesStableProductLinks = sourceArtifacts.some(
+    (artifact) =>
+      /\bplatformProductDetailHref\s*\(/m.test(artifact.content) ||
+      /\/products\/detail\/?\?[^'"`\s}]*\bid=/m.test(artifact.content),
   );
-  if (!usesStableProductRoute) return;
+  const hasStableDetailSource = sourceArtifacts.some(
+    (artifact) =>
+      /(?:^|\/)src\/(?:app\/products\/detail\/page|pages\/products\/detail)\.[cm]?[jt]sx?$/i.test(
+        artifact.filePath.replace(/\\/g, '/'),
+      ) ||
+      /\b(?:PlatformProductDetail|usePlatformProductDetail)\b/m.test(
+        artifact.content,
+      ),
+  );
+  const hasLegacyProductDetailSource = sourceArtifacts.some((artifact) =>
+    /(?:^|\/)src\/(?:app\/products\/\[[^/]+\]\/page|pages\/products\/\[[^/]+\])\.[cm]?[jt]sx?$/i.test(
+      artifact.filePath.replace(/\\/g, '/'),
+    ),
+  );
+  const preservesNativeDetailDesign = sourceArtifacts.some(
+    (artifact) =>
+      /\brenderProduct\s*=/m.test(artifact.content) ||
+      /\busePlatformProductDetail\s*\(/m.test(artifact.content),
+  );
+  const requiresLiveProductDetail =
+    usesStableProductLinks ||
+    hasStableDetailSource ||
+    (hasProductCatalog && hasLegacyProductDetailSource);
+
+  if (requiresLiveProductDetail && !usesStableProductLinks) {
+    findings.push(
+      'Templates with product-detail navigation must link every product through platformProductDetailHref(product.id) or /products/detail/?id=... so products added after the static build use the native detail page.',
+    );
+  }
+  if (requiresLiveProductDetail && !hasStableDetailSource) {
+    findings.push(
+      'Templates with product-detail navigation must provide a stable client product page at src/app/products/detail/page.* using PlatformProductDetail or usePlatformProductDetail.',
+    );
+  }
+  if (
+    requiresLiveProductDetail &&
+    hasLegacyProductDetailSource &&
+    hasStableDetailSource &&
+    !preservesNativeDetailDesign
+  ) {
+    findings.push(
+      'The template has a native dynamic product-detail page, but its stable live-catalog page does not reuse that design. Pass the native renderer through PlatformProductDetail renderProduct or render it from usePlatformProductDetail so old and newly-added products have the same layout.',
+    );
+  }
+
+  if (!requiresLiveProductDetail) {
+    return;
+  }
 
   const exportsStableProductRoute = artifacts.some(
     (artifact) =>
@@ -1740,7 +1809,7 @@ function validateLiveProductRouting(
   );
   if (!exportsStableProductRoute) {
     findings.push(
-      'Product links use /products/detail/?id=..., but the static export does not contain products/detail/index.html. Add a static detail page that reads the query ID and hydrates the matching item from the live catalog.',
+      'The template product catalog requires products/detail/index.html, but the static export does not contain it. Add a stable client detail page that reads the query ID and hydrates the matching item from the live catalog.',
     );
   }
 }

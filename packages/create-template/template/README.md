@@ -102,6 +102,11 @@ template-specific visual design, pass `renderProduct={(product, context) =>
 the lower-level `usePlatformProductDetail()` hook. Always verify that the export
 contains `products/detail/index.html`.
 
+Strict validation requires this stable route whenever a `content.products`
+catalog has product-detail navigation. If a native `/products/[id]` page also
+exists, the stable page must reuse its renderer so products created after the
+static build keep the same design.
+
 Import hooks from `@/lib/siteDataContext` or `@deneb-ui/ui`:
 
 ```tsx
