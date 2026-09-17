@@ -130,7 +130,7 @@ export function EditableProductGrid({
   return (
     <section
       data-preview-page-key={sectionPath}
-      className={`editable-product-grid max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 ${className}`.trim()}
+      className={`editable-product-grid w-full mx-auto px-4 sm:px-6 lg:px-8 py-16 ${className}`.trim()}
       style={style}
       {...(props as any)}
     >
@@ -165,8 +165,8 @@ export function EditableProductGrid({
                   onClick={() => setActiveCategory(cat)}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
                     isActive
-                      ? 'bg-white text-slate-950 shadow-md scale-102 font-extrabold'
-                      : 'bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800/80 hover:bg-slate-850'
+                      ? 'bg-lime-400 text-slate-950 shadow-md scale-102 font-extrabold'
+                      : 'bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800/80 hover:bg-slate-800'
                   }`}
                 >
                   {cat}
