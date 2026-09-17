@@ -155,6 +155,27 @@ function fontsCssImportSpecifier(projectDir: string, layoutPath: string): string
   return rel;
 }
 
+export function stripNextFontGoogle(source: string): { source: string; stripped: boolean } {
+  if (!source.includes("next/font/google")) {
+    return { source, stripped: false };
+  }
+
+  let next = source;
+  // Remove import { ... } from "next/font/google"
+  next = next.replace(/import\s*\{[^}]*\}\s*from\s*['"]next\/font\/google['"];?\r?\n?/g, "");
+  // Remove font const declarations with options like variable, subsets, display
+  next = next.replace(/const\s+[a-zA-Z0-9_$]+\s*=\s*[a-zA-Z0-9_$]+\(\s*\{[\s\S]*?\}\s*\);?\r?\n?/g, (match) => {
+    if (match.includes("variable:") || match.includes("subsets:") || match.includes("display:")) {
+      return "";
+    }
+    return match;
+  });
+  // Clean up font variable classes e.g. ${fraunces.variable}
+  next = next.replace(/\$\{[a-zA-Z0-9_$]+\.variable\}\s*/g, "");
+
+  return { source: next, stripped: true };
+}
+
 function patchLayoutImport(projectDir: string): { patched: boolean; reason: string; layoutPath?: string } {
   const layoutPath = findLayoutPath(projectDir);
   if (!layoutPath) return { patched: false, reason: 'layout.tsx not found' };
@@ -162,6 +183,8 @@ function patchLayoutImport(projectDir: string): { patched: boolean; reason: stri
   const specifier = fontsCssImportSpecifier(projectDir, layoutPath);
   const importLine = `import '${specifier}';`;
   let source = fs.readFileSync(layoutPath, 'utf8');
+  const { source: ungoogled, stripped } = stripNextFontGoogle(source);
+  source = ungoogled;
 
   // Older installer wrote ./fonts/... next to layout.tsx; the CSS lives in src/fonts.
   if (source.includes("import './fonts/deneb-fonts.css'")) {
@@ -176,7 +199,7 @@ function patchLayoutImport(projectDir: string): { patched: boolean; reason: stri
   }
   if (source.includes('deneb-fonts.css')) {
     const guarded = ensureRootHydrationGuard(source);
-    if (guarded !== source) {
+    if (guarded !== source || stripped) {
       fs.writeFileSync(layoutPath, guarded, 'utf8');
       return { patched: true, reason: 'hydration guard', layoutPath };
     }
