@@ -217,6 +217,12 @@ reactive `SiteDataProvider` catalog, retries `api.catalogUrl`, and renders safe
 loading, network-error, and not-found states. `usePlatformProductDetail()` is
 also exported for developers who need complete control of the page markup.
 
+If the template already has a native `/products/[id]` design, the stable page
+must reuse that renderer through `renderProduct` (or render the same component
+from `usePlatformProductDetail`). The validator rejects a generic stable page
+next to a different native detail layout because newly-created products would
+otherwise look different from products present at build time.
+
 ---
 
 ## Data Fetching & Backend Integration Hooks

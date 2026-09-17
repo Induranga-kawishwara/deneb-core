@@ -87,6 +87,8 @@ live lookup, retries, and fallback states:
 
 ```tsx
 // src/app/products/detail/page.tsx
+'use client';
+
 import { PlatformProductDetail } from '@deneb-ui/ui';
 
 export default function ProductDetailPage() {
@@ -99,6 +101,11 @@ template-specific visual design, pass `renderProduct={(product, context) =>
 <YourProductDetail product={product} index={context.productIndex} />}` or use
 the lower-level `usePlatformProductDetail()` hook. Always verify that the export
 contains `products/detail/index.html`.
+
+Strict validation requires this stable route whenever a `content.products`
+catalog has product-detail navigation. If a native `/products/[id]` page also
+exists, the stable page must reuse its renderer so products created after the
+static build keep the same design.
 
 Import hooks from `@/lib/siteDataContext` or `@deneb-ui/ui`:
 
