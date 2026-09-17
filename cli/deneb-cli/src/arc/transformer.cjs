@@ -810,6 +810,7 @@ function applyFilePlan(filePlan, profile) {
   healBroadContainerMarkers(ast);
   healEmptyStateConditionals(ast);
   healHiddenPreviewMarkers(ast);
+  healLegacyProductDetailLinks(ast);
 
   // Page keys are stamped in a separate route-driven pass so App Router and
   // Pages Router projects are handled by the same logic.
@@ -1366,6 +1367,54 @@ function healHiddenPreviewMarkers(ast) {
   return healed;
 }
 
+function healLegacyProductDetailLinks(ast) {
+  let healed = 0;
+  let needsImport = false;
+
+  recast.types.visit(ast, {
+    visitJSXAttribute(pathNode) {
+      const attr = pathNode.node;
+      if (attr.name && attr.name.name === 'href' && attr.value) {
+        if (attr.value.type === 'JSXExpressionContainer' && attr.value.expression) {
+          const expr = attr.value.expression;
+          if (expr.type === 'TemplateLiteral') {
+            const quasis = expr.quasis || [];
+            if (quasis.length >= 1 && typeof quasis[0].value.raw === 'string' && quasis[0].value.raw.startsWith('/products/')) {
+              const arg = expr.expressions && expr.expressions[0];
+              if (arg) {
+                attr.value.expression = b.callExpression(
+                  b.identifier('platformProductDetailHref'),
+                  [arg]
+                );
+                healed++;
+                needsImport = true;
+              }
+            }
+          } else if (
+            expr.type === 'BinaryExpression' &&
+            expr.operator === '+' &&
+            expr.left &&
+            (expr.left.value === '/products/' || expr.left.value === '/products')
+          ) {
+            attr.value.expression = b.callExpression(
+              b.identifier('platformProductDetailHref'),
+              [expr.right]
+            );
+            healed++;
+            needsImport = true;
+          }
+        }
+      }
+      this.traverse(pathNode);
+    },
+  });
+
+  if (needsImport) {
+    ensureImport(ast, '@deneb-ui/ui', ['platformProductDetailHref']);
+  }
+  return healed;
+}
+
 module.exports = {
   applyFilePlan,
   instrumentLayoutSource,
@@ -1380,4 +1429,6 @@ module.exports = {
   healBroadContainerMarkers,
   healEmptyStateConditionals,
   healHiddenPreviewMarkers,
+  healLegacyProductDetailLinks,
 };
+

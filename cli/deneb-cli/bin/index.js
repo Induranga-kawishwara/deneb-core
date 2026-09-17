@@ -3,6 +3,83 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const { spawnSync } = require('node:child_process');
+const readline = require('node:readline');
+const crypto = require('node:crypto');
+
+// SHA-256 hash of default key ("lvuchami") — prevents plain text exposure in repository
+const DENEB_AI_DEFAULT_KEY_HASH = '6f791210e05b535d0e48e260273b3ddb511aefb63ad2a2a35b838a80a6127588';
+
+/**
+ * Validates AI access key against either:
+ * 1. Environment variable DENEB_AI_KEY (configurable by team / CI)
+ * 2. Cryptographic SHA-256 hash of default key
+ * @param {string} inputKey
+ * @returns {boolean}
+ */
+function verifyAiAccessKey(inputKey) {
+  if (!inputKey || typeof inputKey !== 'string') return false;
+  const clean = inputKey.trim();
+  if (process.env.DENEB_AI_KEY && clean === process.env.DENEB_AI_KEY.trim()) {
+    return true;
+  }
+  const hash = crypto.createHash('sha256').update(clean).digest('hex');
+  return hash === DENEB_AI_DEFAULT_KEY_HASH;
+}
+
+/**
+ * Prompt the user with a question and return their answer.
+ * @param {string} query - The question to display
+ * @returns {Promise<string>}
+ */
+function askQuestion(query) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(query, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
+/**
+ * Prompt the user for a password with masked input (shows * for each character).
+ * @param {string} query - The prompt to display
+ * @returns {Promise<string>}
+ */
+function askPassword(query) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    process.stdout.write(query);
+    const stdin = process.stdin;
+    const wasRaw = stdin.isRaw;
+    if (stdin.isTTY) stdin.setRawMode(true);
+    let pwd = '';
+    const onData = (ch) => {
+      const c = ch.toString();
+      if (c === '\n' || c === '\r') {
+        if (stdin.isTTY) stdin.setRawMode(wasRaw || false);
+        stdin.removeListener('data', onData);
+        process.stdout.write('\n');
+        rl.close();
+        resolve(pwd);
+      } else if (c === '\x7f' || c === '\b') {
+        if (pwd.length > 0) {
+          pwd = pwd.slice(0, -1);
+          process.stdout.write('\r' + query + '*'.repeat(pwd.length) + ' \b');
+        }
+      } else if (c === '\x03') {
+        if (stdin.isTTY) stdin.setRawMode(wasRaw || false);
+        rl.close();
+        process.exit(0);
+      } else {
+        pwd += c;
+        process.stdout.write('*');
+      }
+    };
+    stdin.resume();
+    stdin.on('data', onData);
+  });
+}
 
 const args = process.argv.slice(2);
 
@@ -623,6 +700,26 @@ function getComponentRegistry(importPkg) {
       component: 'DenebAction',
       code: `'use client';\n\nimport { DenebAction, type DenebActionProps } from '${importPkg}';\n\nexport { DenebAction, type DenebActionProps };\n`,
     },
+    'product-card': {
+      file: 'ProductCard.tsx',
+      component: 'EditableProductCard',
+      code: `'use client';\n\nimport { EditableProductCard, type EditableProductCardProps, type ProductItem } from '${importPkg}';\n\nexport function ProductCard(props: EditableProductCardProps) {\n  return <EditableProductCard {...props} />;\n}\n\nexport { EditableProductCard, type EditableProductCardProps, type ProductItem };\n`,
+    },
+    'product-grid': {
+      file: 'ProductGrid.tsx',
+      component: 'EditableProductGrid',
+      code: `'use client';\n\nimport { EditableProductGrid, ProductGrid, type EditableProductGridProps } from '${importPkg}';\n\nexport { EditableProductGrid, ProductGrid, type EditableProductGridProps };\n`,
+    },
+    'product-detail': {
+      file: 'ProductDetail.tsx',
+      component: 'PlatformProductDetail',
+      code: `'use client';\n\nimport { PlatformProductDetail, usePlatformProductDetail, platformProductDetailHref, type PlatformProductDetailProps } from '${importPkg}';\n\nexport function ProductDetail(props: PlatformProductDetailProps) {\n  return <PlatformProductDetail {...props} />;\n}\n\nexport { PlatformProductDetail, usePlatformProductDetail, platformProductDetailHref, type PlatformProductDetailProps };\n`,
+    },
+    'platform-product-detail': {
+      file: 'PlatformProductDetail.tsx',
+      component: 'PlatformProductDetail',
+      code: `'use client';\n\nimport { PlatformProductDetail, usePlatformProductDetail, platformProductDetailHref, type PlatformProductDetailProps } from '${importPkg}';\n\nexport { PlatformProductDetail, usePlatformProductDetail, platformProductDetailHref, type PlatformProductDetailProps };\n`,
+    },
   };
 }
 
@@ -683,6 +780,83 @@ async function initProject(targetInput, options = {}) {
     console.error(`\x1b[33m⚠ Note:\x1b[0m Automated conversion encountered an issue: ${err.message}. Falling back to default generation.`);
   }
 
+  // ── AI-Guided Semantic Analysis (interactive prompt) ──
+  // Only show prompt when: not already in AI mode, not a dry run, and running in an interactive terminal
+  if (!options.aiEnabled && !options.dryRun && process.stdin.isTTY) {
+    console.log('');
+    const aiAnswer = await askQuestion(
+      '\x1b[36m?\x1b[0m Would you like to interact with AI for advanced semantic analysis? \x1b[90m(y/N)\x1b[0m '
+    );
+
+    if (aiAnswer.toLowerCase() === 'y' || aiAnswer.toLowerCase() === 'yes') {
+      let isAuthorized = false;
+
+      // Check if DENEB_AI_KEY is already set in environment / .env
+      if (process.env.DENEB_AI_KEY && verifyAiAccessKey(process.env.DENEB_AI_KEY)) {
+        console.log('\x1b[32m✔ AI access key detected from environment (DENEB_AI_KEY).\x1b[0m');
+        isAuthorized = true;
+      } else {
+        const password = await askPassword('\x1b[36m\u{1F511}\x1b[0m Enter AI access key: ');
+        if (verifyAiAccessKey(password)) {
+          isAuthorized = true;
+        }
+      }
+
+      if (isAuthorized) {
+        console.log('\n\x1b[32m✔ Access granted.\x1b[0m Activating AI-guided semantic analysis...\n');
+
+        // Pre-flight check for OpenAI API configuration readiness
+        try {
+          const { loadEnv, checkAiReady } = require('../src/arc/ai-agent.cjs');
+          loadEnv(targetDir);
+          const aiCheck = checkAiReady();
+          if (!aiCheck.ready) {
+            console.log(`\x1b[33m⚠ Note:\x1b[0m ${aiCheck.reason}`);
+            console.log('\x1b[90mEnsure OPENAI_API_KEY is configured in your .env file or environment.\x1b[0m\n');
+          }
+        } catch {
+          // non-blocking pre-check
+        }
+
+        try {
+          const { runDenebArc } = require('../src/arc/index.cjs');
+          const aiResult = await runDenebArc(targetDir, projectName, {
+            ...options,
+            detectedPages,
+            aiEnabled: true,
+          });
+          if (aiResult) conversionRes = aiResult;
+          console.log('\x1b[32m✔ AI-guided refactoring complete.\x1b[0m');
+
+          // Interactive Recipe Learning
+          if (process.stdin.isTTY) {
+            console.log('');
+            const saveRecipeAnswer = await askQuestion(
+              '\x1b[36m?\x1b[0m Would you like to learn & save these converted patterns as a reusable storefront recipe? \x1b[90m(y/N)\x1b[0m '
+            );
+            if (saveRecipeAnswer.toLowerCase() === 'y' || saveRecipeAnswer.toLowerCase() === 'yes') {
+              try {
+                const { saveRecipeFromProject } = require('../src/tools/recipe-engine.cjs');
+                const saveRes = saveRecipeFromProject(targetDir, projectName);
+                console.log(`\x1b[32m✔ Recipe saved successfully:\x1b[0m \x1b[1m${saveRes.recipe.name}\x1b[0m`);
+                console.log(`  Saved to CLI recipe bank: \x1b[90m${saveRes.globalDest}\x1b[0m`);
+              } catch (recErr) {
+                console.log(`\x1b[33m⚠ Could not save recipe:\x1b[0m ${recErr.message}`);
+              }
+            }
+          }
+        } catch (aiErr) {
+          console.error(`\x1b[33m⚠ AI refactoring encountered an issue:\x1b[0m ${aiErr.message}`);
+          console.log('\x1b[90mContinuing with standard ARC results...\x1b[0m');
+        }
+      } else {
+        console.log('\n\x1b[31m✖ Invalid access key.\x1b[0m Continuing with standard ARC results...\n');
+      }
+    } else {
+      console.log('\x1b[90m⏩ Skipping AI analysis. Using standard ARC results.\x1b[0m');
+    }
+  }
+
   if (options.dryRun) {
     return conversionRes;
   }
@@ -710,6 +884,52 @@ async function initProject(targetInput, options = {}) {
     const siteData = getDefaultSiteData(projectName, detectedPages);
     fs.writeFileSync(siteDataPath, JSON.stringify(siteData, null, 2) + '\n');
     console.log(`\x1b[32m✔ Created\x1b[0m ${relSiteData} (merchant & editable site data)`);
+  }
+
+  // 4.5. Stable Live Product Detail Route (/products/detail) for Static Export
+  const hasProductCatalog =
+    Boolean(manifestObj?.editorSchema?.sections?.some((s) => s.path === 'products' || s.path?.startsWith('products['))) ||
+    Boolean(fs.existsSync(siteDataPath) && fs.readFileSync(siteDataPath, 'utf8').includes('"products"')) ||
+    detectedPages.some((p) => p.route === '/products' || p.route?.startsWith('/products'));
+
+  if (hasNext && hasProductCatalog) {
+    const appDir = fs.existsSync(path.join(targetDir, 'src', 'app'))
+      ? path.join(targetDir, 'src', 'app')
+      : fs.existsSync(path.join(targetDir, 'app'))
+        ? path.join(targetDir, 'app')
+        : null;
+
+    if (appDir) {
+      const detailDir = path.join(appDir, 'products', 'detail');
+      const detailPage = path.join(detailDir, 'page.tsx');
+      const detailPageJs = path.join(detailDir, 'page.jsx');
+      const hasDetailPage = fs.existsSync(detailPage) || fs.existsSync(detailPageJs);
+
+      if (!hasDetailPage) {
+        fs.mkdirSync(detailDir, { recursive: true });
+        const detailCode = `'use client';\n\nimport React from 'react';\nimport { PlatformProductDetail } from '@deneb-ui/ui';\n\nexport default function ProductDetailPage() {\n  return <PlatformProductDetail backHref="/" />;\n}\n`;
+        fs.writeFileSync(detailPage, detailCode, 'utf8');
+        console.log(`\x1b[32m✔ Scaffolded\x1b[0m ${path.relative(targetDir, detailPage)} (stable live catalog detail route)`);
+      }
+
+      // Ensure /products/detail is registered in manifest pages[]
+      if (fs.existsSync(manifestPath)) {
+        try {
+          const currentManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+          currentManifest.pages = Array.isArray(currentManifest.pages) ? currentManifest.pages : [];
+          const hasDetailInPages = currentManifest.pages.some((p) => p.route === '/products/detail' || p.id === 'product-detail');
+          if (!hasDetailInPages) {
+            currentManifest.pages.push({
+              id: 'product-detail',
+              label: 'Product Detail',
+              route: '/products/detail',
+            });
+            fs.writeFileSync(manifestPath, JSON.stringify(currentManifest, null, 2) + '\n');
+            console.log(`\x1b[32m✔ Registered\x1b[0m /products/detail in fivora-template.json`);
+          }
+        } catch {}
+      }
+    }
   }
 
   // 4. Update package.json scripts

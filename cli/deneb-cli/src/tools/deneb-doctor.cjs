@@ -176,7 +176,7 @@ function runDoctor(targetDirInput = '.', options = {}) {
   // =========================================================================
   // SUITE 1: System & Runtime Environment
   // =========================================================================
-  if (!isJson) console.log('\x1b[1m[1/6] System & Runtime Environment:\x1b[0m');
+  if (!isJson) console.log('\x1b[1m[1/7] System & Runtime Environment:\x1b[0m');
   const suite1 = 'System & Runtime';
 
   const nodeVersion = process.version;
@@ -198,7 +198,7 @@ function runDoctor(targetDirInput = '.', options = {}) {
   // =========================================================================
   // SUITE 2: Project Dependencies & Package Configuration
   // =========================================================================
-  if (!isJson) console.log('\n\x1b[1m[2/6] Project Package Configuration:\x1b[0m');
+  if (!isJson) console.log('\n\x1b[1m[2/7] Project Package Configuration:\x1b[0m');
   const suite2 = 'Package Configuration';
 
   const pkgPath = path.join(targetDir, 'package.json');
@@ -296,7 +296,7 @@ function runDoctor(targetDirInput = '.', options = {}) {
   // =========================================================================
   // SUITE 3: Next.js Static Export & Asset Optimization Architecture
   // =========================================================================
-  if (!isJson) console.log('\n\x1b[1m[3/6] Static Export & Asset Optimization:\x1b[0m');
+  if (!isJson) console.log('\n\x1b[1m[3/7] Static Export & Asset Optimization:\x1b[0m');
   const suite3 = 'Static Export Architecture';
 
   const nextConfigFiles = ['next.config.ts', 'next.config.mjs', 'next.config.js'];
@@ -341,7 +341,7 @@ function runDoctor(targetDirInput = '.', options = {}) {
   // =========================================================================
   // SUITE 4: Fivora Manifest v2 & Route Coherence
   // =========================================================================
-  if (!isJson) console.log('\n\x1b[1m[4/6] Fivora Manifest v2 & Route Architecture:\x1b[0m');
+  if (!isJson) console.log('\n\x1b[1m[4/7] Fivora Manifest v2 & Route Architecture:\x1b[0m');
   const suite4 = 'Manifest & Route Architecture';
 
   const manifestPath = path.join(targetDir, 'fivora-template.json');
@@ -403,7 +403,7 @@ function runDoctor(targetDirInput = '.', options = {}) {
   // =========================================================================
   // SUITE 5: AST Visual Editing Contract & Field Path Integrity
   // =========================================================================
-  if (!isJson) console.log('\n\x1b[1m[5/6] Visual Editing Contract & AST Integrity:\x1b[0m');
+  if (!isJson) console.log('\n\x1b[1m[5/7] Visual Editing Contract & AST Integrity:\x1b[0m');
   const suite5 = 'AST Visual Editing Contract';
 
   const siteDataPath = path.join(targetDir, 'src', 'data', 'site-data.json');
@@ -851,7 +851,7 @@ function runDoctor(targetDirInput = '.', options = {}) {
     addCheck(suite5, 'warn', 'Review Star Rating Editability', `${unannotatedStarCount} component(s) with unannotated star icons or ${missingRatingSchemaCount} review schema(s) missing rating field. Run with --fix to register.`, { code: 'DNB-REV-010' });
   }
 
-  if (!isJson) console.log('\n\x1b[1m[6/6] Multi-Niche Architecture & Asset Security:\x1b[0m');
+  if (!isJson) console.log('\n\x1b[1m[6/7] Multi-Niche Architecture & Asset Security:\x1b[0m');
   const suite6 = 'Niche Architecture & Security';
 
   // Niche match analysis
@@ -914,6 +914,124 @@ function runDoctor(targetDirInput = '.', options = {}) {
     addCheck(suite6, 'pass', 'Asset Optimization Preflight', `All ${assets.length} public asset(s) within optimal static export bounds (< 4MB)`, { code: 'DNB-AST-003' }) //, `All ${assets.length} public asset(s) within optimal static export bounds (< 4MB)`);
   } else {
     addCheck(suite6, 'warn', 'Asset Optimization Preflight', `${largeAssets.length} large asset(s) detected (> 4MB)`, { code: 'DNB-AST-003' }) //, `${largeAssets.length} large asset(s) detected (> 4MB): ${largeAssets.map((a) => `${a.file} (${a.sizeMB}MB)`).join(', ')}`);
+  }
+
+  // =========================================================================
+  // SUITE 7: Live Product Detail & Static Export Architecture
+  // =========================================================================
+  if (!isJson) console.log('\n\x1b[1m[7/7] Live Product Detail & Static Export Architecture:\x1b[0m');
+  const suite7 = 'Live Product Detail & Static Export';
+
+  const hasCatalogReference =
+    Boolean(manifestData?.editorSchema?.sections?.some((s) => s.path === 'products' || s.path?.startsWith('products['))) ||
+    Boolean(siteData?.content && hasFieldPath(siteData.content, 'products')) ||
+    (Array.isArray(manifestData?.pages) && manifestData.pages.some((p) => p.route === '/products' || p.route?.startsWith('/products')));
+
+  // Check 1: Dynamic build-time /products/${...} links vs platformProductDetailHref (DNB-PRD-001)
+  let legacyProductLinkCount = 0;
+  for (const file of sourceFiles) {
+    let c = fs.readFileSync(file, 'utf-8');
+    const legacyPatterns = [
+      /\/products\/\$\{[^}]+\}/g,
+      /['"`]\/products\/['"`]\s*\+\s*(?:encodeURIComponent\s*\()?[^),\s]+/g,
+    ];
+    let fileModified = false;
+    for (const pattern of legacyPatterns) {
+      const matches = [...c.matchAll(pattern)];
+      if (matches.length > 0) {
+        legacyProductLinkCount += matches.length;
+        if (shouldFix) {
+          c = c.replace(
+            /(?:href=\{`\/products\/\$\{(.*?)\}`\}|href=\{['"]\/products\/['"]\s*\+\s*(?:encodeURIComponent\s*\()?(.*?)\)?\})/g,
+            'href={platformProductDetailHref($1$2)}'
+          );
+          if (!c.includes('platformProductDetailHref')) {
+            if (/^['"]use client['"];?\r?\n/i.test(c)) {
+              c = c.replace(/^(['"]use client['"];?\r?\n)/i, `$1import { platformProductDetailHref } from '@deneb-ui/ui';\n`);
+            } else {
+              c = `import { platformProductDetailHref } from '@deneb-ui/ui';\n` + c;
+            }
+          }
+          fileModified = true;
+        }
+      }
+    }
+    if (shouldFix && fileModified) {
+      fs.writeFileSync(file, c, 'utf8');
+    }
+  }
+
+  if (legacyProductLinkCount === 0) {
+    addCheck(suite7, 'pass', 'Live Product Detail Links', 'Zero legacy /products/${id} links; product links use platformProductDetailHref()', { code: 'DNB-PRD-001' });
+  } else if (shouldFix) {
+    addCheck(suite7, 'fixed', 'Live Product Detail Links', `Converted ${legacyProductLinkCount} legacy product link(s) to platformProductDetailHref()`, { code: 'DNB-PRD-001' });
+  } else {
+    addCheck(suite7, 'err', 'Live Product Detail Links', `${legacyProductLinkCount} build-time /products/:id URL(s) detected. Fivora requires platformProductDetailHref() for static exports. Run with --fix to repair.`, { code: 'DNB-PRD-001' });
+  }
+
+  // Check 2: Stable client product detail route at /products/detail/page.tsx (DNB-PRD-002)
+  const appDir = fs.existsSync(path.join(targetDir, 'src', 'app'))
+    ? path.join(targetDir, 'src', 'app')
+    : fs.existsSync(path.join(targetDir, 'app'))
+      ? path.join(targetDir, 'app')
+      : null;
+
+  let detailPageExists = false;
+  let detailPageUsesPlatform = false;
+  let detailPagePath = null;
+
+  if (appDir) {
+    const candidates = [
+      path.join(appDir, 'products', 'detail', 'page.tsx'),
+      path.join(appDir, 'products', 'detail', 'page.jsx'),
+      path.join(appDir, 'products', 'detail', 'page.js'),
+    ];
+    detailPagePath = candidates[0];
+    for (const cand of candidates) {
+      if (fs.existsSync(cand)) {
+        detailPageExists = true;
+        detailPagePath = cand;
+        const code = fs.readFileSync(cand, 'utf8');
+        if (code.includes('PlatformProductDetail') || code.includes('usePlatformProductDetail')) {
+          detailPageUsesPlatform = true;
+        }
+        break;
+      }
+    }
+  }
+
+  if (!hasCatalogReference) {
+    addCheck(suite7, 'pass', 'Stable Product Detail Route', 'Non-catalog template (product detail route not required)', { code: 'DNB-PRD-002' });
+  } else if (detailPageExists && detailPageUsesPlatform) {
+    addCheck(suite7, 'pass', 'Stable Product Detail Route', `Stable client detail route verified at ${path.relative(targetDir, detailPagePath)} using PlatformProductDetail`, { code: 'DNB-PRD-002' });
+  } else if (shouldFix && appDir) {
+    const detailDir = path.dirname(detailPagePath);
+    fs.mkdirSync(detailDir, { recursive: true });
+    const detailContent = `'use client';\n\nimport React from 'react';\nimport { PlatformProductDetail } from '@deneb-ui/ui';\n\nexport default function ProductDetailPage() {\n  return <PlatformProductDetail backHref="/" />;\n}\n`;
+    fs.writeFileSync(detailPagePath, detailContent, 'utf8');
+    addCheck(suite7, 'fixed', 'Stable Product Detail Route', `Scaffolded stable client route at ${path.relative(targetDir, detailPagePath)} with PlatformProductDetail`, { code: 'DNB-PRD-002' });
+  } else {
+    addCheck(suite7, 'err', 'Stable Product Detail Route', `Missing stable client route src/app/products/detail/page.tsx (Required by Fivora static export catalog contract). Run with --fix to scaffold.`, { code: 'DNB-PRD-002' });
+  }
+
+  // Check 3: Manifest registration for /products/detail (DNB-PRD-003)
+  if (hasCatalogReference && manifestData) {
+    const pages = Array.isArray(manifestData.pages) ? manifestData.pages : [];
+    const hasDetailRoute = pages.some((p) => p.route === '/products/detail' || p.id === 'product-detail');
+    if (hasDetailRoute) {
+      addCheck(suite7, 'pass', 'Detail Route Manifest Registration', 'Route /products/detail declared in fivora-template.json pages', { code: 'DNB-PRD-003' });
+    } else if (shouldFix) {
+      manifestData.pages = pages;
+      manifestData.pages.push({
+        id: 'product-detail',
+        label: 'Product Detail',
+        route: '/products/detail',
+      });
+      fs.writeFileSync(manifestPath, JSON.stringify(manifestData, null, 2) + '\n', 'utf8');
+      addCheck(suite7, 'fixed', 'Detail Route Manifest Registration', 'Added /products/detail to fivora-template.json pages', { code: 'DNB-PRD-003' });
+    } else {
+      addCheck(suite7, 'warn', 'Detail Route Manifest Registration', 'Manifest pages array missing /products/detail route. Run with --fix to add.', { code: 'DNB-PRD-003' });
+    }
   }
 
   // =========================================================================
