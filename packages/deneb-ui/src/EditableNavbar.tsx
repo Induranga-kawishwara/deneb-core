@@ -94,10 +94,10 @@ export function EditableNavbar({
         top: 0,
         zIndex: 50,
         width: '100%',
-        backgroundColor: 'rgba(255, 255, 255, 0.82)',
+        backgroundColor: 'var(--header-bg, rgba(255, 255, 255, 0.82))',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
+        borderBottom: '1px solid var(--color-border, rgba(226, 232, 240, 0.8))',
         transition: 'all 0.2s ease',
         ...style,
       }}
@@ -282,7 +282,7 @@ export function EditableNavbar({
         <div
           style={{
             borderTop: '1px solid var(--color-border, #e2e8f0)',
-            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+            backgroundColor: 'var(--card-bg, var(--page-background, rgba(255, 255, 255, 0.98)))',
             padding: '1.25rem 1.5rem',
             display: 'flex',
             flexDirection: 'column',
@@ -328,7 +328,7 @@ export function EditableNavbar({
           })}
 
           {hasContact ? (
-            <span data-target-page="contact" style={{ marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(226,232,240,0.8)' }}>
+            <span data-target-page="contact" style={{ marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-border, rgba(226, 232, 240, 0.8))' }}>
               <button
                 type="button"
                 onClick={() => {

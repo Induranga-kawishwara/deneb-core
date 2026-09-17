@@ -153,10 +153,10 @@ export function StickyMobileBar({
       } ${className}`}
       data-preview-field-path={fieldPath}
       style={{
-        backgroundColor: 'rgba(255, 255, 255, 0.92)',
+        backgroundColor: 'var(--header-bg, var(--card-bg, rgba(255, 255, 255, 0.92)))',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        borderTop: '1px solid rgba(226, 232, 240, 0.8)',
+        borderTop: '1px solid var(--color-border, rgba(226, 232, 240, 0.8))',
         boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.08)',
         ...style,
       }}

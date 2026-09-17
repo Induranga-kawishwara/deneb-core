@@ -82,10 +82,11 @@ export function FloatingContactWidget({
     [isRight ? 'right' : 'left']: '0',
     width: 'min(18rem, calc(100vw - 2rem))',
     maxWidth: 'calc(100vw - 2rem)',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'var(--card-bg, var(--color-surface, #ffffff))',
+    color: 'var(--page-text, inherit)',
     borderRadius: '1rem',
     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-    border: '1px solid rgba(226, 232, 240, 0.8)',
+    border: '1px solid var(--color-border, rgba(226, 232, 240, 0.8))',
     overflow: 'hidden',
     animation: 'deneb-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
   };

@@ -291,10 +291,10 @@ export function EditableProductCard({
 
   const variantStyles: Record<ProductCardVariant, React.CSSProperties> = {
     'modern-glass': {
-      backgroundColor: 'rgba(255, 255, 255, 0.85)',
+      backgroundColor: 'var(--card-bg, rgba(255, 255, 255, 0.85))',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
-      border: '1px solid rgba(226, 232, 240, 0.8)',
+      border: '1px solid var(--card-border, var(--color-border, rgba(226, 232, 240, 0.8)))',
       borderRadius: '16px',
       boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)',
       overflow: 'hidden',
@@ -303,8 +303,8 @@ export function EditableProductCard({
       flexDirection: 'column',
     },
     classic: {
-      backgroundColor: '#ffffff',
-      border: '1px solid #e2e8f0',
+      backgroundColor: 'var(--card-bg, var(--color-surface, #ffffff))',
+      border: '1px solid var(--card-border, var(--color-border, #e2e8f0))',
       borderRadius: '14px',
       boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
       overflow: 'hidden',
@@ -320,8 +320,8 @@ export function EditableProductCard({
       flexDirection: 'column',
     },
     horizontal: {
-      backgroundColor: '#ffffff',
-      border: '1px solid #e2e8f0',
+      backgroundColor: 'var(--card-bg, var(--color-surface, #ffffff))',
+      border: '1px solid var(--card-border, var(--color-border, #e2e8f0))',
       borderRadius: '16px',
       overflow: 'hidden',
       display: 'flex',
@@ -436,7 +436,7 @@ export function EditableProductCard({
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
                   color: 'var(--muted-text, #64748b)',
-                  backgroundColor: 'rgba(241, 245, 249, 0.9)',
+                  backgroundColor: 'var(--tag-bg, rgba(241, 245, 249, 0.9))',
                   padding: '2px 8px',
                   borderRadius: '6px',
                 }}
@@ -485,7 +485,7 @@ export function EditableProductCard({
           style={{
             marginTop: '0.75rem',
             paddingTop: '0.75rem',
-            borderTop: cardVariant === 'minimal' ? 'none' : '1px solid rgba(226, 232, 240, 0.7)',
+            borderTop: cardVariant === 'minimal' ? 'none' : '1px solid var(--card-border, var(--color-border, rgba(226, 232, 240, 0.7)))',
             display: 'flex',
             flexDirection: 'column',
             gap: '0.75rem',

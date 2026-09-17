@@ -105,9 +105,9 @@ export function EditableCategoryPills({
               whiteSpace: 'nowrap',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              border: isSelected ? '1px solid var(--color-primary, #0f172a)' : '1px solid #e2e8f0',
-              backgroundColor: isSelected ? 'var(--color-primary, #0f172a)' : '#ffffff',
-              color: isSelected ? '#ffffff' : '#475569',
+              border: isSelected ? '1px solid var(--brand-color, var(--color-primary, #0f172a))' : '1px solid var(--color-border, #e2e8f0)',
+              backgroundColor: isSelected ? 'var(--brand-color, var(--color-primary, #0f172a))' : 'var(--card-bg, var(--color-surface, #ffffff))',
+              color: isSelected ? '#ffffff' : 'var(--color-text-muted, var(--muted-text, #475569))',
               boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
             }}
             data-preview-field-path={`${fieldPath}.${idx}`}
