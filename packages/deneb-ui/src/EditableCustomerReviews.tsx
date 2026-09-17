@@ -116,27 +116,27 @@ export function EditableCustomerReviews({
         {subtitle && (
           <span
             data-preview-field-path={`${sectionPath}.reviewsSubtitle`}
-            className="text-xs font-black tracking-widest uppercase text-lime-400 block mb-2"
+            className="text-xs font-black tracking-widest uppercase text-emerald-600 dark:text-lime-400 block mb-2"
           >
             {subtitle}
           </span>
         )}
         <h2
           data-preview-field-path={`${sectionPath}.reviewsTitle`}
-          className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight"
+          className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight"
         >
           {title}
         </h2>
 
         {/* Aggregate Score Bar */}
         <div className="mt-4 flex items-center justify-center gap-3">
-          <div className="flex text-amber-400 text-lg">
+          <div className="flex text-amber-500 dark:text-amber-400 text-lg">
             {'★★★★★'}
           </div>
-          <span className="text-white font-extrabold text-lg">
+          <span className="text-slate-900 dark:text-white font-extrabold text-lg">
             <span data-preview-field-path={`${sectionPath}.reviewsAverage`}>{averageRating}</span> / 5.0
           </span>
-          <span className="text-slate-400 text-sm">
+          <span className="text-slate-500 dark:text-slate-400 text-sm">
             (<span data-preview-field-path={`${sectionPath}.reviewsCount`}>{totalReviews}</span> reviews)
           </span>
         </div>
@@ -149,8 +149,8 @@ export function EditableCustomerReviews({
           onClick={() => setSelectedStarFilter(null)}
           className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
             selectedStarFilter === null
-              ? 'bg-lime-400 text-slate-950 font-extrabold shadow-sm'
-              : 'bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800'
+              ? 'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950 font-extrabold shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-white dark:border-slate-800'
           }`}
         >
           All Reviews
@@ -162,12 +162,12 @@ export function EditableCustomerReviews({
             onClick={() => setSelectedStarFilter(stars)}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
               selectedStarFilter === stars
-                ? 'bg-lime-400 text-slate-950 font-extrabold shadow-sm'
-                : 'bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800'
+                ? 'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950 font-extrabold shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-white dark:border-slate-800'
             }`}
           >
             <span>{stars} Stars</span>
-            <span className="text-amber-400">★</span>
+            <span className="text-amber-500 dark:text-amber-400">★</span>
           </button>
         ))}
       </div>
@@ -177,18 +177,18 @@ export function EditableCustomerReviews({
         {filteredReviews.map((review, i) => (
           <div
             key={review.id || i}
-            className="p-6 rounded-2xl bg-gradient-to-b from-slate-900/60 to-slate-950/80 border border-slate-800/80 flex flex-col justify-between hover:border-slate-700 transition-all duration-200"
+            className="p-6 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 shadow-sm hover:shadow-md dark:bg-gradient-to-b dark:from-slate-900/60 dark:to-slate-950/80 dark:border-slate-800/80 dark:hover:border-slate-700 flex flex-col justify-between transition-all duration-200"
           >
             <div>
               {/* Star Rating & Verified Badge */}
               <div className="flex items-center justify-between mb-4">
-                <div className="flex text-amber-400 text-sm">
+                <div className="flex text-amber-500 dark:text-amber-400 text-sm">
                   {Array.from({ length: review.rating }).map((_, idx) => (
                     <span key={idx}>★</span>
                   ))}
                 </div>
                 {review.verified !== false && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20">
                     <svg className="w-3 h-3 fill-current" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -200,29 +200,29 @@ export function EditableCustomerReviews({
               {/* Review Comment */}
               <p
                 data-preview-field-path={`${sectionPath}.review${i + 1}Comment`}
-                className="text-sm text-slate-300 leading-relaxed italic mb-4"
+                className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed italic mb-4"
               >
                 &ldquo;{review.comment}&rdquo;
               </p>
             </div>
 
             {/* Author and Date Footer */}
-            <div className="pt-4 border-t border-slate-800/60 flex items-center justify-between">
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
               <div>
                 <span
                   data-preview-field-path={`${sectionPath}.review${i + 1}Author`}
-                  className="block text-xs font-bold text-white"
+                  className="block text-xs font-bold text-slate-900 dark:text-white"
                 >
                   {review.author}
                 </span>
                 {review.productName && (
-                  <span className="text-[11px] text-slate-400 block">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
                     Purchased: {review.productName}
                   </span>
                 )}
               </div>
               {review.date && (
-                <span className="text-[11px] text-slate-500 font-mono">
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">
                   {review.date}
                 </span>
               )}

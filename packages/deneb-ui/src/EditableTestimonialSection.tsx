@@ -55,8 +55,8 @@ function StarSvg({ filled = true, size = 16 }: { filled?: boolean; size?: number
       style={{
         width: `${size}px`,
         height: `${size}px`,
-        fill: filled ? '#fbbf24' : '#334155',
-        color: filled ? '#fbbf24' : '#334155',
+        fill: filled ? '#fa7014' : '#dadce0',
+        color: filled ? '#fa7014' : '#dadce0',
         flexShrink: 0,
       }}
       aria-hidden="true"
@@ -126,7 +126,7 @@ function TestimonialCard({
   return (
     <div
       data-preview-item-path={`testimonials.testimonials[${index}]`}
-      className={`relative p-5 sm:p-7 lg:p-8 rounded-2xl bg-gradient-to-b from-slate-900/60 to-slate-950/80 border border-slate-800/80 hover:border-slate-700 shadow-md transition-all duration-300 flex flex-col justify-between space-y-5 min-w-0 ${cardClassName || ''}`.trim()}
+      className={`relative p-5 sm:p-7 lg:p-8 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 hover:border-slate-300 shadow-sm hover:shadow-md dark:bg-gradient-to-b dark:from-slate-900/70 dark:to-slate-950/90 dark:border-slate-800/80 dark:hover:border-slate-700 dark:shadow-xl transition-all duration-300 flex flex-col justify-between space-y-5 min-w-0 ${cardClassName || ''}`.trim()}
     >
       <div className="space-y-4 min-w-0">
         {/* Category Tag & Rating Stars */}
@@ -134,15 +134,16 @@ function TestimonialCard({
           {Boolean(currentItem.tag) && (
             <span
               data-preview-field-path={`testimonials.testimonials[${index}].tag`}
-              className="px-2.5 py-1 rounded-full bg-slate-800/80 text-lime-400 text-[10px] sm:text-[11px] uppercase tracking-wider font-extrabold border border-lime-400/20 shrink-0"
+              className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/80 dark:text-lime-400 dark:border-lime-400/20 text-[10px] sm:text-[11px] uppercase tracking-wider font-extrabold shrink-0"
             >
               {tagText}
             </span>
           )}
 
           <div
-            className="inline-flex items-center gap-1.5 p-1 -mr-1 rounded-lg cursor-pointer transition-all hover:bg-amber-400/10 group ml-auto shrink-0"
+            className="inline-flex items-center gap-1.5 p-1 -mr-1 rounded-lg cursor-pointer transition-all hover:bg-amber-500/10 group ml-auto shrink-0"
             onClick={handleFocusRating}
+            title={`Rating: ${currentRating} of ${maxStars} (Click to edit)`}
           >
             <div className="flex items-center gap-[2px]" data-fivora-stars-row="true">
               {Array.from({ length: maxStars }).map((_, sIdx) => (
@@ -153,7 +154,8 @@ function TestimonialCard({
               ref={ratingRef}
               data-preview-field-path={`testimonials.testimonials[${index}].rating`}
               data-fivora-rating-text="true"
-              className="text-xs font-black text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded-md border border-amber-400/20 group-hover:bg-amber-400/20 transition-colors tabular-nums"
+              className="text-xs font-black text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20 dark:text-amber-400 group-hover:bg-amber-500/20 transition-colors tabular-nums"
+              title="Star count (1-5)"
             >
               {currentRating}
             </span>
@@ -163,30 +165,30 @@ function TestimonialCard({
         {/* Quote Body */}
         <blockquote
           data-preview-field-path={`testimonials.testimonials[${index}].quote`}
-          className="font-serif-italic text-sm sm:text-base text-slate-300 leading-relaxed break-words"
+          className="font-serif-italic text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed break-words"
         >
           &ldquo;{quoteText}&rdquo;
         </blockquote>
       </div>
 
       {/* Author Info */}
-      <div className="pt-4 border-t border-slate-800/60 flex items-center gap-3 min-w-0">
+      <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center gap-3 min-w-0">
         <img
           src={authorAvatar}
           alt={authorName}
           data-preview-field-path={`testimonials.testimonials[${index}].avatar`}
-          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-slate-700 shadow-sm shrink-0"
+          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-sm shrink-0"
         />
         <div className="min-w-0 flex-1">
           <h4
             data-preview-field-path={`testimonials.testimonials[${index}].author`}
-            className="font-heading font-black text-sm sm:text-base text-white truncate"
+            className="font-heading font-black text-sm sm:text-base text-slate-900 dark:text-white truncate"
           >
             {authorName}
           </h4>
           <p
             data-preview-field-path={`testimonials.testimonials[${index}].role`}
-            className="text-xs text-slate-400 font-medium leading-snug line-clamp-2"
+            className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-snug line-clamp-2"
           >
             {authorRole}
           </p>
@@ -198,9 +200,9 @@ function TestimonialCard({
 
 export function EditableTestimonialSection({
   basePath = 'testimonials',
-  badge = 'CRITIC ACCLAIM',
-  heading = 'What Connoisseurs Say',
-  subheading = 'Unfiltered sensory impressions and reviews from sommeliers, culinary critics, and world sensory judges.',
+  badge = 'WORDS OF ACCLAIM',
+  heading = 'WHAT THE CRITICS ARE SAYING',
+  subheading = 'Reflections from international cuppers, culinary masters, and dedicated regulars.',
   testimonials = DEFAULT_TESTIMONIALS,
   maxStars = 5,
   className = '',
@@ -229,7 +231,8 @@ export function EditableTestimonialSection({
 
   return (
     <section
-      data-design-section="testimonials"
+      data-preview-page-key={basePath}
+      data-design-section={basePath}
       className={`editable-testimonial-section w-full py-12 sm:py-20 px-3 sm:px-6 lg:px-8 ${className}`.trim()}
       style={style}
       {...props}
@@ -238,19 +241,19 @@ export function EditableTestimonialSection({
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto space-y-3 mb-10 sm:mb-14 px-2">
           {badge && (
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-lime-400/10 text-lime-400 text-xs uppercase tracking-widest font-black border border-lime-400/20">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 dark:bg-slate-800/80 dark:text-lime-400 dark:border-lime-400/20 text-xs uppercase tracking-widest font-black shadow-sm">
               <span data-preview-field-path={`testimonials.badge`}>{badge}</span>
             </div>
           )}
           <h2
             data-preview-field-path={`testimonials.heading`}
-            className="font-heading text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight"
+            className="font-heading text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white tracking-tight"
           >
             {heading}
           </h2>
           <p
             data-preview-field-path={`testimonials.subheading`}
-            className="text-xs sm:text-base text-slate-400 leading-relaxed max-w-2xl mx-auto"
+            className="text-xs sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto"
           >
             {subheading}
           </p>
@@ -275,5 +278,3 @@ export function EditableTestimonialSection({
     </section>
   );
 }
-
-export type { TestimonialItem };

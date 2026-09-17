@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 export interface FeedbackItem {
   id?: string | number;
@@ -83,8 +83,8 @@ function GoogleStarSvg({ filled = true, size = 18 }: { filled?: boolean; size?: 
       style={{
         width: `${size}px`,
         height: `${size}px`,
-        fill: filled ? '#fbbf24' : '#334155',
-        color: filled ? '#fbbf24' : '#334155',
+        fill: filled ? '#fa7014' : '#dadce0',
+        color: filled ? '#fa7014' : '#dadce0',
         flexShrink: 0,
       }}
       aria-hidden="true"
@@ -99,12 +99,14 @@ function FeedbackCard({
   index,
   maxStars,
   badgeIcon,
+  badgeTitle,
   cardClassName,
 }: {
   item: FeedbackItem;
   index: number;
   maxStars: number;
   badgeIcon?: string;
+  badgeTitle?: string;
   cardClassName?: string;
 }) {
   const currentItem = item || {};
@@ -157,7 +159,7 @@ function FeedbackCard({
   return (
     <div
       data-preview-item-path={`feedback.feedbacks[${index}]`}
-      className={`p-6 sm:p-7 rounded-2xl bg-gradient-to-b from-slate-900/60 to-slate-950/80 border border-slate-800/80 hover:border-slate-700 shadow-md transition-all duration-300 flex flex-col justify-between space-y-4 ${cardClassName || ''}`.trim()}
+      className={`p-6 sm:p-7 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 hover:border-slate-300 shadow-sm hover:shadow-md dark:bg-gradient-to-b dark:from-slate-900/70 dark:to-slate-950/90 dark:border-slate-800/80 dark:hover:border-slate-700 dark:shadow-xl transition-all duration-300 flex flex-col justify-between space-y-4 ${cardClassName || ''}`.trim()}
     >
       <div className="space-y-3.5">
         {/* Author Profile Bar */}
@@ -167,37 +169,57 @@ function FeedbackCard({
               src={reviewerAvatar}
               alt={reviewerName}
               data-preview-field-path={`feedback.feedbacks[${index}].avatar`}
-              className="w-11 h-11 rounded-full object-cover border border-slate-700 shadow-sm"
+              className="w-11 h-11 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-sm"
             />
             <div>
               <span
                 data-preview-field-path={`feedback.feedbacks[${index}].name`}
-                className="block text-sm font-black text-white"
+                className="block text-sm font-black text-slate-900 dark:text-white"
               >
                 {reviewerName}
               </span>
               <span
                 data-preview-field-path={`feedback.feedbacks[${index}].date`}
-                className="block text-xs text-slate-400"
+                className="block text-xs text-slate-500 dark:text-slate-400"
               >
                 {reviewerDate}
               </span>
             </div>
           </div>
 
-          <img
-            src={badgeIcon || DEFAULT_GOOGLE_ICON}
-            alt="Google"
-            data-preview-static="true"
-            className="w-5 h-5 object-contain opacity-90"
-          />
+          {(() => {
+            const itemCustomIcon = (currentItem as Record<string, unknown>)?.badgeIcon || (currentItem as Record<string, unknown>)?.platformIcon;
+            const finalCardIcon = typeof itemCustomIcon === 'string' && itemCustomIcon.trim() ? itemCustomIcon : (badgeIcon || DEFAULT_GOOGLE_ICON);
+            const cardIconFieldPath = typeof itemCustomIcon === 'string' && itemCustomIcon.trim()
+              ? `feedback.feedbacks[${index}].badgeIcon`
+              : `feedback.badgeIcon`;
+
+            return (
+              <img
+                src={finalCardIcon}
+                alt={badgeTitle || 'Review Platform'}
+                data-preview-field-path={cardIconFieldPath}
+                className="w-5 h-5 object-contain opacity-90 shrink-0 cursor-pointer"
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  minWidth: '20px',
+                  minHeight: '20px',
+                  maxWidth: '20px',
+                  maxHeight: '20px',
+                }}
+                title="Click to upload/change review platform icon (Google, Twitter, Trustpilot, etc.)"
+              />
+            );
+          })()}
         </div>
 
         {/* Star rating row & Google verified tag */}
         <div className="flex items-center justify-between gap-2 pt-1">
           <div
-            className="inline-flex items-center gap-2 p-1 -ml-1 rounded-lg cursor-pointer transition-all hover:bg-amber-400/10 group"
+            className="inline-flex items-center gap-2 p-1 -ml-1 rounded-lg cursor-pointer transition-all hover:bg-amber-500/10 group"
             onClick={handleFocusRating}
+            title={`Rating: ${currentRating} of ${maxStars} (Click to edit)`}
           >
             <div className="flex items-center gap-[2px]" data-fivora-stars-row="true">
               {Array.from({ length: maxStars }).map((_, sIdx) => (
@@ -208,7 +230,7 @@ function FeedbackCard({
               ref={ratingRef}
               data-preview-field-path={`feedback.feedbacks[${index}].rating`}
               data-fivora-rating-text="true"
-              className="text-xs font-black text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded-md border border-amber-400/20 group-hover:bg-amber-400/20 transition-colors tabular-nums"
+              className="text-xs font-black text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20 dark:text-amber-400 group-hover:bg-amber-500/20 transition-colors tabular-nums"
               title="Star count (1-5)"
             >
               {currentRating}
@@ -216,18 +238,18 @@ function FeedbackCard({
           </div>
 
           {/* Google verified indicator */}
-          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20">
             <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
             </svg>
-            <span data-preview-static="true">Verified</span>
+            <span>Verified</span>
           </div>
         </div>
 
         {/* Comment / Review text */}
         <p
           data-preview-field-path={`feedback.feedbacks[${index}].comment`}
-          className="text-sm sm:text-base text-slate-300 leading-relaxed italic font-normal pt-1"
+          className="text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed italic font-normal pt-1"
         >
           &ldquo;{reviewerComment}&rdquo;
         </p>
@@ -237,52 +259,35 @@ function FeedbackCard({
 }
 
 export function EditableGoogleFeedback({
-  basePath = 'feedback',
-  badgeIcon = DEFAULT_GOOGLE_ICON,
+  heading = 'Loved by Customers Worldwide',
+  subheading = 'Real stories and verified 5-star reviews from our official Google Business profile.',
   badgeTitle = 'Google Reviews',
   badgeRating = '4.9',
-  badgeReviewsCount = '340+ Verified Reviews',
-  heading = 'Loved by Customers Worldwide',
-  subheading = 'Real experiences and verified reviews from Google Business ratings.',
+  badgeReviewsCount = '128 verified reviews',
+  badgeIcon,
   feedbacks = DEFAULT_FEEDBACKS,
   maxStars = 5,
   className = '',
   cardClassName = '',
   style,
+  basePath = 'feedback',
   ...props
 }: EditableGoogleFeedbackProps) {
-  const items = useMemo(() => {
-    const list = Array.isArray(feedbacks) ? feedbacks : [];
-    if (list.length === 0) {
-      return DEFAULT_FEEDBACKS;
-    }
-    return list.map((item, index) => {
-      const fallback = DEFAULT_FEEDBACKS[index % DEFAULT_FEEDBACKS.length] || DEFAULT_FEEDBACKS[0];
-      if (!item || typeof item !== 'object') {
-        return { ...fallback, id: `fallback-${index}` };
-      }
-      return {
-        ...fallback,
-        ...item,
-        id: item.id || `feedback-${index}`,
-        rating: item.rating !== undefined && item.rating !== null ? item.rating : 5,
-      };
-    });
-  }, [feedbacks]);
+  const items = Array.isArray(feedbacks) && feedbacks.length > 0 ? feedbacks : DEFAULT_FEEDBACKS;
 
   return (
     <section
-      data-design-section="google-feedback"
-      className={`editable-google-feedback w-full ${className}`.trim()}
+      data-preview-page-key={basePath}
+      className={`editable-google-feedback w-full py-12 sm:py-20 ${className}`.trim()}
       style={style}
       {...props}
     >
-      <div className="w-full mx-auto px-4 sm:px-6 lg:px-10">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10">
         {/* Section Header & Google Rating Badge */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 sm:mb-14">
           <div className="max-w-2xl space-y-3">
             {/* Google Rating Pill Badge */}
-            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-slate-800 shadow-sm">
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-100 border border-slate-200 dark:bg-slate-900/80 dark:border-slate-800 shadow-sm">
               <img
                 src={badgeIcon || DEFAULT_GOOGLE_ICON}
                 alt="Google"
@@ -291,15 +296,15 @@ export function EditableGoogleFeedback({
               />
               <span
                 data-preview-field-path={`feedback.badgeTitle`}
-                className="text-xs uppercase tracking-widest font-black text-white"
+                className="text-xs uppercase tracking-widest font-black text-slate-800 dark:text-slate-200"
               >
                 {badgeTitle}
               </span>
-              <span className="w-1 h-1 rounded-full bg-slate-700" />
+              <span className="w-1 h-1 rounded-full bg-slate-400 dark:bg-slate-600" />
               <div className="flex items-center gap-1.5">
                 <span
                   data-preview-field-path={`feedback.badgeRating`}
-                  className="text-xs font-black text-amber-400"
+                  className="text-xs font-black text-amber-600 dark:text-amber-400"
                 >
                   {badgeRating}
                 </span>
@@ -309,31 +314,31 @@ export function EditableGoogleFeedback({
                   ))}
                 </div>
               </div>
-              <span className="text-[11px] text-slate-400 font-medium sm:inline">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium hidden sm:inline">
                 (<span data-preview-field-path={`feedback.badgeReviewsCount`}>{badgeReviewsCount}</span>)
               </span>
             </div>
 
             <h2
               data-preview-field-path={`feedback.heading`}
-              className="font-heading text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight"
+              className="font-heading text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white tracking-tight"
             >
               {heading}
             </h2>
             <p
               data-preview-field-path={`feedback.subheading`}
-              className="text-xs sm:text-base text-slate-400 leading-relaxed"
+              className="text-xs sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed"
             >
               {subheading}
             </p>
           </div>
 
           {/* Aggregate Badge for Desktop */}
-          <div className="flex flex-col items-end text-right md:flex">
+          <div className="hidden md:flex flex-col items-end text-right">
             <div className="flex items-center gap-2">
               <span
                 data-preview-field-path={`feedback.badgeRating`}
-                className="font-heading text-4xl font-black text-amber-400"
+                className="font-heading text-4xl font-black text-amber-500 dark:text-amber-400"
               >
                 {badgeRating}
               </span>
@@ -345,7 +350,7 @@ export function EditableGoogleFeedback({
                 </div>
                 <span
                   data-preview-field-path={`feedback.badgeReviewsCount`}
-                  className="text-xs text-slate-400 font-bold"
+                  className="text-xs text-slate-500 dark:text-slate-400 font-bold"
                 >
                   {badgeReviewsCount}
                 </span>
@@ -366,6 +371,7 @@ export function EditableGoogleFeedback({
               index={index}
               maxStars={maxStars}
               badgeIcon={badgeIcon}
+              badgeTitle={badgeTitle}
               cardClassName={cardClassName}
             />
           ))}

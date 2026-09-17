@@ -132,12 +132,12 @@ export function TrustBadges({
       {(title || subtitle) && (
         <div className="text-center mb-8">
           {title && (
-            <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+            <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
               {title}
             </h3>
           )}
           {subtitle && (
-            <p className="mt-1 text-sm text-slate-600 max-w-xl mx-auto">
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
               {subtitle}
             </p>
           )}
@@ -156,18 +156,18 @@ export function TrustBadges({
             key={badge.id}
             className={`flex items-start gap-4 p-5 rounded-2xl transition-all duration-200 hover:-translate-y-0.5 ${
               variant === 'cards'
-                ? 'bg-white border border-slate-200/80 shadow-sm hover:shadow-md'
+                ? 'bg-white border border-slate-200/80 shadow-sm hover:shadow-md dark:bg-slate-900/60 dark:border-slate-800 dark:hover:border-slate-700'
                 : 'bg-transparent'
             }`}
           >
-            <div className="flex-shrink-0 p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+            <div className="flex-shrink-0 p-2.5 rounded-xl bg-slate-50 border border-slate-100 dark:bg-slate-800/80 dark:border-slate-700 flex items-center justify-center">
               {renderIcon(badge)}
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-slate-900 leading-tight">
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">
                 {badge.title}
               </h4>
-              <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                 {badge.description}
               </p>
             </div>

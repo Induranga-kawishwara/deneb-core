@@ -130,7 +130,7 @@ export function EditableProductGrid({
   return (
     <section
       data-preview-page-key={sectionPath}
-      className={`editable-product-grid w-full mx-auto px-4 sm:px-6 lg:px-8 py-16 ${className}`.trim()}
+      className={`editable-product-grid max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 ${className}`.trim()}
       style={style}
       {...(props as any)}
     >
@@ -140,14 +140,14 @@ export function EditableProductGrid({
           {subtitle && (
             <span
               data-preview-field-path={`${sectionPath}.gridSubtitle`}
-              className="text-xs font-black tracking-widest uppercase text-lime-400 block mb-2"
+              className="text-xs font-black tracking-widest uppercase text-emerald-600 dark:text-lime-400 block mb-2"
             >
               {subtitle}
             </span>
           )}
           <h2
             data-preview-field-path={`${sectionPath}.gridTitle`}
-            className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight"
+            className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight"
           >
             {title}
           </h2>
@@ -165,8 +165,8 @@ export function EditableProductGrid({
                   onClick={() => setActiveCategory(cat)}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
                     isActive
-                      ? 'bg-lime-400 text-slate-950 shadow-md scale-102 font-extrabold'
-                      : 'bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800/80 hover:bg-slate-800'
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-md scale-102 font-extrabold'
+                      : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-200/70 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-white dark:border-slate-800/80 dark:hover:bg-slate-850'
                   }`}
                 >
                   {cat}
