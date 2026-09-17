@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import type { TestimonialItem } from './EditableTestimonialCard';
 
@@ -68,13 +69,11 @@ function StarSvg({ filled = true, size = 16 }: { filled?: boolean; size?: number
 function TestimonialCard({
   item,
   index,
-  basePath,
   maxStars,
   cardClassName,
 }: {
   item: TestimonialItem;
   index: number;
-  basePath: string;
   maxStars: number;
   cardClassName?: string;
 }) {
@@ -264,10 +263,9 @@ export function EditableTestimonialSection({
         >
           {items.map((item, index) => (
             <TestimonialCard
-              key={item.id || `testimonial-${index}`}
+              key={item.id || String(index)}
               item={item}
               index={index}
-              basePath={basePath}
               maxStars={maxStars}
               cardClassName={cardClassName}
             />

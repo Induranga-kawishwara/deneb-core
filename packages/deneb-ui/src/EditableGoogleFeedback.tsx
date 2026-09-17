@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 
 export interface FeedbackItem {
@@ -96,14 +97,12 @@ function GoogleStarSvg({ filled = true, size = 18 }: { filled?: boolean; size?: 
 function FeedbackCard({
   item,
   index,
-  basePath,
   maxStars,
   badgeIcon,
   cardClassName,
 }: {
   item: FeedbackItem;
   index: number;
-  basePath: string;
   maxStars: number;
   badgeIcon?: string;
   cardClassName?: string;
@@ -362,10 +361,9 @@ export function EditableGoogleFeedback({
         >
           {items.map((item, index) => (
             <FeedbackCard
-              key={item.id || `feedback-${index}`}
+              key={item.id || String(index)}
               item={item}
               index={index}
-              basePath={basePath}
               maxStars={maxStars}
               badgeIcon={badgeIcon}
               cardClassName={cardClassName}
