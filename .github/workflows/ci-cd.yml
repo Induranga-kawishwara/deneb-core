@@ -27,6 +27,7 @@ on:
 jobs:
   build-and-test:
     name: Build, Validate & Publish
+    if: github.repository == 'deneb-ui/core'
     runs-on: ubuntu-latest
     env:
       CAN_PUBLISH: ${{ github.repository == 'deneb-ui/core' }}
