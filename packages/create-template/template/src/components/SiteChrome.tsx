@@ -21,7 +21,7 @@ export default function SiteChrome({ children }: { children: ReactNode }) {
       <Footer />
       <FloatingContactWidget />
       <div className="fixed bottom-6 left-6 z-40">
-        <ThemeToggle />
+        <ThemeToggle showLabel className="shadow-lg backdrop-blur-md" />
       </div>
     </div>
   );

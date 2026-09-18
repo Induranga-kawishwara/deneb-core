@@ -303,10 +303,17 @@ if (themeArg) {
 }
 
 const positionalTarget = args.find((a) => !a.startsWith('-'));
+const isNonInteractive =
+  !process.stdin.isTTY ||
+  Boolean(process.env.CI) ||
+  args.includes('--yes') ||
+  args.includes('-y') ||
+  args.includes('--non-interactive') ||
+  args.includes('--skip-install');
 
 if (positionalTarget && positionalTarget.trim()) {
-  if (cliTheme) {
-    runScaffolding(positionalTarget, cliTheme);
+  if (cliTheme || isNonInteractive) {
+    runScaffolding(positionalTarget, cliTheme || 'dual');
   } else {
     const rl = readline.createInterface({
       input: process.stdin,
@@ -324,6 +331,8 @@ if (positionalTarget && positionalTarget.trim()) {
       runScaffolding(positionalTarget, themeAns.trim() || 'dual');
     });
   }
+} else if (isNonInteractive) {
+  runScaffolding('my-deneb-store', cliTheme || 'dual');
 } else {
   const rl = readline.createInterface({
     input: process.stdin,

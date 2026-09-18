@@ -424,6 +424,11 @@
             "key": "submitLabel",
             "type": "text",
             "label": "Submit button"
+          },
+          {
+            "key": "directMessageText",
+            "type": "text",
+            "label": "Direct message label"
           }
         ]
       },

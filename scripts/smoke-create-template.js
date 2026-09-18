@@ -10,7 +10,7 @@ const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-scaffold-'));
 const bin = path.join(rootDir, 'packages', 'create-template', 'bin', 'index.js');
 
 console.log(`Scaffolding smoke template into ${dest}`);
-const result = spawnSync(process.execPath, [bin, dest, '--skip-install'], {
+const result = spawnSync(process.execPath, [bin, dest, '--skip-install', '--theme=dual'], {
   cwd: rootDir,
   stdio: 'inherit',
 });

@@ -1,17 +1,17 @@
 {
   "project": {
-    "id": "starter-demo",
-    "slug": "starter-demo",
-    "title": "Fivora Starter Demo",
+    "id": "deneb-portfolio-showcase",
+    "slug": "deneb-portfolio-showcase",
+    "title": "DENEB UI — Showcase & Portfolio",
     "status": "APPROVED"
   },
   "merchant": {
-    "businessName": "Fivora Store",
-    "description": "A modern high-converting digital storefront built on the Fivora platform."
+    "businessName": "DENEB UI Showcase",
+    "description": "The visual-first React framework for high-converting storefronts and modern digital portfolios. Powered by DENEB-UI in collaboration with FIVORA."
   },
   "template": {
-    "id": "starter-template",
-    "name": "Fivora Starter",
+    "id": "deneb-portfolio-template",
+    "name": "DENEB UI Portfolio Showcase",
     "engine": "NEXT_STATIC_EXPORT",
     "structure": {
       "pages": [
@@ -30,7 +30,17 @@
         "bodyFont": "Inter",
         "baseSize": "16px",
         "heroMinHeight": "72vh",
-        "sectionPadding": "5rem"
+        "sectionPadding": "5rem",
+        "borderRadius": "12px",
+        "dark": {
+          "backgroundColor": "#090d16",
+          "cardBackgroundColor": "#131b2e",
+          "textColor": "#f8fafc",
+          "borderColor": "rgba(255, 255, 255, 0.12)",
+          "primaryColor": "#00adb5",
+          "secondaryColor": "#1e293b",
+          "accentColor": "#38bdf8"
+        }
       }
     }
   },
@@ -45,8 +55,8 @@
   },
   "content": {
     "common": {
-      "websiteTitle": "Fivora Store",
-      "shortDescription": "Next-generation commerce templates built for the Fivora with reusable components and strict visual editing.",
+      "websiteTitle": "DENEB UI — Showcase & Portfolio",
+      "shortDescription": "The visual-first React framework for modern storefronts and digital portfolios. Powered by DENEB-UI in collaboration with FIVORA.",
       "logoUrl": "/fivora-logo.png",
       "headerCtaLabel": "Contact Us",
       "navLabels": {
@@ -55,111 +65,126 @@
         "services": "Services",
         "contact": "Contact"
       },
-      "footerHeading": "Build something extraordinary with Fivora.",
-      "copyright": "Fivora. All rights reserved.",
+      "footerHeading": "Build something extraordinary with DENEB-UI & FIVORA.",
+      "copyright": "DENEB-UI. All rights reserved. Collaborate with FIVORA.",
       "socialMedia": {
-        "twitter": "https://twitter.com",
-        "github": "https://github.com",
+        "twitter": "https://twitter.com/denebui",
+        "github": "https://github.com/deneb-ui",
         "linkedin": "https://linkedin.com",
         "instagram": "https://instagram.com"
       }
     },
     "home": {
-      "heroEyebrow": "⚡ Fivora Template Starter",
-      "heroTitle": "Design Stores That Captivate",
-      "heroSummary": "Built with @deneb-ui/ui. Hot-reload locally, simulate merchant visual editing in the Lab, validate preflight contracts, and package with 1-click.",
+      "heroEyebrow": "⚡ DENEB UI FRAMEWORK",
+      "heroTitle": "The Visual-First React Framework for High-Converting Experiences",
+      "heroSummary": "Design, build, and ship web storefronts and portfolios with 100% atomic editable components, auto-balancing layouts, and instant dual-mode aesthetics. Built in collaboration with FIVORA Cloud.",
       "bannerImageUrl": "/fivora-icon.svg",
-      "primaryCtaLabel": "Explore Services",
-      "secondaryCtaLabel": "About This Starter",
-      "introTitle": "Engineered for high conversion and effortless editing",
-      "introBody": "Every editable value comes directly from Fivora site data with auto-balancing layouts, responsive typography, and strict contract validation out of the box.",
-      "featuresHeading": "Why build with the Fivora Authoring Kit?",
+      "primaryCtaLabel": "Explore Showcase",
+      "secondaryCtaLabel": "About DENEB-UI",
+      "introTitle": "Engineered for visual perfection and effortless editing",
+      "introBody": "Every editable value comes directly from structured site data with auto-balancing layouts, responsive typography, and strict contract validation out of the box.",
+      "featuresHeading": "Why build with the DENEB-UI Authoring Kit?",
       "features": [
         {
-          "title": "Auto-Balancing Layouts",
-          "body": "Cards, grids, and containers automatically balance and fill space seamlessly across all screen sizes."
+          "title": "100% Atomic DENEB Components",
+          "body": "Pre-built, accessible, high-converting components with responsive design token integration and zero runtime overhead."
         },
         {
           "title": "Strict Visual Editing",
-          "body": "Direct bindings enable merchants to click, edit, and preview changes without breaking template styles."
+          "body": "Direct bidirectional field bindings enable instant visual customization in the Lab and on the FIVORA platform without breaking styles."
         },
         {
-          "title": "1-Click Clean Packaging",
-          "body": "Built-in zip command strips heavy caches, node_modules, and git files so uploads pass instantly."
+          "title": "Instant Dual-Mode Aesthetics",
+          "body": "Seamless light and dark mode out-of-the-box with intelligent token contrast calculations for typography and surfaces."
+        },
+        {
+          "title": "FIVORA Cloud Collaboration",
+          "body": "Built-in integration for collaborative editing, marketplace publishing, and automated zero-dependency clean packaging."
         }
       ],
       "demoPreOrderCta": [
         {
-          "buttonLabel": "Book a Demo",
+          "buttonLabel": "Book a Consultation",
           "buttonUrl": "https://wa.me/94771234567"
         }
       ],
-      "productsHeading": "Featured Store Products",
-      "productsSummary": "Live inventory and pricing updated in real time from your Fivora Shop Owner panel."
+      "productsHeading": "Featured Portfolio & Templates",
+      "productsSummary": "Explore high-converting storefronts, portals, and templates engineered with DENEB-UI and verified for production."
     },
     "about": {
-      "heading": "Built for the next generation of online storefronts",
-      "body": "The Fivora connects businesses with high-converting, beautifully crafted templates. This starter template demonstrates clean monorepo architecture, responsive typography, and auto-balancing components.",
+      "heading": "Empowering Developers to Build Visually Editable Web Experiences",
+      "body": "DENEB UI was created by Chamika Gayashan & Induranga Kawishwara to bridge the gap between developer-grade React code and effortless visual editing. In collaboration with the FIVORA platform, we empower creators to ship ultra-fast static web applications while giving non-technical teams an intuitive live visual editor.",
       "imageUrl": "/placeholder.svg",
-      "collageHeading": "Our story in pictures",
-      "collageDescription": "A quick visual tour of how we design, build, and ship merchant-ready storefronts.",
-      "historyHeading": "Where we started",
-      "history": "We began as a small team helping local businesses move online. Today our templates power visual editing labs, strict Fivora contracts, and one-click packaging for developers worldwide.",
+      "collageHeading": "The DENEB-UI Journey",
+      "collageDescription": "A visual tour of our architecture, design system engineering, and cloud deployment pipeline.",
+      "historyHeading": "Our Engineering Philosophy",
+      "history": "We believe modern web developers shouldn't have to choose between code elegance and visual customization. DENEB-UI provides atomic, contract-bound components that compile to lean Next.js static exports, backed by FIVORA Cloud for instant real-time publishing.",
       "collageImages": [
         {
-          "id": "studio",
+          "id": "design-system",
           "image": "/placeholder.svg",
-          "caption": "Design studio"
+          "caption": "Atomic Design System"
         },
         {
-          "id": "build",
+          "id": "visual-engine",
           "image": "/placeholder.svg",
-          "caption": "Build & test"
+          "caption": "Live Visual Engine"
         },
         {
-          "id": "ship",
+          "id": "cloud-publish",
           "image": "/placeholder.svg",
-          "caption": "Ship to Fivora"
+          "caption": "FIVORA Cloud Publishing"
         }
       ]
     },
     "servicesPage": {
-      "heading": "Template Services & Capabilities",
-      "intro": "Each service card is an atomic component featuring an image, heading, description, and repeatable checklist."
+      "heading": "Framework Solutions & Capabilities",
+      "intro": "Every capability is backed by atomic DENEB components, automated packaging, and preflight verification."
     },
     "services": [
       {
         "id": "visual-editing",
         "name": "Visual Editing Lab",
-        "description": "Simulate how merchants customize your template in real time with the built-in local development lab.",
+        "description": "Simulate how merchants customize your template in real time with the built-in local development lab and field focus bridge.",
         "imageUrl": "/placeholder.svg",
         "features": [
           "Zero-server static preview",
           "Field focus bridge",
-          "Instant feedback"
+          "Instant visual feedback"
         ]
       },
       {
         "id": "clean-packaging",
         "name": "Automated Packager",
-        "description": "Automatically produce clean, upload-ready ZIP archives excluding junk and cache files.",
+        "description": "Automatically produce clean, upload-ready ZIP archives excluding junk, build caches, and sensitive files.",
         "imageUrl": "/placeholder.svg",
         "features": [
           "Excludes node_modules",
           "Excludes .next and .git",
           "100% preflight compliant"
         ]
+      },
+      {
+        "id": "dual-mode-system",
+        "name": "Dual-Mode Theme Engine",
+        "description": "Harmonic light and dark themes generated automatically with smart contrast adjustments for high visual appeal.",
+        "imageUrl": "/placeholder.svg",
+        "features": [
+          "Auto contrast calculations",
+          "ThemeToggle component",
+          "Persistent theme storage"
+        ]
       }
     ],
     "contact": {
-      "heading": "Get in touch with our team",
-      "intro": "Have questions about building or customizing Fivora templates? Contact us today.",
+      "heading": "Connect with the DENEB-UI Team",
+      "intro": "Have questions about DENEB-UI components or building custom storefronts with the FIVORA platform? Contact us today.",
       "phone": "+94 11 234 5678",
-      "email": "developer@fivora.lk",
+      "email": "hello@deneb-ui.dev",
       "address": "Colombo, Sri Lanka",
       "directionsLabel": "Get Directions",
       "directionsUrl": "https://maps.app.goo.gl/example",
-      "formTitle": "Send an enquiry",
+      "formTitle": "Send an Inquiry",
       "submitLabel": "Send Message",
       "directMessageText": "Send us a direct message",
       "whatsapp": "+94 77 123 4567"
@@ -167,38 +192,38 @@
     "products": [
       {
         "id": "prod-1",
-        "name": "Minimalist Ceramic Cup",
-        "description": "Handcrafted matte ceramic cup for your daily espresso or pour-over brew.",
-        "price": 3200,
-        "compareAtPrice": 4000,
+        "name": "Aura Luxury Storefront",
+        "description": "High-converting boutique and jewelry storefront template with dark aesthetics, before/after sliders, and quick checkout.",
+        "price": 4900,
+        "compareAtPrice": 6500,
         "currency": "LKR",
         "imageUrl": "/placeholder.svg",
-        "category": "Ceramics",
-        "badge": "Bestseller",
+        "category": "E-Commerce",
+        "badge": "Popular",
         "isAvailable": true
       },
       {
         "id": "prod-2",
-        "name": "Artisan Linen Apron",
-        "description": "Durable pure washed linen apron with deep front utility pockets.",
-        "price": 5400,
-        "compareAtPrice": 6200,
+        "name": "Apex SaaS & Analytics",
+        "description": "Clean, high-performance web template tailored for developer tools, SaaS metrics, and responsive pricing grids.",
+        "price": 6200,
+        "compareAtPrice": 7500,
         "currency": "LKR",
         "imageUrl": "/placeholder.svg",
-        "category": "Kitchen",
-        "badge": "New",
+        "category": "Technology",
+        "badge": "Featured",
         "isAvailable": true
       },
       {
         "id": "prod-3",
-        "name": "Botanical Room Spray",
-        "description": "Natural essential oil room mist infused with wild lavender and cedarwood.",
-        "price": 2800,
+        "name": "Zenith Artisan Portfolio",
+        "description": "Minimalist digital portfolio template featuring auto-balancing photo galleries, quote cards, and WhatsApp contact integration.",
+        "price": 3800,
         "compareAtPrice": null,
         "currency": "LKR",
         "imageUrl": "/placeholder.svg",
-        "category": "Aromatherapy",
-        "badge": null,
+        "category": "Portfolio",
+        "badge": "New",
         "isAvailable": true
       }
     ]
@@ -206,16 +231,16 @@
   "media": {},
   "seo": null,
   "siteInstance": {
-    "id": "starter-demo-instance",
-    "slug": "starter-demo",
-    "domain": "starter-demo.fivora.site",
-    "subdomain": "starter-demo",
+    "id": "deneb-portfolio-showcase-instance",
+    "slug": "deneb-portfolio-showcase",
+    "domain": "deneb-showcase.fivora.site",
+    "subdomain": "deneb-showcase",
     "customDomain": null,
-    "liveUrl": "https://starter-demo.fivora.site"
+    "liveUrl": "https://deneb-showcase.fivora.site"
   },
   "api": {
     "baseUrl": "https://api.fivora.site",
-    "catalogUrl": "https://api.fivora.site/site-catalog/starter-demo/live-data",
+    "catalogUrl": "https://api.fivora.site/site-catalog/deneb-portfolio-showcase/live-data",
     "contactUrl": "https://api.fivora.site/site-contact",
     "analyticsUrl": "https://api.fivora.site/site-analytics/page-view"
   }
