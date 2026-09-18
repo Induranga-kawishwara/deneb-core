@@ -2178,7 +2178,7 @@ function auditSensitiveAttributes(
 
 function isHiddenHtmlElement(token: string, tag: string) {
   if (
-    /\bhidden(?:\s|=|\/?>)/i.test(token) ||
+    /(?:^|\s)hidden(?:\s|=|\/?>)/i.test(token) ||
     /\baria-hidden\s*=\s*(?:"true"|'true')/i.test(token)
   ) {
     return true;

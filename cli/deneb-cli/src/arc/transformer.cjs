@@ -313,6 +313,20 @@ function wrapLiteralTextChildren(node, fieldPath, fallback) {
   if (wrapped) node.children = nextChildren;
 }
 
+function buildCompositeKeyAttribute(binding, indexName) {
+  const fields = ['id', 'slug', 'title', 'name'];
+  let expr = b.memberExpression(b.identifier(binding), b.identifier(fields[0]), false);
+  for (let i = 1; i < fields.length; i++) {
+    expr = b.logicalExpression(
+      '||',
+      expr,
+      b.memberExpression(b.identifier(binding), b.identifier(fields[i]), false)
+    );
+  }
+  expr = b.logicalExpression('||', expr, b.identifier(indexName));
+  return b.jsxAttribute(b.jsxIdentifier('key'), b.jsxExpressionContainer(expr));
+}
+
 /**
  * Converts a literal-array `.map()` render into a Fivora list contract.
  *
@@ -321,7 +335,7 @@ function wrapLiteralTextChildren(node, fieldPath, fallback) {
  * emitted as JSX template literals (`items[${index}].title`) so added and
  * reordered items stay editable, which is what strict mode requires.
  */
-function applyCollectionTransform(ast, transform, isClient = false) {
+function applyCollectionTransform(ast, transform, isClient = false, isTypeScript = false) {
   const listPath = transform.listField;
   const binding = transform.itemParam;
   if (!listPath || !binding) return false;
@@ -335,8 +349,30 @@ function applyCollectionTransform(ast, transform, isClient = false) {
   // The contract needs a concrete index for each item marker.
   let indexName = transform.indexParam;
   if (!indexName) {
-    indexName = callback.params.some((p) => p.name === 'index') ? 'denebIndex' : 'index';
-    callback.params.push(b.identifier(indexName));
+    if (callback.params && callback.params.length >= 2 && callback.params[1]?.type === 'Identifier') {
+      indexName = callback.params[1].name;
+    } else {
+      indexName = callback.params.some((p) => p?.name === 'index') ? 'denebIndex' : 'index';
+      const indexId = b.identifier(indexName);
+      if (isTypeScript) {
+        indexId.typeAnnotation = b.tsTypeAnnotation(b.tsNumberKeyword());
+      }
+      callback.params.push(indexId);
+    }
+  }
+
+  // In TypeScript files, prevent TS7006 implicit any on callback parameters
+  if (isTypeScript && callback.params && callback.params.length > 0) {
+    const itemParam = callback.params[0];
+    if (itemParam && !itemParam.typeAnnotation) {
+      itemParam.typeAnnotation = b.tsTypeAnnotation(b.tsAnyKeyword());
+    }
+    if (callback.params.length >= 2) {
+      const idxParam = callback.params[1];
+      if (idxParam && !idxParam.typeAnnotation) {
+        idxParam.typeAnnotation = b.tsTypeAnnotation(b.tsNumberKeyword());
+      }
+    }
   }
 
   const itemRoot = findElementByLoc(ast, transform.loc);
@@ -353,6 +389,11 @@ function applyCollectionTransform(ast, transform, isClient = false) {
     );
     itemRoot.node.openingElement.attributes.push(
       b.jsxAttribute(b.jsxIdentifier('data-preview-style-type'), b.stringLiteral('card'))
+    );
+  }
+  if (!hasJsxAttribute(itemRoot.node, 'key')) {
+    itemRoot.node.openingElement.attributes.push(
+      buildCompositeKeyAttribute(binding, indexName)
     );
   }
 
@@ -374,7 +415,7 @@ function applyCollectionTransform(ast, transform, isClient = false) {
     );
   }
 
-  return bindArrayDeclaration(ast, mapCall, listPath, isClient, Boolean(transform.hasComponentRef));
+  return bindArrayDeclaration(ast, mapCall, listPath, isClient, Boolean(transform.hasComponentRef), isTypeScript);
 }
 
 function findMapCall(ast, loc) {
@@ -395,7 +436,7 @@ function findMapCall(ast, loc) {
               hit = true;
               return false;
             }
-            inner.traverse(inner);
+            this.traverse(inner);
           },
         });
         if (hit) {
@@ -543,7 +584,7 @@ function findEnclosingFunction(pathNode) {
   return null;
 }
 
-function bindArrayDeclaration(ast, mapCallPath, listPath, isClient = false, mergeDefaultRefs = false) {
+function bindArrayDeclaration(ast, mapCallPath, listPath, isClient = false, mergeDefaultRefs = false, isTypeScript = false) {
   const arrayName = mapCallPath.node.callee.object?.name;
   if (!arrayName) return false;
   let bound = false;
@@ -568,9 +609,13 @@ function bindArrayDeclaration(ast, mapCallPath, listPath, isClient = false, merg
           const body = fnPath.node.body.body;
           const already = body.some((stmt) => recast.print(stmt).code.includes(`const ${arrayName} =`));
           if (!already) {
+            const localId = b.identifier(arrayName);
+            if (isTypeScript) {
+              localId.typeAnnotation = b.tsTypeAnnotation(b.tsArrayType(b.tsAnyKeyword()));
+            }
             const localDecl = b.variableDeclaration('const', [
               b.variableDeclarator(
-                b.identifier(arrayName),
+                localId,
                 mergeDefaultRefs
                   ? mergeDefaultItemRefsBinding(listPath.split('.'), defaultName)
                   : siteDataListBinding(listPath.split('.'), b.identifier(defaultName))
@@ -588,6 +633,9 @@ function bindArrayDeclaration(ast, mapCallPath, listPath, isClient = false, merg
         return false;
       }
 
+      if (isTypeScript && node.id?.type === 'Identifier' && !node.id.typeAnnotation) {
+        node.id.typeAnnotation = b.tsTypeAnnotation(b.tsArrayType(b.tsAnyKeyword()));
+      }
       node.init = siteDataListBinding(listPath.split('.'), node.init);
       bound = true;
       return false;
@@ -656,15 +704,41 @@ function resolveSiteDataRuntimeSpecifier(profile) {
   return '@deneb-ui/ui';
 }
 
+function functionReferencesSiteData(fn) {
+  if (!fn || !fn.body) return false;
+  let found = false;
+  recast.types.visit(fn.body, {
+    visitIdentifier(pathNode) {
+      if (pathNode.node.name === 'siteData') {
+        found = true;
+        return false;
+      }
+      this.traverse(pathNode);
+    },
+  });
+  return found;
+}
+
 function injectSiteDataHook(ast) {
-  const program = ast.program || ast;
   let injected = false;
+  let anyFunctionReferencedSiteData = false;
+  let alreadyHasUseSiteData = false;
+
+  recast.types.visit(ast, {
+    visitCallExpression(pathNode) {
+      if (pathNode.node.callee && pathNode.node.callee.name === 'useSiteData') {
+        alreadyHasUseSiteData = true;
+        return false;
+      }
+      this.traverse(pathNode);
+    },
+  });
 
   function injectIntoFunction(fn) {
     if (!fn || !fn.body || fn.body.type !== 'BlockStatement') return false;
     const body = fn.body.body;
     const already = body.some((stmt) => recast.print(stmt).code.includes('useSiteData'));
-    if (already) return true;
+    if (already) return false;
     const hook = b.variableDeclaration('const', [
       b.variableDeclarator(
         b.identifier('siteData'),
@@ -672,40 +746,70 @@ function injectSiteDataHook(ast) {
       ),
     ]);
     body.unshift(hook);
+    alreadyHasUseSiteData = true;
     return true;
   }
 
+  // Pass 1: Inject useSiteData() into EVERY component function that references siteData
   recast.types.visit(ast, {
-    visitExportDefaultDeclaration(pathNode) {
-      if (injected) return false;
-      const decl = pathNode.node.declaration;
-      if (decl && (decl.type === 'FunctionDeclaration' || decl.type === 'ArrowFunctionExpression' || decl.type === 'FunctionExpression')) {
-        injected = injectIntoFunction(decl);
-      }
-      this.traverse(pathNode);
-    },
     visitFunctionDeclaration(pathNode) {
-      if (injected) return false;
-      const name = pathNode.node.id && pathNode.node.id.name;
-      if (name && /^[A-Z]/.test(name)) {
-        injected = injectIntoFunction(pathNode.node);
-        return false;
+      if (functionReferencesSiteData(pathNode.node)) {
+        anyFunctionReferencedSiteData = true;
+        if (injectIntoFunction(pathNode.node)) injected = true;
       }
       this.traverse(pathNode);
     },
-    visitVariableDeclarator(pathNode) {
-      if (injected) return false;
-      const id = pathNode.node.id;
-      const init = pathNode.node.init;
-      if (id && id.type === 'Identifier' && /^[A-Z]/.test(id.name) && init && (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression')) {
-        injected = injectIntoFunction(init);
-        return false;
+    visitFunctionExpression(pathNode) {
+      if (functionReferencesSiteData(pathNode.node)) {
+        anyFunctionReferencedSiteData = true;
+        if (injectIntoFunction(pathNode.node)) injected = true;
+      }
+      this.traverse(pathNode);
+    },
+    visitArrowFunctionExpression(pathNode) {
+      if (functionReferencesSiteData(pathNode.node)) {
+        anyFunctionReferencedSiteData = true;
+        if (injectIntoFunction(pathNode.node)) injected = true;
       }
       this.traverse(pathNode);
     },
   });
 
-  if (!injected) {
+  // Pass 2: If no component references siteData yet (e.g. before subsequent AST edits),
+  // ensure the primary component receives useSiteData()
+  if (!injected && !anyFunctionReferencedSiteData && !alreadyHasUseSiteData) {
+    recast.types.visit(ast, {
+      visitExportDefaultDeclaration(pathNode) {
+        if (injected) return false;
+        const decl = pathNode.node.declaration;
+        if (decl && (decl.type === 'FunctionDeclaration' || decl.type === 'ArrowFunctionExpression' || decl.type === 'FunctionExpression')) {
+          injected = injectIntoFunction(decl);
+        }
+        this.traverse(pathNode);
+      },
+      visitFunctionDeclaration(pathNode) {
+        if (injected) return false;
+        const name = pathNode.node.id && pathNode.node.id.name;
+        if (name && /^[A-Z]/.test(name)) {
+          injected = injectIntoFunction(pathNode.node);
+          return false;
+        }
+        this.traverse(pathNode);
+      },
+      visitVariableDeclarator(pathNode) {
+        if (injected) return false;
+        const id = pathNode.node.id;
+        const init = pathNode.node.init;
+        if (id && id.type === 'Identifier' && /^[A-Z]/.test(id.name) && init && (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression')) {
+          injected = injectIntoFunction(init);
+          return false;
+        }
+        this.traverse(pathNode);
+      },
+    });
+  }
+
+  if (!injected && !anyFunctionReferencedSiteData && !alreadyHasUseSiteData) {
     recast.types.visit(ast, {
       visitFunctionDeclaration(pathNode) {
         if (injected) return false;
@@ -754,6 +858,8 @@ function applyFilePlan(filePlan, profile) {
     'style-bind',
   ]);
 
+  const isTypeScript = Boolean(filePlan.file && /\.(tsx|ts)$/.test(filePlan.file));
+
   // Collections run first: they rewrite the array declaration and add an index
   // parameter, and later per-element edits must observe that shape.
   const ordered = [...filePlan.transformations].sort(
@@ -768,7 +874,7 @@ function applyFilePlan(filePlan, profile) {
 
     if (transform.operation === 'collection-conversion') {
       try {
-        if (applyCollectionTransform(ast, transform, isClient)) applied++;
+        if (applyCollectionTransform(ast, transform, isClient, isTypeScript)) applied++;
         else failures.push({ loc: transform.loc, reason: 'collection-not-bindable' });
       } catch (err) {
         failures.push({ loc: transform.loc, reason: err.message });
@@ -796,9 +902,7 @@ function applyFilePlan(filePlan, profile) {
   const siteDataImport = resolveSiteDataSpecifier(profile, filePlan.file);
   if (isClient) {
     const runtimeSpecifier = resolveSiteDataRuntimeSpecifier(profile);
-    if (!fileAlreadyUsesSiteDataHook(ast)) {
-      injectSiteDataHook(ast);
-    }
+    injectSiteDataHook(ast);
     ensureImport(ast, runtimeSpecifier, ['useSiteData']);
   } else {
     ensureDefaultImport(ast, siteDataImport, 'siteData');
@@ -1137,20 +1241,69 @@ function ensureJsonModule(tsconfig) {
 function sanitizeContradictoryMarkers(ast) {
   let cleaned = 0;
   recast.types.visit(ast, {
-    visitJSXOpeningElement(pathNode) {
-      const attrs = pathNode.node.attributes || [];
-      const hasEditable = attrs.some(
+    visitJSXElement(pathNode) {
+      const opening = pathNode.node.openingElement;
+      if (!opening || !Array.isArray(opening.attributes)) {
+        this.traverse(pathNode);
+        return;
+      }
+      const attrs = opening.attributes;
+      const hasStatic = attrs.some(
+        (a) => a.type === 'JSXAttribute' && a.name && a.name.name === 'data-preview-static'
+      );
+      if (!hasStatic) {
+        this.traverse(pathNode);
+        return;
+      }
+
+      // 0. Broad container collision: broad content containers cannot carry data-preview-static
+      const tag = getJsxName(pathNode.node);
+      const lower = String(tag || '').toLowerCase();
+      if (BROAD_CONTENT_CONTAINERS.has(tag) || BROAD_CONTENT_CONTAINERS.has(lower)) {
+        opening.attributes = attrs.filter(
+          (a) => !(a.type === 'JSXAttribute' && a.name && a.name.name === 'data-preview-static')
+        );
+        cleaned++;
+        this.traverse(pathNode);
+        return;
+      }
+
+      // 1. Direct collision: cannot share element with editable markers
+      const hasDirectEditable = attrs.some(
         (a) => a.type === 'JSXAttribute' && a.name && (
           a.name.name === 'data-preview-field-path' ||
           a.name.name === 'data-preview-list-path' ||
           a.name.name === 'data-preview-item-path'
         )
       );
-      const hasStatic = attrs.some(
-        (a) => a.type === 'JSXAttribute' && a.name && a.name.name === 'data-preview-static'
-      );
-      if (hasEditable && hasStatic) {
-        pathNode.node.attributes = attrs.filter(
+
+      // 2. Hierarchical collision: static element cannot enclose editable descendants
+      let hasNestedEditable = false;
+      if (!hasDirectEditable) {
+        recast.types.visit(pathNode.node, {
+          visitJSXElement(inner) {
+            if (inner.node === pathNode.node) {
+              this.traverse(inner);
+              return;
+            }
+            const innerAttrs = inner.node.openingElement?.attributes || [];
+            if (innerAttrs.some(
+              (a) => a.type === 'JSXAttribute' && a.name && (
+                a.name.name === 'data-preview-field-path' ||
+                a.name.name === 'data-preview-list-path' ||
+                a.name.name === 'data-preview-item-path'
+              )
+            )) {
+              hasNestedEditable = true;
+              return false;
+            }
+            this.traverse(inner);
+          },
+        });
+      }
+
+      if (hasDirectEditable || hasNestedEditable) {
+        opening.attributes = attrs.filter(
           (a) => !(a.type === 'JSXAttribute' && a.name && a.name.name === 'data-preview-static')
         );
         cleaned++;
@@ -1162,7 +1315,7 @@ function sanitizeContradictoryMarkers(ast) {
 }
 
 function sanitizeContradictoryMarkersInSource(code, relativeFile) {
-  if (!code.includes('data-preview-static') && !code.includes('data-preview-field-path')) {
+  if (!code.includes('data-preview-static') && !code.includes('data-preview-field-path') && !code.includes('overflow-hidden')) {
     return { code, updated: false };
   }
   let ast;
@@ -1175,8 +1328,9 @@ function sanitizeContradictoryMarkersInSource(code, relativeFile) {
   const healedBroad = healBroadContainerMarkers(ast);
   const healedEmpty = healEmptyStateConditionals(ast);
   const healedHidden = healHiddenPreviewMarkers(ast);
-  if (cleaned === 0 && healedBroad === 0 && healedEmpty === 0 && healedHidden === 0) return { code, updated: false };
-  return { code: printSource(ast, code), updated: true, count: cleaned + healedBroad + healedEmpty + healedHidden };
+  const healedOverflow = healSectionOverflowHidden(ast);
+  if (cleaned === 0 && healedBroad === 0 && healedEmpty === 0 && healedHidden === 0 && healedOverflow === 0) return { code, updated: false };
+  return { code: printSource(ast, code), updated: true, count: cleaned + healedBroad + healedEmpty + healedHidden + healedOverflow };
 }
 
 function healBroadContainerMarkers(ast) {
@@ -1415,8 +1569,75 @@ function healLegacyProductDetailLinks(ast) {
   return healed;
 }
 
+function healSectionOverflowHidden(ast) {
+  let healed = 0;
+  recast.types.visit(ast, {
+    visitJSXOpeningElement(pathNode) {
+      const node = pathNode.node;
+      const tag = getJsxName(node);
+      const lower = String(tag || '').toLowerCase();
+      const isContainer = lower === 'section' || lower === 'div' || lower === 'main' || lower === 'article';
+      if (!isContainer) {
+        this.traverse(pathNode);
+        return;
+      }
+      const classAttr = (node.attributes || []).find(
+        (a) => a.type === 'JSXAttribute' && a.name && (a.name.name === 'className' || a.name.name === 'class')
+      );
+      if (!classAttr || !classAttr.value) {
+        this.traverse(pathNode);
+        return;
+      }
+      let modified = false;
+      if (classAttr.value.type === 'StringLiteral' || classAttr.value.type === 'Literal') {
+        const val = String(classAttr.value.value || '');
+        if (/\boverflow-hidden\b/.test(val)) {
+          classAttr.value.value = val.replace(/\boverflow-hidden\b/g, 'overflow-clip');
+          modified = true;
+        }
+      } else if (classAttr.value.type === 'JSXExpressionContainer') {
+        const expr = classAttr.value.expression;
+        if (expr && (expr.type === 'StringLiteral' || expr.type === 'Literal')) {
+          const val = String(expr.value || '');
+          if (/\boverflow-hidden\b/.test(val)) {
+            expr.value = val.replace(/\boverflow-hidden\b/g, 'overflow-clip');
+            modified = true;
+          }
+        } else if (expr && expr.type === 'TemplateLiteral') {
+          for (const quasi of expr.quasis || []) {
+            if (quasi.value && /\boverflow-hidden\b/.test(quasi.value.raw || '')) {
+              quasi.value.raw = (quasi.value.raw || '').replace(/\boverflow-hidden\b/g, 'overflow-clip');
+              if (quasi.value.cooked) {
+                quasi.value.cooked = (quasi.value.cooked || '').replace(/\boverflow-hidden\b/g, 'overflow-clip');
+              }
+              modified = true;
+            }
+          }
+        }
+      }
+      if (modified) healed++;
+      this.traverse(pathNode);
+    },
+  });
+  return healed;
+}
+
+function healMissingSiteDataHooks(code, filePath = 'file.tsx') {
+  if (!code.includes('siteData')) return code;
+  try {
+    const ast = parseSource(code, filePath);
+    const injected = injectSiteDataHook(ast);
+    if (injected) {
+      ensureImport(ast, '@deneb-ui/ui', ['useSiteData']);
+      return printSource(ast, code);
+    }
+  } catch {}
+  return code;
+}
+
 module.exports = {
   applyFilePlan,
+  applyCollectionTransform,
   instrumentLayoutSource,
   instrumentPageKey,
   resolveSiteDataSpecifier,
@@ -1429,6 +1650,9 @@ module.exports = {
   healBroadContainerMarkers,
   healEmptyStateConditionals,
   healHiddenPreviewMarkers,
+  healSectionOverflowHidden,
   healLegacyProductDetailLinks,
+  healMissingSiteDataHooks,
+  injectSiteDataHook,
 };
 

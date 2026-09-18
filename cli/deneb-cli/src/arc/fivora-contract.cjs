@@ -228,10 +228,10 @@ function auditMarkerPlacement(code, filePath) {
     const hasStatic = /\bdata-preview-static\b/.test(attrs);
 
     const isHidden =
-      /\bhidden(?:[\s=]|\/?>)/i.test(attrs) ||
+      /(?:^|\s)hidden(?:[\s=]|\/?>)/i.test(attrs) ||
       /\baria-hidden\s*=\s*(?:"true"|'true'|\{\s*true\s*\})/i.test(attrs) ||
       /\bstyle\s*=\s*\{\s*\{[\s\S]*?\b(?:display\s*:\s*['"]none['"]|visibility\s*:\s*['"]hidden['"])[\s\S]*?\}\s*\}/i.test(attrs) ||
-      /\bclassName\s*=\s*(?:"[^"]*\bhidden\b[^"]*"|'[^']*\bhidden\b[^']*'|\{\s*`[^`]*\bhidden\b[^`]*`\s*\})/i.test(attrs);
+      /\bclassName\s*=\s*(?:"[^"]*(?<![\w-])hidden(?![a-zA-Z0-9_-])[^"]*"|'[^']*(?<![\w-])hidden(?![a-zA-Z0-9_-])[^']*'|\{\s*`[^`]*(?<![\w-])hidden(?![a-zA-Z0-9_-])[^`]*`\s*\})/i.test(attrs);
 
     if ((hasField || hasList || hasItem) && isHidden) {
       errors.push(

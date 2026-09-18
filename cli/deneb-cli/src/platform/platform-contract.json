@@ -9,6 +9,7 @@
     "__fivoraIntake.referenceWebsiteUrl",
     "additionalPages[*].id",
     "additionalPages[*].route",
+    "additionalPages[*].label",
     "common.currency",
     "common.whatsappNumber",
     "common.whatsapp",

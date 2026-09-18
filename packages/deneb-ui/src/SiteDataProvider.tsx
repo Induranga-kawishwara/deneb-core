@@ -94,7 +94,10 @@ export type SiteData = {
   [key: string]: unknown;
 };
 
-export const SiteDataContext = createContext<SiteData>({});
+const UNINITIALIZED_SITE_DATA = Symbol('DENEB_UNINITIALIZED_SITE_DATA');
+export const SiteDataContext = createContext<SiteData | typeof UNINITIALIZED_SITE_DATA>(
+  UNINITIALIZED_SITE_DATA as any
+);
 
 export function isRecord(value: unknown): value is GenericRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -598,7 +601,18 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
 }
 
 export function useSiteData<T = SiteData>(): T {
-  return useContext(SiteDataContext) as T;
+  const ctx = useContext(SiteDataContext);
+  if (ctx === UNINITIALIZED_SITE_DATA) {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.warn(
+        '[Deneb UI] useSiteData() was called outside of <SiteDataProvider>. ' +
+        'Ensure your root layout.tsx or _app.tsx wraps the tree with: ' +
+        '<SiteDataProvider initialSiteData={initialSiteData}>. Falling back to empty data.'
+      );
+    }
+    return {} as T;
+  }
+  return ctx as T;
 }
 
 export function contentObject(value: unknown): GenericRecord {

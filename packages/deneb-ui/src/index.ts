@@ -23,6 +23,9 @@ export * from './EditableCard';
 export * from './EditablePricingCard';
 export * from './EditableTestimonialCard';
 export * from './EditableTestimonialSection';
+export * from './EditableTestimonialCarousel';
+export * from './EditableBeforeAfterSlider';
+export * from './EditableBookingModal';
 export * from './EditableFAQAccordion';
 export * from './EditableContactForm';
 export * from './EditableNavbar';
@@ -111,6 +114,9 @@ export { EditableAnnouncementBar as AnnouncementBar } from './EditableAnnounceme
 export { EditableCategoryPills as CategoryPills } from './EditableCategoryPills';
 export { EditableCartDrawer as CartDrawer } from './EditableCartDrawer';
 export { EditableFilterSidebar as FilterSidebar } from './EditableFilterSidebar';
+export { EditableBeforeAfterSlider as BeforeAfterSlider } from './EditableBeforeAfterSlider';
+export { EditableBookingModal as BookingModal } from './EditableBookingModal';
+export { EditableTestimonialCarousel as TestimonialCarousel } from './EditableTestimonialCarousel';
 
 
 export { PlatformAdditionalPages, AdditionalPagesNav } from './PlatformAdditionalPages';

@@ -395,7 +395,7 @@ test('static-array collections become list contracts without changing render log
   assert.match(grid, /data-preview-item-path=\{`home\.products\[\$\{index\}\]`\}/);
   assert.match(grid, /data-preview-field-path=\{`home\.products\[\$\{index\}\]\.title`\}/);
   // The array is site-data backed with the developer's literal as fallback.
-  assert.match(grid, /const products = siteData\?\.content\?\.home\?\.products \?\? \[/);
+  assert.match(grid, /const products(?::\s*any\[\])? = siteData\?\.content\?\.home\?\.products \?\? \[/);
   // Render logic is untouched: items are still read off the map variable.
   assert.match(grid, /\{product\.title\}/);
   assert.match(grid, /className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3"/);
@@ -701,7 +701,7 @@ export function BrandMarquee() {
   assert.match(result.code, /const DEFAULT_BRANDS = \[\s*\{\s*name:\s*['"]Apple['"]\s*\}/);
   // Inside component body: useSiteData hook followed by dynamic BRANDS binding
   assert.match(result.code, /const siteData = useSiteData\(\);/);
-  assert.match(result.code, /const BRANDS = siteData\?\.content\?\.home\?\.BRANDS \?\? DEFAULT_BRANDS;/);
+  assert.match(result.code, /const BRANDS(?::\s*any\[\])? = siteData\?\.content\?\.home\?\.BRANDS \?\? DEFAULT_BRANDS;/);
   // Verify AST parses cleanly
   assert.doesNotThrow(() => parseSource(result.code, 'BrandMarquee.tsx'));
 });
@@ -1470,6 +1470,164 @@ test('saveRecipeFromProject learns calibrated fixes and registers live product d
     fs.rmSync(tmpDir, { recursive: true, force: true });
   } catch {}
 });
+
+test('applyCollectionTransform generates composite key for unkeyed map loops', () => {
+  const { parseSource, printSource } = require('../ast.cjs');
+  const { applyCollectionTransform } = require('../transformer.cjs');
+  const code = `
+    export function FeatureList() {
+      const items = [{ id: '1', title: 'Speed' }];
+      return (
+        <div>
+          {items.map((item, index) => (
+            <div>{item.title}</div>
+          ))}
+        </div>
+      );
+    }
+  `;
+  const ast = parseSource(code, 'FeatureList.tsx');
+  const recast = require('recast');
+  const { locKey } = require('../ast.cjs');
+  let targetLoc = null;
+  recast.types.visit(ast, {
+    visitJSXElement(p) {
+      if (p.parent?.node?.type === 'ArrowFunctionExpression') {
+        targetLoc = locKey(p.node);
+        return false;
+      }
+      this.traverse(p);
+    },
+  });
+  const transformed = applyCollectionTransform(ast, {
+    loc: targetLoc,
+    listField: 'home.features',
+    itemParam: 'item',
+    indexParam: 'index',
+  });
+  assert.ok(transformed);
+  const out = printSource(ast, code);
+  assert.match(out, /key=\{item\.id \|\| item\.slug \|\| item\.title \|\| item\.name \|\| index\}/);
+});
+
+test('sanitizeContradictoryMarkers strips data-preview-static when element wraps editable descendants', () => {
+  const { parseSource, printSource } = require('../ast.cjs');
+  const { sanitizeContradictoryMarkers } = require('../transformer.cjs');
+  const code = `
+    export function Hero() {
+      return (
+        <section data-preview-static="hero-wrapper">
+          <h1 data-preview-field-path="home.hero.title">Hello</h1>
+        </section>
+      );
+    }
+  `;
+  const ast = parseSource(code, 'Hero.tsx');
+  const cleaned = sanitizeContradictoryMarkers(ast);
+  assert.equal(cleaned, 1);
+  const out = printSource(ast, code);
+  assert.doesNotMatch(out, /data-preview-static/);
+  assert.match(out, /data-preview-field-path="home\.hero\.title"/);
+});
+
+test('sanitizeContradictoryMarkers strips data-preview-static from broad containers even without editable descendants', () => {
+  const { parseSource, printSource } = require('../ast.cjs');
+  const { sanitizeContradictoryMarkers } = require('../transformer.cjs');
+  const code = `
+    export function Container() {
+      return (
+        <div data-preview-static="box-container">
+          <p>Plain unannotated text</p>
+        </div>
+      );
+    }
+  `;
+  const ast = parseSource(code, 'Container.tsx');
+  const cleaned = sanitizeContradictoryMarkers(ast);
+  assert.equal(cleaned, 1);
+  const out = printSource(ast, code);
+  assert.doesNotMatch(out, /data-preview-static/);
+  assert.match(out, /<div\s*>/);
+});
+
+test('healBroadContainerMarkers demotes data-preview-field-path from broad containers to inner leaf span', () => {
+  const { parseSource, printSource } = require('../ast.cjs');
+  const { healBroadContainerMarkers } = require('../transformer.cjs');
+  const code = `
+    export function Card() {
+      return (
+        <div data-preview-field-path="home.card.heading">
+          Card Title Content
+        </div>
+      );
+    }
+  `;
+  const ast = parseSource(code, 'Card.tsx');
+  const healed = healBroadContainerMarkers(ast);
+  assert.equal(healed, 1);
+  const out = printSource(ast, code);
+  assert.doesNotMatch(out, /<div[^>]*data-preview-field-path/);
+  assert.match(out, /<span\s+data-preview-field-path="home\.card\.heading">/);
+});
+
+test('healSectionOverflowHidden converts overflow-hidden to overflow-clip on section containers', () => {
+  const { parseSource, printSource } = require('../ast.cjs');
+  const { healSectionOverflowHidden } = require('../transformer.cjs');
+  const code = `
+    export function Showcase() {
+      return (
+        <section className="relative py-24 overflow-hidden bg-white">
+          <span data-preview-field-path="home.title">Showcase</span>
+        </section>
+      );
+    }
+  `;
+  const ast = parseSource(code, 'Showcase.tsx');
+  const healed = healSectionOverflowHidden(ast);
+  assert.equal(healed, 1);
+  const out = printSource(ast, code);
+  assert.doesNotMatch(out, /overflow-hidden/);
+  assert.match(out, /overflow-clip/);
+});
+
+test('injectSiteDataHook does not inject hook into helper sub-functions or functions that already have it', () => {
+  const { parseSource, printSource } = require('../ast.cjs');
+  const { injectSiteDataHook } = require('../transformer.cjs');
+  const code = `
+    import { useSiteData } from '@deneb-ui/ui';
+
+    function HelperIcon() {
+      return <svg><path d="M0 0" /></svg>;
+    }
+
+    export function MainSection() {
+      const { siteData } = useSiteData();
+      return <div>{siteData?.content?.home?.title}</div>;
+    }
+  `;
+  const ast = parseSource(code, 'MainSection.tsx');
+  const injected = injectSiteDataHook(ast);
+  assert.equal(injected, false);
+  const out = printSource(ast, code);
+  assert.doesNotMatch(out, /function HelperIcon\(\)\s*\{\s*const \{ siteData \} = useSiteData\(\);/);
+});
+
+test('learning loadFingerprintBoost returns verified boost for baseline trained fingerprints', () => {
+  const { loadFingerprintBoost } = require('../learning.cjs');
+  const boost1 = loadFingerprintBoost('leaf-static-marker');
+  assert.equal(boost1.state, 'verified');
+  assert.equal(boost1.boost, 0.08);
+
+  const boost2 = loadFingerprintBoost('section-overflow-clip');
+  assert.equal(boost2.state, 'verified');
+  assert.equal(boost2.boost, 0.08);
+
+  const boost3 = loadFingerprintBoost('empty-state-array-guard');
+  assert.equal(boost3.state, 'verified');
+  assert.equal(boost3.boost, 0.08);
+});
+
+
 
 
 

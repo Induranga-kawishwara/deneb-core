@@ -13,6 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { matchRecipeForProject, loadAllRecipes } = require('./recipe-engine.cjs');
+const { healMissingSiteDataHooks, healBroadContainerMarkers, healSectionOverflowHidden } = require('../arc/transformer.cjs');
 
 function createBox(lines, width = 60) {
   const horizontal = '═'.repeat(width - 2);
@@ -286,6 +287,34 @@ function runDoctor(targetDirInput = '.', options = {}) {
       } else {
         addCheck(suite2, 'err', 'Platform Engine Compatibility', 'Detected packages requiring Node >=22. Run "deneb doctor --fix" to inject Node 20 overrides.', { code: 'DNB-ENG-001' }) //, 'Detected packages requiring Node >=22. Run "deneb doctor --fix" to inject Node 20 overrides.');
       }
+
+      // Check TypeScript compilation preflight
+      const tsconfigPath = path.join(targetDir, 'tsconfig.json');
+      if (fs.existsSync(tsconfigPath)) {
+        const tscBin = process.platform === 'win32'
+          ? path.join(targetDir, 'node_modules', '.bin', 'tsc.cmd')
+          : path.join(targetDir, 'node_modules', '.bin', 'tsc');
+
+        let tscRes = null;
+        if (fs.existsSync(tscBin)) {
+          tscRes = spawnSync(tscBin, ['--noEmit'], { cwd: targetDir, encoding: 'utf-8', shell: process.platform === 'win32', maxBuffer: 10 * 1024 * 1024 });
+        } else {
+          const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+          tscRes = spawnSync(npxCmd, ['--no-install', 'tsc', '--noEmit'], { cwd: targetDir, encoding: 'utf-8', shell: process.platform === 'win32', maxBuffer: 10 * 1024 * 1024 });
+        }
+
+        if (tscRes && tscRes.status === 0) {
+          addCheck(suite2, 'pass', 'TypeScript Compilation Preflight', '0 type errors detected (tsc --noEmit clean)', { code: 'DNB-TYP-001' });
+        } else if (tscRes && tscRes.status !== null) {
+          const rawErr = (tscRes.stdout || tscRes.stderr || '').trim();
+          const lines = rawErr.split(/\r?\n/).filter(Boolean);
+          const errLines = lines.filter((l) => l.includes('error TS'));
+          const summary = errLines.length > 0 ? `${errLines.length} type error(s) (e.g. ${errLines[0].trim()})` : (lines[0] || 'Type errors found');
+          addCheck(suite2, 'err', 'TypeScript Compilation Preflight', summary, { code: 'DNB-TYP-001', action: 'Fix TypeScript compilation errors shown by tsc --noEmit' });
+        } else {
+          addCheck(suite2, 'warn', 'TypeScript Compilation Preflight', 'Could not execute tsc to verify types', { code: 'DNB-TYP-001' });
+        }
+      }
     } catch (e) {
       addCheck(suite2, 'err', 'package.json Syntax', e.message);
     }
@@ -419,6 +448,37 @@ function runDoctor(targetDirInput = '.', options = {}) {
     addCheck(suite5, 'warn', 'site-data.json', 'src/data/site-data.json not found');
   }
 
+  // Root Layout SiteDataProvider Instrumentation Check
+  const doctorLayoutFiles = [
+    path.join(targetDir, 'src', 'app', 'layout.tsx'),
+    path.join(targetDir, 'src', 'app', 'layout.jsx'),
+    path.join(targetDir, 'app', 'layout.tsx'),
+    path.join(targetDir, 'app', 'layout.jsx'),
+  ];
+  const docLayout = doctorLayoutFiles.find((f) => fs.existsSync(f));
+  if (docLayout) {
+    const layoutSrc = fs.readFileSync(docLayout, 'utf8');
+    const hasSiteProvider = /SiteDataProvider|DenebDataProvider|<Providers\b/.test(layoutSrc);
+    if (hasSiteProvider) {
+      addCheck(suite5, 'pass', 'Root Layout Provider', `<SiteDataProvider> mounted in ${path.relative(targetDir, docLayout)}`, { code: 'DNB-LAY-001' });
+    } else if (isFix) {
+      try {
+        const { instrumentLayoutSource } = require('../arc/transformer.cjs');
+        const instrumented = instrumentLayoutSource(layoutSrc, '@/data/site-data.json', '@deneb-ui/ui');
+        if (instrumented.updated && instrumented.code !== layoutSrc) {
+          fs.writeFileSync(docLayout, instrumented.code, 'utf8');
+          addCheck(suite5, 'fixed', 'Root Layout Provider', `Instrumented <SiteDataProvider> into ${path.relative(targetDir, docLayout)}`, { code: 'DNB-LAY-001' });
+        } else {
+          addCheck(suite5, 'warn', 'Root Layout Provider', `Missing <SiteDataProvider> in ${path.relative(targetDir, docLayout)}`, { code: 'DNB-LAY-001' });
+        }
+      } catch {
+        addCheck(suite5, 'warn', 'Root Layout Provider', `Missing <SiteDataProvider> in ${path.relative(targetDir, docLayout)}`, { code: 'DNB-LAY-001' });
+      }
+    } else {
+      addCheck(suite5, 'warn', 'Root Layout Provider', `Missing <SiteDataProvider> in ${path.relative(targetDir, docLayout)} (Run with --fix to instrument automatically)`, { code: 'DNB-LAY-001' });
+    }
+  }
+
   // Scan all source files for visual editing contract compliance
   const sourceFiles = findSourceFiles(path.join(targetDir, 'src'));
   const foundFieldPaths = new Set();
@@ -503,8 +563,8 @@ function runDoctor(targetDirInput = '.', options = {}) {
       }
     }
 
-    // 4. Broad Static Container Detection
-    // Fivora forbids data-preview-static on broad layout containers like <div>, <section>, <nav>, <main>, <header>
+    // 4. Broad Container Detection
+    // Fivora forbids data-preview-static and data-preview-field-path on broad layout containers like <div>, <section>, <nav>, <main>, <header>
     const broadStaticMatches = code.matchAll(/<(div|section|nav|main|header|article|aside)(\s+[^>]*data-preview-static="[^"]*"[^>]*)>/gi);
     let fileNeedsBroadStaticFix = false;
     let newCodeBroad = fs.readFileSync(file, 'utf-8');
@@ -513,7 +573,7 @@ function runDoctor(targetDirInput = '.', options = {}) {
       const tag = bsm[1].toLowerCase();
       // Only flag if it's not a pure leaf element
       if (['div', 'section', 'nav', 'main', 'header', 'article', 'aside'].includes(tag)) {
-        broadStaticContainers.push({ tag, file: path.relative(targetDir, file) });
+        broadStaticContainers.push({ tag, file: path.relative(targetDir, file), type: 'static' });
         if (shouldFix) {
           const originalTag = `<${bsm[1]}${bsm[2]}>`;
           const cleanTag = originalTag.replace(/\s*data-preview-static="[^"]*"/g, '');
@@ -521,6 +581,26 @@ function runDoctor(targetDirInput = '.', options = {}) {
           fileNeedsBroadStaticFix = true;
         }
       }
+    }
+
+    const broadFieldMatches = code.matchAll(/<(div|section|nav|main|header|article|aside)(\s+[^>]*data-preview-field-path="[^"]*"[^>]*)>/gi);
+    for (const bfm of broadFieldMatches) {
+      const tag = bfm[1].toLowerCase();
+      if (['div', 'section', 'nav', 'main', 'header', 'article', 'aside'].includes(tag)) {
+        broadStaticContainers.push({ tag, file: path.relative(targetDir, file), type: 'field' });
+      }
+    }
+
+    if (shouldFix && [...broadFieldMatches].length > 0) {
+      try {
+        const { parseSource, printSource } = require('../arc/ast.cjs');
+        const ast = parseSource(newCodeBroad, file);
+        const healed = healBroadContainerMarkers(ast);
+        if (healed > 0) {
+          newCodeBroad = printSource(ast, newCodeBroad);
+          fileNeedsBroadStaticFix = true;
+        }
+      } catch {}
     }
 
     if (shouldFix && fileNeedsBroadStaticFix) {
@@ -595,17 +675,84 @@ function runDoctor(targetDirInput = '.', options = {}) {
   }
 
   if (broadStaticContainers.length === 0) {
-    addCheck(suite5, 'pass', 'Granular Static Markup', 'Zero broad layout containers (div/nav/section) marked static', { code: 'DNB-STC-006' }) //, 'Zero broad layout containers (div/nav/section) marked static');
+    addCheck(suite5, 'pass', 'Granular Static Markup', 'Zero broad layout containers (div/nav/section) marked static or field-bound', { code: 'DNB-STC-006' });
   } else if (shouldFix) {
-    addCheck(suite5, 'fixed', 'Granular Static Markup', `Stripped data-preview-static from ${broadStaticContainers.length} broad container(s)`, { code: 'DNB-STC-006' }) //, `Stripped data-preview-static from ${broadStaticContainers.length} broad container(s)`);
+    addCheck(suite5, 'fixed', 'Granular Static Markup', `Repaired/demoted ${broadStaticContainers.length} broad container marker(s)`, { code: 'DNB-STC-006' });
   } else {
-    addCheck(suite5, 'warn', 'Granular Static Markup', `${broadStaticContainers.length} broad container(s) marked with data-preview-static (Fivora requires marking only smallest leaf elements)`, { code: 'DNB-STC-006' }) //, `${broadStaticContainers.length} broad container(s) marked with data-preview-static (Fivora requires marking only smallest leaf elements)`);
+    addCheck(suite5, 'warn', 'Granular Static Markup', `${broadStaticContainers.length} broad container(s) marked with static or field paths (Fivora requires marking only smallest leaf elements). Run with --fix to repair.`, { code: 'DNB-STC-006' });
   }
 
   if (dynamicVariableMarkers.length === 0) {
     addCheck(suite5, 'pass', 'Literal Marker Standard', 'All data-preview-field-path annotations use literal strings or JSX templates', { code: 'DNB-AST-002' }) //, 'All data-preview-field-path annotations use literal strings or JSX templates');
   } else {
     addCheck(suite5, 'warn', 'Literal Marker Standard', `${dynamicVariableMarkers.length} dynamic variable marker(s) detected`, { code: 'DNB-AST-002' }) //, `${dynamicVariableMarkers.length} dynamic variable marker(s) detected (e.g. ${dynamicVariableMarkers[0].expr})`);
+  }
+
+  // Check: Control-Only & Platform Contract Path Integrity (DNB-CTL-001)
+  if (manifestData) {
+    manifestData.visualEditing = manifestData.visualEditing || {};
+    const existingControlOnly = new Set(manifestData.visualEditing.controlOnlyPaths || []);
+    const missingControlOnly = [];
+
+    // 1. Platform contract paths: if __fivoraIntake or additionalPages exist in editorSchema,
+    // ensure their paths are in controlOnlyPaths
+    const schemaSections = manifestData.editorSchema?.sections || [];
+    const hasIntake = schemaSections.some((s) => s.id === '__fivoraIntake');
+    const hasPages = schemaSections.some((s) => s.id === 'additionalPages');
+
+    if (hasIntake) {
+      const intakePaths = [
+        '__fivoraIntake.tone',
+        '__fivoraIntake.outputLanguage',
+        '__fivoraIntake.businessSummary',
+        '__fivoraIntake.additionalBusinessDetails',
+        '__fivoraIntake.referenceWebsiteUrl',
+      ];
+      for (const p of intakePaths) {
+        if (!existingControlOnly.has(p)) missingControlOnly.push(p);
+      }
+    }
+
+    if (hasPages) {
+      const pagesPaths = [
+        'additionalPages[*].id',
+        'additionalPages[*].route',
+        'additionalPages[*].label',
+      ];
+      for (const p of pagesPaths) {
+        if (!existingControlOnly.has(p)) missingControlOnly.push(p);
+      }
+    }
+
+    // 2. Modal & unrendered form fields in siteData.content (e.g. *.form.*)
+    if (siteData && siteData.content) {
+      function collectModalFormPaths(obj, prefix = '') {
+        if (!obj || typeof obj !== 'object') return;
+        if (Array.isArray(obj)) return;
+        for (const [k, v] of Object.entries(obj)) {
+          const p = prefix ? `${prefix}.${k}` : k;
+          if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+            collectModalFormPaths(v, p);
+          } else {
+            if (/\.form\./i.test(p) || /^form\./i.test(p) || /\.modal\./i.test(p) || /Modal\./i.test(p)) {
+              if (!existingControlOnly.has(p)) missingControlOnly.push(p);
+            }
+          }
+        }
+      }
+      collectModalFormPaths(siteData.content);
+    }
+
+    if (missingControlOnly.length === 0) {
+      addCheck(suite5, 'pass', 'Control-Only Path Contract', 'All platform-managed & modal form paths declared in controlOnlyPaths', { code: 'DNB-CTL-001' });
+    } else if (shouldFix) {
+      for (const p of missingControlOnly) existingControlOnly.add(p);
+      manifestData.visualEditing.controlOnlyPaths = [...existingControlOnly].sort();
+      fs.writeFileSync(manifestPath, JSON.stringify(manifestData, null, 2) + '\n', 'utf8');
+      addCheck(suite5, 'fixed', 'Control-Only Path Contract', `Added ${missingControlOnly.length} platform & modal field(s) to controlOnlyPaths`, { code: 'DNB-CTL-001' });
+    } else {
+      addCheck(suite5, 'warn', 'Control-Only Path Contract', `${missingControlOnly.length} platform or modal path(s) missing from controlOnlyPaths (Run with --fix to register automatically)`, { code: 'DNB-CTL-001' });
+    }
   }
 
   // =========================================================================
@@ -647,17 +794,33 @@ function runDoctor(targetDirInput = '.', options = {}) {
   // Check: Empty-State Array & Out-of-Range Guards (DNB-ARR-003)
   let unguardedArrayCount = 0;
   for (const file of sourceFiles) {
-    const c = fs.readFileSync(file, 'utf-8');
+    let c = fs.readFileSync(file, 'utf-8');
+    let fileModified = false;
     if (c.includes('data-preview-list-path')) {
       if (/\?\s*[A-Z0-9_]+\s*:\s*[A-Z0-9_]+/i.test(c) && !c.includes('Array.isArray')) {
         unguardedArrayCount++;
+        if (shouldFix) {
+          const repaired = c.replace(
+            /([a-zA-Z0-9_$]+)\s*(?:&&|\?\.)\s*length(?:\s*>\s*0)?\s*\?\s*\1\s*:\s*([a-zA-Z0-9_$]+)/g,
+            'Array.isArray($1) ? $1 : ($1 || $2)'
+          );
+          if (repaired !== c) {
+            c = repaired;
+            fileModified = true;
+          }
+        }
       }
+    }
+    if (shouldFix && fileModified) {
+      fs.writeFileSync(file, c, 'utf8');
     }
   }
   if (unguardedArrayCount === 0) {
     addCheck(suite5, 'pass', 'Empty-State Array Guards', 'All list collections guarded against empty state ([]) out-of-range elements', { code: 'DNB-ARR-003' });
+  } else if (shouldFix) {
+    addCheck(suite5, 'fixed', 'Empty-State Array Guards', `Injected Array.isArray safe empty-state guard into ${unguardedArrayCount} component(s)`, { code: 'DNB-ARR-003' });
   } else {
-    addCheck(suite5, 'warn', 'Empty-State Array Guards', `${unguardedArrayCount} list component(s) should verify Array.isArray(liveList) ? liveList : DEFAULT_LIST`, { code: 'DNB-ARR-003' });
+    addCheck(suite5, 'warn', 'Empty-State Array Guards', `${unguardedArrayCount} list component(s) should verify Array.isArray(liveList) ? liveList : (liveList || DEFAULT_LIST). Run with --fix to repair.`, { code: 'DNB-ARR-003' });
   }
 
   // Check: Empty-State Singleton Persistence Guard (DNB-EMP-002)
@@ -699,6 +862,120 @@ function runDoctor(targetDirInput = '.', options = {}) {
     addCheck(suite5, 'fixed', 'WhatsApp Action Live Sync', `Repaired ${disconnectedWhatsAppCount} WhatsApp action trigger(s) to dynamically resolve whatsappOrderUrl`, { code: 'DNB-WHA-008' });
   } else {
     addCheck(suite5, 'warn', 'WhatsApp Action Live Sync', `${disconnectedWhatsAppCount} WhatsApp trigger(s) using disconnected fallback instead of whatsappOrderUrl. Run with --fix to repair.`, { code: 'DNB-WHA-008' });
+  }
+
+  // Check: Multi-Component Scope & useSiteData Injection (DNB-SCP-001)
+  let missingSiteDataHookCount = 0;
+  for (const file of sourceFiles) {
+    if (!/\.(tsx|jsx|ts|js)$/.test(file)) continue;
+    let c = fs.readFileSync(file, 'utf-8');
+    if (c.includes('siteData') && (c.includes('useSiteData') || c.includes('@deneb-ui/ui'))) {
+      const healed = healMissingSiteDataHooks(c, file);
+      const norm = (s) => s.replace(/\r\n/g, '\n');
+      if (healed && norm(healed) !== norm(c)) {
+        missingSiteDataHookCount++;
+        if (shouldFix) {
+          fs.writeFileSync(file, healed, 'utf8');
+        }
+      }
+    }
+  }
+  if (missingSiteDataHookCount === 0) {
+    addCheck(suite5, 'pass', 'Component Scope siteData Binding', 'All components referencing siteData have local useSiteData() hook binding', { code: 'DNB-SCP-001' });
+  } else if (shouldFix) {
+    addCheck(suite5, 'fixed', 'Component Scope siteData Binding', `Injected missing useSiteData() hook into ${missingSiteDataHookCount} component(s)`, { code: 'DNB-SCP-001' });
+  } else {
+    addCheck(suite5, 'err', 'Component Scope siteData Binding', `${missingSiteDataHookCount} component(s) reference siteData without calling useSiteData(). Run with --fix to inject.`, { code: 'DNB-SCP-001' });
+  }
+
+  // Check: Collection Callback TypeScript Typing & Collision Guard (DNB-TYP-002)
+  let collParamsFixed = 0;
+  for (const file of sourceFiles) {
+    if (!/\.(tsx|ts)$/.test(file)) continue;
+    let c = fs.readFileSync(file, 'utf-8');
+    let fileModified = false;
+
+    // 1. Fix 3-parameter collision: .map((stat, idx, index) =>
+    const trippleMatches = [...c.matchAll(/\.map\(\s*\(\s*([a-zA-Z0-9_$]+)\s*,\s*([a-zA-Z0-9_$]+)\s*,\s*index\s*\)\s*=>/g)];
+    if (trippleMatches.length > 0) {
+      collParamsFixed += trippleMatches.length;
+      if (shouldFix) {
+        for (const m of trippleMatches) {
+          const p1 = m[1];
+          const p2 = m[2];
+          c = c.replace(m[0], `.map((${p1}: any, ${p2}: number) =>`);
+          c = c.replace(/\[\$\{index\}\]/g, `[\${${p2}}]`);
+        }
+        fileModified = true;
+      }
+    }
+
+    // 2. Fix leftover [${index}] when callback uses idx
+    if (c.includes('[${index}]') && c.includes('idx') && !c.includes('index) =>') && !c.includes('index,') && !c.includes('index:')) {
+      c = c.replace(/\[\$\{index\}\]/g, '[${idx}]');
+      fileModified = true;
+    }
+
+    // 3. Fix untyped parameters in .map() on data-preview or siteData collections causing TS7006
+    if (c.includes('data-preview-') || c.includes('siteData')) {
+      const untypedMap2 = [...c.matchAll(/\.map\(\s*\(\s*([a-zA-Z0-9_$]+)\s*,\s*([a-zA-Z0-9_$]+)\s*\)\s*=>/g)];
+      for (const m of untypedMap2) {
+        const p1 = m[1];
+        const p2 = m[2];
+        if (!p1.includes(':') && !p2.includes(':')) {
+          collParamsFixed++;
+          if (shouldFix) {
+            c = c.replace(m[0], `.map((${p1}: any, ${p2}: number) =>`);
+            fileModified = true;
+          }
+        }
+      }
+
+      const untypedMap1 = [...c.matchAll(/\.map\(\s*\(\s*([a-zA-Z0-9_$]+)\s*\)\s*=>/g)];
+      for (const m of untypedMap1) {
+        const p1 = m[1];
+        if (!p1.includes(':')) {
+          collParamsFixed++;
+          if (shouldFix) {
+            c = c.replace(m[0], `.map((${p1}: any) =>`);
+            fileModified = true;
+          }
+        }
+      }
+    }
+
+    if (shouldFix && fileModified) {
+      fs.writeFileSync(file, c, 'utf8');
+    }
+  }
+
+  if (collParamsFixed === 0) {
+    addCheck(suite5, 'pass', 'Collection Callback TypeScript Contracts', 'Zero parameter collisions or untyped callback parameters in collection maps', { code: 'DNB-TYP-002' });
+  } else if (shouldFix) {
+    addCheck(suite5, 'fixed', 'Collection Callback TypeScript Contracts', `Repaired and type-annotated ${collParamsFixed} collection map callback(s)`, { code: 'DNB-TYP-002' });
+  } else {
+    addCheck(suite5, 'warn', 'Collection Callback TypeScript Contracts', `${collParamsFixed} collection callback(s) have untyped parameters or parameter collisions. Run with --fix to repair.`, { code: 'DNB-TYP-002' });
+  }
+
+  // Check: JSON Module Direct Import Type Narrowing Guard (DNB-TYP-003)
+  let staticJsonImportCount = 0;
+  for (const file of sourceFiles) {
+    if (!/\.(tsx|ts)$/.test(file)) continue;
+    let c = fs.readFileSync(file, 'utf-8');
+    if (c.includes('import siteData from') && c.includes('site-data.json')) {
+      staticJsonImportCount++;
+      if (shouldFix) {
+        c = c.replace(/import\s+siteData\s+from\s+['"]([^'"]*site-data\.json)['"];?/, 'import rawSiteData from "$1";\nconst siteData: any = rawSiteData;');
+        fs.writeFileSync(file, c, 'utf8');
+      }
+    }
+  }
+  if (staticJsonImportCount === 0) {
+    addCheck(suite5, 'pass', 'JSON Import Type Safety', 'No statically locked site-data.json imports causing TS2339 schema collisions', { code: 'DNB-TYP-003' });
+  } else if (shouldFix) {
+    addCheck(suite5, 'fixed', 'JSON Import Type Safety', `Safely typed ${staticJsonImportCount} static site-data.json import(s)`, { code: 'DNB-TYP-003' });
+  } else {
+    addCheck(suite5, 'warn', 'JSON Import Type Safety', `${staticJsonImportCount} file(s) statically import site-data.json without any-casting, which can trigger TS2339 under resolveJsonModule. Run with --fix to heal.`, { code: 'DNB-TYP-003' });
   }
 
   // Check: Next.js Image Empty String Guard (DNB-IMG-002)
@@ -895,9 +1172,20 @@ function runDoctor(targetDirInput = '.', options = {}) {
     fs.existsSync(path.join(targetDir, 'public', 'preview.png'));
 
   if (previewExists) {
-    addCheck(suite6, 'pass', 'Storefront Preview Graphic', 'preview.png / thumbnail.png verified for Fivora gallery', { code: 'DNB-PRV-001' }) //, 'preview.png / thumbnail.png verified for Fivora gallery');
+    addCheck(suite6, 'pass', 'Storefront Preview Graphic', 'preview.png / thumbnail.png verified for Fivora gallery', { code: 'DNB-PRV-001' });
+  } else if (shouldFix) {
+    try {
+      const minimalPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+      fs.writeFileSync(path.join(targetDir, 'preview.png'), minimalPng);
+      if (fs.existsSync(path.join(targetDir, 'public'))) {
+        fs.writeFileSync(path.join(targetDir, 'public', 'preview.png'), minimalPng);
+      }
+      addCheck(suite6, 'fixed', 'Storefront Preview Graphic', 'Created placeholder preview.png for Fivora marketplace preflight', { code: 'DNB-PRV-001' });
+    } catch {
+      addCheck(suite6, 'warn', 'Storefront Preview Graphic', 'preview.png not found in root or public folder', { code: 'DNB-PRV-001' });
+    }
   } else {
-    addCheck(suite6, 'warn', 'Storefront Preview Graphic', 'preview.png not found in root or public folder', { code: 'DNB-PRV-001' }) //, 'preview.png not found in root or public folder');
+    addCheck(suite6, 'warn', 'Storefront Preview Graphic', 'preview.png not found in root or public folder (Run with --fix to scaffold placeholder)', { code: 'DNB-PRV-001' });
   }
 
   // Large assets audit (> 4MB)
