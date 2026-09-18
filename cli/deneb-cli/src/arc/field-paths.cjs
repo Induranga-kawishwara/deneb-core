@@ -83,6 +83,10 @@ function inferFieldName(kind, tag, text, extra = {}) {
     if (extra.cta) return extra.cta === 'primary' ? 'primaryCtaLabel' : `${extra.cta}Label`;
     return toCamel([text || '', 'label']) || (extra.action ? `${extra.action}Label` : 'ctaLabel');
   }
+  if (extra.isBrandLogo) {
+    if (kind === 'image') return 'logoUrl';
+    return 'logoText';
+  }
   if (kind === 'image') return extra.alt ? toCamel([extra.alt, 'image']) || 'image' : 'image';
   if (kind === 'alt') return extra.imageField ? extra.imageField.replace(/Image$/, 'ImageAlt').replace(/image$/, 'imageAlt') : 'imageAlt';
   if (kind === 'placeholder') return toCamel([text || '', 'placeholder']) || 'placeholder';

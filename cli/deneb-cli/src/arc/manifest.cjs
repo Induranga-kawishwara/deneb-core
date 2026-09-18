@@ -180,11 +180,13 @@ function upsertSchemaList(sections, listPath, itemFields, items) {
   const key = rest[rest.length - 1];
   if (fields.some((f) => f.key === key)) return;
 
+  const isPrimitiveList = (itemFields || []).length === 0;
   fields.push({
     key,
     type: 'list',
     label: humanLabel(key),
     itemLabel: humanLabel(key).replace(/s$/, '') || 'Item',
+    itemType: isPrimitiveList ? 'string' : 'object',
     minItems: 0,
     maxItems: Math.max((items || []).length, 12),
     fields: (itemFields || []).map((field) => ({
