@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 export interface ThemeToggleProps {
   className?: string;
@@ -17,16 +17,16 @@ export function ThemeToggle({ className = '', showLabel = false }: ThemeTogglePr
 
   useEffect(() => {
     setMounted(true);
-    const hasDarkClass = document.documentElement.classList.contains('dark');
+    const hasDarkClass = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
     const storedTheme = typeof window !== 'undefined' ? localStorage.getItem('deneb-theme') : null;
-    const prefersDark = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
+    const prefersDark = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
 
     const activeDark = storedTheme ? storedTheme === 'dark' : hasDarkClass || prefersDark;
     setIsDark(activeDark);
     if (activeDark) {
-      document.documentElement.classList.add('dark');
+      if (typeof document !== 'undefined') document.documentElement.classList.add('dark');
     } else {
-      document.documentElement.classList.remove('dark');
+      if (typeof document !== 'undefined') document.documentElement.classList.remove('dark');
     }
   }, []);
 
@@ -34,11 +34,11 @@ export function ThemeToggle({ className = '', showLabel = false }: ThemeTogglePr
     const nextDark = !isDark;
     setIsDark(nextDark);
     if (nextDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('deneb-theme', 'dark');
+      if (typeof document !== 'undefined') document.documentElement.classList.add('dark');
+      if (typeof window !== 'undefined') localStorage.setItem('deneb-theme', 'dark');
     } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('deneb-theme', 'light');
+      if (typeof document !== 'undefined') document.documentElement.classList.remove('dark');
+      if (typeof window !== 'undefined') localStorage.setItem('deneb-theme', 'light');
     }
   };
 

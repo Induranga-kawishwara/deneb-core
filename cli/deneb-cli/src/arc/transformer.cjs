@@ -27,10 +27,14 @@ const { toPosix } = require('./fs-utils.cjs');
 const { BROAD_CONTENT_CONTAINERS } = require('./fivora-contract.cjs');
 
 function findElementByLoc(ast, loc) {
+  if (!loc) return null;
+  const parts = loc.split(':');
+  const targetLoc = parts.length > 4 ? parts.slice(0, 4).join(':') : loc;
   let found = null;
   recast.types.visit(ast, {
     visitJSXElement(pathNode) {
-      if (locKey(pathNode.node) === loc) {
+      const k = locKey(pathNode.node);
+      if (k === targetLoc || k === loc) {
         found = pathNode;
         return false;
       }
@@ -241,6 +245,14 @@ function applyTransformToElement(pathNode, transform) {
   if (transform.operation === 'extract-placeholder') {
     replaceAttrValue(node, 'placeholder', siteDataBinding(transform.field.split('.'), transform.fallback, 'text'));
     ensurePreviewPath(node, transform.field);
+    return;
+  }
+  if (transform.operation === 'extract-prop') {
+    const propName = transform.propName || 'title';
+    replaceAttrValue(node, propName, siteDataBinding(transform.field.split('.'), transform.fallback, transform.fieldType || 'text'));
+    if (!hasJsxAttribute(node, 'data-preview-field-path') && !hasJsxAttribute(node, 'data-preview-list-path')) {
+      ensurePreviewPath(node, transform.field);
+    }
     return;
   }
   if (transform.operation === 'wrap-text-span') {
@@ -823,13 +835,15 @@ function injectSiteDataHook(ast) {
 }
 
 function resolveSiteDataSpecifier(profile, fromRelativeFile) {
-  const aliases = profile.aliasMap || {};
+  const aliases = (profile && profile.aliasMap) || {};
   const hasAt = Object.keys(aliases).some((k) => k === '@/*' || k.startsWith('@/'));
-  const siteDataRel = profile.hasSrc ? 'src/data/site-data.json' : 'data/site-data.json';
-  if (hasAt && profile.hasSrc) return '@/data/site-data.json';
+  const hasSrc = Boolean(profile && profile.hasSrc);
+  const siteDataRel = hasSrc ? 'src/data/site-data.json' : 'data/site-data.json';
+  if (hasAt && hasSrc) return '@/data/site-data.json';
 
-  const fromAbs = path.join(profile.root, fromRelativeFile);
-  const toAbs = path.join(profile.root, siteDataRel);
+  const root = profile && profile.root ? profile.root : process.cwd();
+  const fromAbs = path.join(root, fromRelativeFile || 'page.tsx');
+  const toAbs = path.join(root, siteDataRel);
   let relSpec = path.relative(path.dirname(fromAbs), toAbs).replace(/\\/g, '/');
   if (!relSpec.startsWith('.')) relSpec = './' + relSpec;
   return relSpec;
@@ -853,6 +867,7 @@ function applyFilePlan(filePlan, profile) {
     'extract-alt',
     'extract-placeholder',
     'extract-text',
+    'extract-prop',
     'wrap-text-span',
     'collection-conversion',
     'style-bind',
@@ -1152,9 +1167,96 @@ function instrumentLayoutSource(code, siteDataImport, providerImport = '@deneb-u
 
   ensureProviderInitialData(ast, jsonIdent);
   injectPlatformAdditionalPages(ast, providerImport);
+  injectDualModeTheme(ast, jsonIdent, providerImport);
   sanitizeDuplicateBindings(ast);
   const next = printSource(ast, code);
   return { code: next, updated: next !== code };
+}
+
+/**
+ * Injects <ThemeStyles /> and <ThemeToggle /> into the layout JSX tree.
+ * ThemeStyles applies light/dark variables and auto-contrast rules.
+ * ThemeToggle provides an out-of-the-box floating theme switcher.
+ */
+function injectDualModeTheme(ast, jsonIdent, providerImport = '@deneb-ui/ui') {
+  if (!ast) return;
+  let hasThemeStyles = false;
+  let hasThemeToggle = false;
+  recast.types.visit(ast, {
+    visitJSXIdentifier(pathNode) {
+      if (pathNode.node.name === 'ThemeStyles') hasThemeStyles = true;
+      if (pathNode.node.name === 'ThemeToggle') hasThemeToggle = true;
+      this.traverse(pathNode);
+    },
+  });
+
+  const importsToAdd = [];
+  if (!hasThemeStyles) importsToAdd.push('ThemeStyles');
+  if (!hasThemeToggle) importsToAdd.push('ThemeToggle');
+  if (importsToAdd.length === 0) return;
+
+  if (!hasThemeStyles) {
+    let stylesInjected = false;
+    const snippet = parseSource(
+      `<ThemeStyles theme={${jsonIdent}?.template?.structure?.theme || ${jsonIdent}?.theme} enableDualMode />`,
+      'snippet.tsx'
+    );
+    const stylesEl = snippet.program.body[0].expression;
+
+    // Try <head> first
+    recast.types.visit(ast, {
+      visitJSXElement(pathNode) {
+        if (stylesInjected) return false;
+        const name = getJsxName(pathNode.node);
+        if (name === 'head' || name === 'Head') {
+          pathNode.node.children = [b.jsxText('\n        '), stylesEl, ...(pathNode.node.children || [])];
+          stylesInjected = true;
+          return false;
+        }
+        this.traverse(pathNode);
+      },
+    });
+
+    // If no <head>, inject inside SiteDataProvider or <body>
+    if (!stylesInjected) {
+      recast.types.visit(ast, {
+        visitJSXElement(pathNode) {
+          if (stylesInjected) return false;
+          const name = getJsxName(pathNode.node);
+          if (name === 'SiteDataProvider' || name === 'body') {
+            pathNode.node.children = [b.jsxText('\n        '), stylesEl, ...(pathNode.node.children || [])];
+            stylesInjected = true;
+            return false;
+          }
+          this.traverse(pathNode);
+        },
+      });
+    }
+  }
+
+  if (!hasThemeToggle) {
+    let toggleInjected = false;
+    const snippet = parseSource(
+      '<ThemeToggle showLabel className="fixed bottom-6 left-6 z-40" />',
+      'snippet.tsx'
+    );
+    const toggleEl = snippet.program.body[0].expression;
+
+    recast.types.visit(ast, {
+      visitJSXElement(pathNode) {
+        if (toggleInjected) return false;
+        const name = getJsxName(pathNode.node);
+        if (name === 'SiteDataProvider' || name === 'body') {
+          pathNode.node.children = [...(pathNode.node.children || []), b.jsxText('\n        '), toggleEl];
+          toggleInjected = true;
+          return false;
+        }
+        this.traverse(pathNode);
+      },
+    });
+  }
+
+  ensureImport(ast, providerImport || '@deneb-ui/ui', importsToAdd);
 }
 
 /**

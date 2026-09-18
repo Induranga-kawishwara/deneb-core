@@ -13,8 +13,7 @@ import {
   EditableText,
   EditableList,
   EditableCard,
-  EditableProductCard,
-  ListActionCta,
+  EditableImage,
 } from '@deneb-ui/ui';
 
 
@@ -140,14 +139,28 @@ export default function HomePage() {
             data-preview-field-path="home.introBody"
             defaultValue={contentText(home.introBody)}
           />
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-            <ListActionCta
-              listPath="home.demoPreOrderCta"
-              editable
-              buttonLabel={demoCtaLabel}
-              buttonUrl={demoCtaUrl}
-              className="button-primary"
-            />
+          <div
+            style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', marginTop: '1.5rem', flexWrap: 'wrap' }}
+            data-preview-list-path="home.demoPreOrderCta"
+          >
+            {contentList(home.demoPreOrderCta).map((rawCta, index) => {
+              const cta = contentObject(rawCta);
+              const label = contentText(cta.buttonLabel) || 'Book a Consultation';
+              const url = contentText(cta.buttonUrl) || '#';
+              return (
+                <a
+                  key={index}
+                  href={url}
+                  className="button-primary"
+                  data-preview-item-path={`home.demoPreOrderCta[${index}]`}
+                  data-preview-field-path={`home.demoPreOrderCta[${index}].buttonUrl`}
+                >
+                  <span data-preview-field-path={`home.demoPreOrderCta[${index}].buttonLabel`}>
+                    {label}
+                  </span>
+                </a>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -229,38 +242,110 @@ export default function HomePage() {
           />
         </div>
 
-        <EditableList
-          data-preview-list-path="products"
-          items={products}
-          className="card-grid"
-          itemAs={false}
-        >
-          {(rawProduct, index, itemPath) => {
+        <div className="card-grid" data-preview-list-path="products">
+          {products.map((rawProduct, index) => {
             const product = contentObject(rawProduct);
             const productId =
               typeof product.id === 'string' || typeof product.id === 'number'
                 ? product.id
                 : null;
+            const price = typeof product.price === 'number' ? product.price : parseFloat(String(product.price || 0));
+            const compareAt = typeof product.compareAtPrice === 'number' ? product.compareAtPrice : parseFloat(String(product.compareAtPrice || 0));
+            const currency = contentText(product.currency) || 'LKR';
+            const badge = contentText(product.badge);
+            const category = contentText(product.category);
 
             return (
-              <EditableProductCard
+              <EditableCard
                 key={productId ?? index}
-                itemPath={itemPath}
-                product={product}
-                currency={contentText(product.currency) || 'LKR'}
-                actionSlot={
-                  <a
-                    href={platformProductDetailHref(productId)}
-                    className="product-detail-link"
-                    data-preview-static="Open the stable live product detail page"
-                  >
-                    View details
-                  </a>
-                }
-              />
+                className="card product-card"
+                item={product as any}
+                itemPath={`products[${index}]`}
+                data-preview-item-path={`products[${index}]`}
+                balance
+                radius="xl"
+                style={{ display: 'flex', flexDirection: 'column' }}
+              >
+                <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '12px', marginBottom: '0.75rem' }}>
+                  <EditableImage
+                    src={contentText(product.imageUrl) || '/placeholder.svg'}
+                    alt={contentText(product.name)}
+                    data-preview-field-path={`products[${index}].imageUrl`}
+                    aspectRatio="4/3"
+                    fit="cover"
+                    radius="lg"
+                  />
+                  {badge && (
+                    <span
+                      className="badge-primary"
+                      data-preview-field-path={`products[${index}].badge`}
+                      style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 10 }}
+                    >
+                      {badge}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '0.5rem' }}>
+                  {category && (
+                    <span
+                      className="tag"
+                      data-preview-field-path={`products[${index}].category`}
+                      style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                    >
+                      {category}
+                    </span>
+                  )}
+                  <EditableText
+                    variant="h3"
+                    size="lg"
+                    weight="bold"
+                    color="heading"
+                    data-preview-field-path={`products[${index}].name`}
+                    defaultValue={contentText(product.name)}
+                  />
+                  <EditableText
+                    variant="p"
+                    color="muted"
+                    data-preview-field-path={`products[${index}].description`}
+                    defaultValue={contentText(product.description)}
+                  />
+
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: 'auto', paddingTop: '0.75rem' }}>
+                    <EditableText
+                      as="span"
+                      weight="bold"
+                      size="xl"
+                      color="primary"
+                      data-preview-field-path={`products[${index}].price`}
+                      defaultValue={`${currency} ${price}`}
+                    />
+                    {compareAt > 0 && (
+                      <EditableText
+                        as="span"
+                        color="muted"
+                        style={{ textDecoration: 'line-through', fontSize: '0.875rem' }}
+                        data-preview-field-path={`products[${index}].compareAtPrice`}
+                        defaultValue={`${currency} ${compareAt}`}
+                      />
+                    )}
+                  </div>
+
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <a
+                      href={platformProductDetailHref(productId)}
+                      className="button-secondary"
+                      style={{ width: '100%', textAlign: 'center' }}
+                      data-preview-static="Open the stable live product detail page"
+                    >
+                      View details
+                    </a>
+                  </div>
+                </div>
+              </EditableCard>
             );
-          }}
-        </EditableList>
+          })}
+        </div>
       </section>
     </div>
   );

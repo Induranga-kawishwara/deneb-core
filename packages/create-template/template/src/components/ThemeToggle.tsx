@@ -47,6 +47,7 @@ export function ThemeToggle({ className = '', showLabel = false }: ThemeTogglePr
       <button
         type="button"
         aria-label="Toggle theme"
+        data-preview-static="theme-toggle"
         className={`w-9 h-9 rounded-lg border border-[var(--border-color,#e2e8f0)] bg-[var(--card-bg,#ffffff)] opacity-0 transition-opacity ${className}`}
       />
     );
@@ -56,6 +57,7 @@ export function ThemeToggle({ className = '', showLabel = false }: ThemeTogglePr
     <button
       type="button"
       onClick={toggleTheme}
+      data-preview-static="theme-toggle"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       className={`inline-flex items-center justify-center gap-2 h-9 px-2.5 rounded-lg border border-[var(--border-color,rgba(0,0,0,0.1))] bg-[var(--card-bg,#ffffff)] text-[var(--text-color,#0f172a)] hover:border-[var(--color-primary,#016a7e)] hover:text-[var(--color-primary,#016a7e)] shadow-sm transition-all duration-200 cursor-pointer ${className}`}

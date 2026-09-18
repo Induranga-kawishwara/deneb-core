@@ -43,6 +43,7 @@ export * from './EditableCartDrawer';
 export * from './EditableFilterSidebar';
 export * from './SiteDataProvider';
 export * from './ThemeStyles';
+export * from './ThemeToggle';
 export { ResponsiveBaseStyles } from './ResponsiveBaseStyles';
 export { DenebComponentStyles } from './DenebComponentStyles';
 export { FontLoader, DENEB_FONTS_LINK_ID } from './fonts/FontLoader';

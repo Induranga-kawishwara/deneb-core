@@ -56,7 +56,6 @@ const PLATFORM_PATHS = [
   // Contact fields used as action links (href attributes)
   'contact.contactNumber',
   'contact.googleMapLink',
-  'contact.whatsapp',
   // Product system fields
   'products[*].id',
   'products[*].isAvailable',
@@ -65,6 +64,9 @@ const PLATFORM_PATHS = [
   // List item system keys
   'testimonials[*].id',
   'categories[*].slug',
+  'services[*].id',
+  'products[*].currency',
+  'about.collageImages[*].id',
 ];
 
 const manifestPath = path.resolve(__dirname, '..', 'fivora-template.json');
@@ -76,12 +78,87 @@ if (!fs.existsSync(manifestPath)) {
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 if (!manifest.visualEditing) manifest.visualEditing = {};
 
-const existing = Array.isArray(manifest.visualEditing.controlOnlyPaths)
-  ? manifest.visualEditing.controlOnlyPaths : [];
+const siteDataPath = path.resolve(__dirname, '..', manifest.siteDataFile || 'src/data/site-data.json');
+let siteData = {};
+if (fs.existsSync(siteDataPath)) {
+  try {
+    siteData = JSON.parse(fs.readFileSync(siteDataPath, 'utf8'));
+  } catch {}
+}
 
-const merged = [...new Set([...PLATFORM_PATHS, ...existing])];
-const added = merged.length - existing.length;
+function pathExistsInContent(content, p) {
+  if (!content || typeof content !== 'object') return false;
+  const segments = p.split('.');
+  let current = [content];
+  for (const seg of segments) {
+    const isList = seg.endsWith('[*]');
+    const key = isList ? seg.slice(0, -3) : seg;
+    const next = [];
+    for (const item of current) {
+      if (!item || typeof item !== 'object') continue;
+      const val = item[key];
+      if (val === undefined) continue;
+      if (isList) {
+        if (Array.isArray(val)) {
+          next.push(...val);
+        }
+      } else {
+        next.push(val);
+      }
+    }
+    if (next.length === 0) return false;
+    current = next;
+  }
+  return true;
+}
+
+function pathExistsInSchema(schema, p) {
+  if (!schema || !Array.isArray(schema.sections)) return false;
+  const canonical = p.replace(/\[\d+\]/g, '[*]');
+
+  function checkNode(node, currentPath) {
+    if (currentPath === canonical) return true;
+    if (node.type === 'object' && Array.isArray(node.fields)) {
+      for (const field of node.fields) {
+        if (checkNode(field, `${currentPath}.${field.key}`)) return true;
+      }
+    }
+    if (node.type === 'list') {
+      const itemPath = `${currentPath}[*]`;
+      if (itemPath === canonical) return true;
+      if (node.itemField && itemPath === canonical) return true;
+      if (Array.isArray(node.fields)) {
+        for (const field of node.fields) {
+          if (checkNode(field, `${itemPath}.${field.key}`)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  for (const section of schema.sections) {
+    if (checkNode(section, section.path)) return true;
+  }
+  return false;
+}
+
+function isKnownPath(p) {
+  return (
+    pathExistsInContent(siteData.content, p) ||
+    pathExistsInContent(siteData, p) ||
+    pathExistsInSchema(manifest.editorSchema, p)
+  );
+}
+
+const existing = Array.isArray(manifest.visualEditing.controlOnlyPaths)
+  ? manifest.visualEditing.controlOnlyPaths.filter(isKnownPath)
+  : [];
+
+const relevantPlatformPaths = PLATFORM_PATHS.filter(isKnownPath);
+const merged = [...new Set([...relevantPlatformPaths, ...existing])];
 manifest.visualEditing.controlOnlyPaths = merged;
 
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
-console.log(`merge-platform-contract: +${added} platform paths merged (${merged.length} total)`);
+console.log(`merge-platform-contract: ${merged.length} platform paths retained`);
+
+

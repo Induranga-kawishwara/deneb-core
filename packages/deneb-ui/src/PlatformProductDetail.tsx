@@ -441,7 +441,7 @@ export function PlatformProductDetail({
         role="status"
         className="mx-auto flex min-h-[40vh] max-w-7xl items-center justify-center px-4 py-16 text-sm text-slate-400"
       >
-        Loading product…
+        <span data-preview-static="product-detail-loading">Loading product…</span>
       </div>
     );
   }
