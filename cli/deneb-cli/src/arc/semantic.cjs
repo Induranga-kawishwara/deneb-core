@@ -609,6 +609,22 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
         return;
       }
 
+      const isHashAnchor = Boolean(actionableHref && actionableHref.startsWith('#') && (!actionIntent || actionIntent.action === 'link'));
+      if (isHashAnchor && innerText && !textInfo.dynamic && !apiOwned) {
+        usedLocs.add(loc);
+        candidates.push({
+          ...baseMeta,
+          kind: 'text',
+          operation: 'extract-text',
+          value: innerText,
+          confidence: confidenceFor('text'),
+          reason: 'in-page-anchor-label',
+          fingerprint: fingerprintCandidate({ tag: name, kind: 'text', text: innerText }),
+        });
+        this.traverse(pathNode);
+        return;
+      }
+
       const isAction = !isSubmit && (Boolean(actionableHref) || Boolean(actionIntent)) && (ACTION_TAGS.has(name) || isLikelyCtaClass(className));
 
       if (isAction && (actionableHref || actionIntent)) {

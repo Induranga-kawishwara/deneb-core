@@ -322,11 +322,19 @@ function slimListItems(items, itemFields) {
   });
 }
 
+function isModalOrFormPath(path) {
+  return (
+    /(?:^|\.)(?:form|modal|dialog|drawer|popup|sheet|booking|checkout|cartDrawer)(?:\.|$)/i.test(path) ||
+    /(?:Modal|Form|Drawer|Dialog|Booking)(?:\.|$)/.test(path)
+  );
+}
+
 function isAllowedControlOnly(path) {
   return (
     BASELINE_CONTROL_ONLY.test(path) ||
     SYSTEM_FIELD.test(path) ||
-    PLATFORM_CONTROLLED_PATHS.has(wildcardPath(path))
+    PLATFORM_CONTROLLED_PATHS.has(wildcardPath(path)) ||
+    isModalOrFormPath(path)
   );
 }
 
@@ -335,10 +343,17 @@ function isAllowedControlOnly(path) {
  * by the strict contract validator when their sub-paths appear in controlOnlyPaths.
  * Template developers must never need to add these manually.
  */
-function ensurePlatformSections(sections) {
+function ensurePlatformSections(sections, content, boundListPaths = []) {
   // additionalPages: rendered visually by PlatformAdditionalPages component.
   // label is editable; id and route are platform-controlled.
-  if (!sections.find((s) => s.id === 'additionalPages')) {
+  // Only inject additionalPages if it is actually bound or present in content with items.
+  // Templates without additionalPages rendered would fail Fivora strict validation
+  // if an unrendered editable list is declared in editorSchema.sections.
+  const hasAdditionalPages =
+    (Array.isArray(boundListPaths) && boundListPaths.some((p) => p === 'additionalPages' || p.startsWith('additionalPages['))) ||
+    (content && Array.isArray(content.additionalPages) && content.additionalPages.length > 0 && Array.isArray(boundListPaths) && boundListPaths.includes('additionalPages'));
+
+  if (hasAdditionalPages && !sections.find((s) => s.id === 'additionalPages')) {
     sections.push({
       id: 'additionalPages',
       path: 'additionalPages',
@@ -401,7 +416,8 @@ function computeControlOnlyPaths(content, boundPaths, declared = []) {
   }
 
   for (const path of inventory.concreteFields) {
-    if (bound.has(wildcardPath(path))) continue;
+    const isModalForm = isModalOrFormPath(path);
+    if (bound.has(wildcardPath(path)) && !isModalForm) continue;
     if (isAllowedControlOnly(path)) controlOnly.add(path);
   }
 
@@ -578,7 +594,7 @@ function buildSiteDataAndManifest({
   // Auto-inject platform-managed editorSchema sections if not already present.
   // These sections are required so the validator accepts their controlOnlyPaths,
   // but template developers should never need to add these manually.
-  ensurePlatformSections(editorSections);
+  ensurePlatformSections(editorSections, content, boundListPaths);
 
   // controlOnlyPaths: platform paths are auto-merged by platform-contract.json at
   // validate/build time. We only emit template-specific paths here (currently none

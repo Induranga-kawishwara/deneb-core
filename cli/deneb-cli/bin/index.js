@@ -932,6 +932,31 @@ async function initProject(targetInput, options = {}) {
     }
   }
 
+  // 4.6. Ensure Root Layout instruments SiteDataProvider
+  const appLayoutCandidates = [
+    path.join(targetDir, 'src', 'app', 'layout.tsx'),
+    path.join(targetDir, 'src', 'app', 'layout.jsx'),
+    path.join(targetDir, 'app', 'layout.tsx'),
+    path.join(targetDir, 'app', 'layout.jsx'),
+  ];
+  const targetLayoutFile = appLayoutCandidates.find((f) => fs.existsSync(f));
+  if (targetLayoutFile) {
+    try {
+      const layoutContent = fs.readFileSync(targetLayoutFile, 'utf8');
+      const hasProvider = /SiteDataProvider|DenebDataProvider|<Providers\b/.test(layoutContent);
+      if (!hasProvider) {
+        const { instrumentLayoutSource } = require('../src/arc/transformer.cjs');
+        const instrumented = instrumentLayoutSource(layoutContent, '@/data/site-data.json', '@deneb-ui/ui');
+        if (instrumented.updated && instrumented.code !== layoutContent) {
+          fs.writeFileSync(targetLayoutFile, instrumented.code, 'utf8');
+          console.log(`\x1b[32m✔ Instrumented\x1b[0m ${path.relative(targetDir, targetLayoutFile)} with <SiteDataProvider>`);
+        }
+      }
+    } catch (layoutErr) {
+      // Non-blocking layout instrumentation
+    }
+  }
+
   // 4. Update package.json scripts
   pkg.scripts = pkg.scripts || {};
   const scriptsToAdd = {
@@ -1028,6 +1053,15 @@ async function initProject(targetInput, options = {}) {
     } catch (err) {
       console.log(`\n\x1b[33m! Fonts were not installed automatically: ${err.message}. Run \x1b[1mdeneb fonts install .\x1b[0m\x1b[0m`);
     }
+  }
+
+  // 7. Post-Init Self-Healing Preflight Check
+  try {
+    const { runDoctor } = require('../src/tools/deneb-doctor.cjs');
+    console.log(`\n\x1b[36m🩺 Running DENEB post-init diagnostic & auto-healing pass...\x1b[0m`);
+    runDoctor(targetDir, { fix: true, json: false });
+  } catch (docErr) {
+    // Non-blocking doctor check
   }
 
   console.log(`\n\x1b[32m✔ Project initialization complete!\x1b[0m`);

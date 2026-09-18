@@ -135,12 +135,23 @@ function classifyResidual(node, text, tag) {
   return null;
 }
 
+function hasEditableDescendant(node) {
+  if (!node || !Array.isArray(node.children)) return false;
+  for (const child of node.children) {
+    if (child.type === 'JSXElement') {
+      if (hasEditableMarker(child.openingElement || child)) return true;
+      if (hasEditableDescendant(child)) return true;
+    }
+  }
+  return false;
+}
+
 function ensureStaticOnLeaf(node, reason) {
   const tag = getJsxName(node);
   if (BROAD_CONTENT_CONTAINERS.has(tag.toLowerCase()) || BROAD_CONTENT_CONTAINERS.has(tag)) {
     return false;
   }
-  if (hasJsxAttribute(node, 'data-preview-static') || hasEditableMarker(node)) return false;
+  if (hasJsxAttribute(node, 'data-preview-static') || hasEditableMarker(node) || hasEditableDescendant(node)) return false;
   node.openingElement.attributes.push(jsxStaticAttr(reason || 'decorative'));
   return true;
 }

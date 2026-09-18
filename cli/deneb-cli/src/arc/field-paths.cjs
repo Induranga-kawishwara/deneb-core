@@ -163,12 +163,12 @@ function classifyFieldType(kind, value) {
   if (kind === 'image') return 'image';
   if (kind === 'url') return 'url';
   if (kind === 'email' || (typeof value === 'string' && /^mailto:/i.test(value))) return 'email';
-  if (kind === 'phone' || (typeof value === 'string' && /^(tel:|\+)/i.test(value))) return 'phone';
-  if (kind === 'color') return 'color';
+  if (kind === 'phone' || (typeof value === 'string' && /^(tel:|\+)/i.test(value))) return 'tel';
+  if (kind === 'color') return 'text';
   if (kind === 'rating' || kind === 'number' || typeof value === 'number') return 'number';
   if (typeof value === 'boolean') return 'boolean';
   if (kind === 'textarea' || (typeof value === 'string' && value.length > 80)) return 'textarea';
-  if (typeof value === 'string' && /\$|lkr|usd|rs\.?\s*\d/i.test(value)) return 'currency';
+  if (typeof value === 'string' && /\$|lkr|usd|rs\.?\s*\d/i.test(value)) return 'text';
   return 'text';
 }
 
