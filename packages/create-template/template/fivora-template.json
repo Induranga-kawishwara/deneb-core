@@ -5,34 +5,12 @@
     "contractVersion": 1,
     "mode": "strict",
     "controlOnlyPaths": [
-      "__fivoraIntake.tone",
-      "__fivoraIntake.outputLanguage",
-      "__fivoraIntake.businessSummary",
-      "__fivoraIntake.additionalBusinessDetails",
-      "__fivoraIntake.referenceWebsiteUrl",
-      "additionalPages[*].id",
-      "additionalPages[*].route",
-      "common.currency",
-      "common.whatsappNumber",
-      "common.whatsapp",
-      "common.email",
-      "common.address",
-      "common.contactNumber",
-      "common.openingHours",
-      "common.newsletterTitle",
-      "common.newsletterDescription",
-      "contact.contactNumber",
-      "contact.googleMapLink",
-      "contact.whatsapp",
       "products[*].id",
       "products[*].isAvailable",
-      "products[*].measurement",
-      "products[*].unit",
-      "testimonials[*].id",
-      "categories[*].slug",
       "services[*].id",
       "products[*].currency",
-      "about.collageImages[*].id"
+      "about.collageImages[*].id",
+      "contact.whatsapp"
     ]
   },
   "siteDataFile": "src/data/site-data.json",
@@ -429,12 +407,18 @@
             "key": "directMessageText",
             "type": "text",
             "label": "Direct message label"
+          },
+          {
+            "key": "whatsapp",
+            "type": "tel",
+            "label": "WhatsApp"
           }
         ]
       },
       {
         "id": "products",
         "path": "products",
+        "pageKey": "home",
         "type": "list",
         "label": "Products",
         "minItems": 0,

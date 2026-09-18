@@ -1627,6 +1627,88 @@ test('learning loadFingerprintBoost returns verified boost for baseline trained 
   assert.equal(boost3.boost, 0.08);
 });
 
+test('instrumentLayoutSource injects ThemeStyles and ThemeToggle with dual mode support into root layout', () => {
+  const { instrumentLayoutSource } = require('../transformer.cjs');
+  const code = `
+    import React from 'react';
+    export default function RootLayout({ children }: { children: React.ReactNode }) {
+      return (
+        <html lang="en">
+          <body>
+            <main>{children}</main>
+          </body>
+        </html>
+      );
+    }
+  `;
+  const result = instrumentLayoutSource(code, '@/data/site-data.json', '@deneb-ui/ui');
+  assert.equal(result.updated, true);
+  assert.ok(result.code.includes('ThemeStyles'));
+  assert.ok(result.code.includes('ThemeToggle'));
+  assert.ok(result.code.includes('SiteDataProvider'));
+  assert.ok(result.code.includes('enableDualMode'));
+  assert.ok(result.code.includes('fixed bottom-6 left-6 z-40'));
+});
+
+test('semantic prop harvester detects user-facing copy props and transformer binds them to siteData', () => {
+  const { analyzeFile } = require('../semantic.cjs');
+  const { planTransformations } = require('../planner.cjs');
+  const { applyFilePlan } = require('../transformer.cjs');
+  const code = `
+    export function Showcase() {
+      return (
+        <div className="features">
+          <FeatureCard title="Lightning Fast" description="Instant response times" />
+        </div>
+      );
+    }
+  `;
+  const profile = { root: '/tmp/test', hasSrc: true, jsxFiles: ['Showcase.tsx'], routes: [{ id: 'home', route: '/' }] };
+  const analysis = analyzeFile({
+    code,
+    relativeFile: 'Showcase.tsx',
+    profile,
+    graph: { routesByFile: { 'Showcase.tsx': ['home'] } },
+    ownerScope: 'home',
+  });
+  const propCandidates = analysis.candidates.filter((c) => c.operation === 'extract-prop');
+  assert.ok(propCandidates.length >= 2);
+  assert.ok(propCandidates.some((c) => c.value === 'Lightning Fast' && c.extra?.propName === 'title'));
+  assert.ok(propCandidates.some((c) => c.value === 'Instant response times' && c.extra?.propName === 'description'));
+
+  const plan = planTransformations({
+    profile,
+    analyses: [{ ...analysis, relativeFile: 'Showcase.tsx', code }],
+  });
+  const filePlan = plan.files[0];
+  const transformed = applyFilePlan(filePlan, profile);
+  assert.equal(transformed.changed, true);
+  assert.ok(transformed.code.includes('title={siteData?.content?.home'));
+  assert.ok(transformed.code.includes('description={siteData?.content?.home'));
+});
+
+test('manifest buildSiteDataAndManifest creates default dual-mode palette with dark mode overrides', () => {
+  const { buildSiteDataAndManifest } = require('../manifest.cjs');
+  const profile = {
+    packageName: 'test-store',
+    hasSrc: true,
+    routes: [{ id: 'home', label: 'Home', route: '/', required: true }],
+  };
+  const plan = { files: [], usedPaths: [] };
+  const bundle = buildSiteDataAndManifest({
+    projectDir: '/tmp/test',
+    projectName: 'test-store',
+    profile,
+    plan,
+  });
+  assert.ok(bundle.siteData.theme);
+  assert.ok(bundle.siteData.theme.dark);
+  assert.equal(bundle.siteData.theme.backgroundColor, '#ffffff');
+  assert.equal(bundle.siteData.theme.dark.backgroundColor, '#0b0f19');
+  assert.equal(bundle.siteData.theme.dark.textColor, '#f9fafb');
+});
+
+
 
 
 

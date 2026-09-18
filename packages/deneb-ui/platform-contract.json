@@ -26,7 +26,10 @@
     "products[*].measurement",
     "products[*].unit",
     "testimonials[*].id",
-    "categories[*].slug"
+    "categories[*].slug",
+    "services[*].id",
+    "products[*].currency",
+    "about.collageImages[*].id"
   ],
   "platformSiteDataKeys": [
     "__fivoraIntake",

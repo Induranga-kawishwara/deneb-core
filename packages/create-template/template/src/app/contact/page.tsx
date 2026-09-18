@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { MapLink, EditableText, EditableBox } from '@deneb-ui/ui';
+import { EditableText, EditableBox } from '@deneb-ui/ui';
 import { contentObject, contentText, useSiteData } from '@/lib/siteDataContext';
 
 export default function ContactPage() {
@@ -76,50 +76,64 @@ export default function ContactPage() {
             size="xl"
             weight="bold"
             color="heading"
+            data-preview-static="contact-heading"
             defaultValue="Direct Information"
           />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
-            {phone && (
-              <a href={`tel:${phone}`} data-preview-field-path="contact.phone">
-                {phone}
-              </a>
-            )}
-            {email && (
-              <a href={`mailto:${email}`} data-preview-field-path="contact.email">
-                {email}
-              </a>
-            )}
-            {address && (
-              <EditableText
-                variant="p"
-                color="muted"
-                data-preview-field-path="contact.address"
-                defaultValue={address}
-              />
-            )}
+            <a href={phone ? `tel:${phone}` : ''} data-preview-field-path="contact.phone">
+              {phone}
+            </a>
+            <a href={email ? `mailto:${email}` : ''} data-preview-field-path="contact.email">
+              {email}
+            </a>
+            <EditableText
+              variant="p"
+              color="muted"
+              data-preview-field-path="contact.address"
+              defaultValue={address}
+            />
           </div>
           <div style={{ marginTop: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <MapLink
-              mapUrl={directionsUrl}
-              address={address}
-              label={directionsLabel}
-              labelFieldPath="contact.directionsLabel"
-              urlFieldPath="contact.directionsUrl"
-              variant="outline"
-              size="md"
-            />
-            {whatsapp && (
-              <a
-                href={`https://wa.me/${whatsapp.replace(/[^0-9]/g, '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="button-secondary"
-              >
-                <span data-preview-field-path="contact.directMessageText">
-                  {directMessageText}
-                </span>
-              </a>
-            )}
+            <a
+              href={directionsUrl || '#'}
+              data-preview-field-path="contact.directionsUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="deneb-map-link"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                fontWeight: 500,
+                textDecoration: 'none',
+                transition: 'all 0.2s ease',
+                cursor: 'pointer',
+                borderRadius: '0.5rem',
+                fontSize: '0.95rem',
+                padding: '0.5rem 1rem',
+                backgroundColor: 'transparent',
+                border: '1px solid var(--color-border, #e2e8f0)',
+                color: 'var(--color-text, #0f172a)',
+              }}
+            >
+              <svg data-preview-static="map-link-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              <span data-preview-field-path="contact.directionsLabel">{directionsLabel}</span>
+            </a>
+            <a
+              href={whatsapp ? `https://wa.me/${whatsapp.replace(/[^0-9]/g, '')}` : '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="button-secondary"
+              data-preview-field-path="contact.whatsapp"
+            >
+              <span data-preview-field-path="contact.directMessageText">
+                {directMessageText}
+              </span>
+            </a>
           </div>
         </EditableBox>
 

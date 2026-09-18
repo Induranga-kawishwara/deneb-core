@@ -33,6 +33,20 @@ const { BROAD_CONTENT_CONTAINERS } = require('./fivora-contract.cjs');
 const TECHNICAL_TEXT_RE = /^(true|false|null|undefined|px|rem|em|auto|hidden|flex|grid|sr-only)$/i;
 const ARIA_ONLY_RE = /^(aria-|data-state|data-slot|data-orientation)/;
 const SKIP_ATTR_NAMES = new Set(['className', 'class', 'style', 'key', 'id', 'role', 'type', 'name', 'htmlFor', 'suppressHydrationWarning']);
+const USER_FACING_PROP_NAMES = new Set([
+  'title',
+  'heading',
+  'subheading',
+  'subtitle',
+  'label',
+  'description',
+  'caption',
+  'badge',
+  'buttonText',
+  'ctaText',
+  'helperText',
+  'summary',
+]);
 
 function fingerprintCandidate(features) {
   return shortHash(JSON.stringify(features));
@@ -567,6 +581,43 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
           reason: 'literal-placeholder',
           fingerprint: fingerprintCandidate({ tag: name, kind: 'placeholder' }),
         });
+      }
+
+      const isCustomComponent = Boolean(name && ((name[0] >= 'A' && name[0] <= 'Z') || name.includes('.')));
+      if (isCustomComponent && !apiOwned && node.openingElement && Array.isArray(node.openingElement.attributes)) {
+        for (const attr of node.openingElement.attributes) {
+          if (attr.type === 'JSXAttribute' && attr.name && USER_FACING_PROP_NAMES.has(attr.name.name)) {
+            const propName = attr.name.name;
+            let propValue = '';
+            if (attr.value) {
+              if (attr.value.type === 'StringLiteral' || attr.value.type === 'Literal') {
+                propValue = String(attr.value.value || '');
+              } else if (attr.value.type === 'JSXExpressionContainer') {
+                const expr = attr.value.expression;
+                if (expr && (expr.type === 'StringLiteral' || expr.type === 'Literal')) {
+                  propValue = String(expr.value || '');
+                }
+              }
+            }
+            if (propValue && !isStaticSkipText(propValue)) {
+              const propLoc = `${loc}:${propName}`;
+              if (!usedLocs.has(propLoc)) {
+                usedLocs.add(propLoc);
+                candidates.push({
+                  ...baseMeta,
+                  loc: propLoc,
+                  kind: 'text',
+                  operation: 'extract-prop',
+                  value: propValue,
+                  extra: { propName, tag: name },
+                  confidence: 0.88,
+                  reason: `component-prop-${propName}`,
+                  fingerprint: fingerprintCandidate({ tag: name, kind: 'prop', propName }),
+                });
+              }
+            }
+          }
+        }
       }
 
       const insideForm = parents.some((p) => FORM_CONTAINER_TAGS.has(p));

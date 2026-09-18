@@ -159,6 +159,16 @@ function planTransformations({ profile, analyses, recipe }) {
           field: inferFieldName('placeholder', candidate.tag, candidate.value, extra),
           used: usedPaths,
         });
+      } else if (candidate.operation === 'extract-prop') {
+        const propName = extra.propName || 'text';
+        transform.field = buildFieldPath({
+          scope,
+          section,
+          field: inferFieldName(propName, candidate.tag, candidate.value, extra),
+          used: usedPaths,
+        });
+        transform.propName = propName;
+        transform.fieldType = classifyFieldType('text', candidate.value);
       } else if (candidate.operation === 'collection-conversion') {
         // A collection is named after the developer's own array variable so the
         // merchant sees "products", not "items2".

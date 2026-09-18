@@ -62,6 +62,37 @@ function setDeep(target, pathStr, value) {
   if (curr[last] === undefined) curr[last] = value;
 }
 
+function defaultDualModeTheme(existingTheme = {}) {
+  const base = {
+    primaryColor: '#0284c7',
+    secondaryColor: '#0f172a',
+    accentColor: '#38bdf8',
+    backgroundColor: '#ffffff',
+    cardBackgroundColor: '#f8fafc',
+    textColor: '#0f172a',
+    borderColor: '#e2e8f0',
+    headingFont: 'Outfit, sans-serif',
+    bodyFont: 'Inter, sans-serif',
+    borderRadius: '12px',
+    dark: {
+      primaryColor: '#38bdf8',
+      secondaryColor: '#f8fafc',
+      accentColor: '#0284c7',
+      backgroundColor: '#0b0f19',
+      cardBackgroundColor: '#111827',
+      textColor: '#f9fafb',
+      borderColor: '#1f2937',
+    },
+  };
+  if (isPlainObject(existingTheme)) {
+    Object.assign(base, existingTheme);
+    if (isPlainObject(existingTheme.dark)) {
+      base.dark = { ...base.dark, ...existingTheme.dark };
+    }
+  }
+  return base;
+}
+
 function getDeep(target, pathStr) {
   const parts = String(pathStr).split('.').filter(Boolean);
   let curr = target;
@@ -384,7 +415,7 @@ function ensurePlatformSections(sections, content, boundListPaths = []) {
         { key: 'businessSummary', type: 'textarea', label: 'Business summary' },
         { key: 'additionalBusinessDetails', type: 'textarea', label: 'Additional business details' },
         { key: 'referenceWebsiteUrl', type: 'url', label: 'Reference website URL' },
-        { key: 'guidanceNotes', type: 'object', label: 'AI Guidance Notes' },
+        { key: 'guidanceNotes', type: 'object', label: 'AI Guidance Notes', fields: [] },
       ],
     });
   }
@@ -572,7 +603,10 @@ function buildSiteDataAndManifest({
       id: `${projectName}-template`,
       name: projectName,
       engine: 'NEXT_STATIC_EXPORT',
-      structure: { pages: routes.map((p) => p.id) },
+      structure: {
+        pages: routes.map((p) => p.id),
+        theme: defaultDualModeTheme(existingSiteData?.template?.structure?.theme || existingSiteData?.theme),
+      },
     },
     requirements: existingSiteData?.requirements || {
       requiredPages: routes.filter((p) => p.required).map((p) => p.id),
@@ -580,7 +614,7 @@ function buildSiteDataAndManifest({
     },
     content,
     styles: collectStylesFromPlan(plan, existingSiteData?.styles),
-    ...(isPlainObject(existingSiteData?.theme) ? { theme: { ...existingSiteData.theme } } : {}),
+    theme: defaultDualModeTheme(existingSiteData?.theme || existingSiteData?.template?.structure?.theme),
   };
 
   applyFontTheme(siteData, collectFontIdsFromSiteData(siteData));

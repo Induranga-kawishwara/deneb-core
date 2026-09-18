@@ -120,22 +120,17 @@ export function MapLink({
   const opensNewTab = finalHref !== '#';
 
   return (
-    <span className="deneb-map-link-group" style={{ display: 'contents' }}>
-      <a
-        href={finalHref}
-        data-preview-static="map-link"
-        target={opensNewTab ? '_blank' : undefined}
-        rel={opensNewTab ? 'noopener noreferrer' : undefined}
-        className={`deneb-map-link ${className}`.trim()}
-        style={mergedStyles}
-        {...rest}
-      >
-        {icon !== undefined ? icon : defaultIcon}
-        <span data-preview-field-path={resolvedLabelFieldPath}>{label}</span>
-      </a>
-      <span hidden aria-hidden="true" data-preview-field-path={resolvedUrlFieldPath}>
-        {urlText}
-      </span>
-    </span>
+    <a
+      href={finalHref}
+      data-preview-field-path={resolvedUrlFieldPath}
+      target={opensNewTab ? '_blank' : undefined}
+      rel={opensNewTab ? 'noopener noreferrer' : undefined}
+      className={`deneb-map-link ${className}`.trim()}
+      style={mergedStyles}
+      {...rest}
+    >
+      {icon !== undefined ? icon : defaultIcon}
+      <span data-preview-field-path={resolvedLabelFieldPath}>{label}</span>
+    </a>
   );
 }

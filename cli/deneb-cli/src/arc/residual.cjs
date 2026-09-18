@@ -97,7 +97,7 @@ function inMapCallback(pathNode) {
 
 function isMeaningfulVisibleText(text) {
   const value = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!value || value.length <= 2) return false;
+  if (!value || value.length < 2) return false;
   if (!/\p{L}/u.test(value)) return false;
   if (isStaticSkipText(value)) return false;
   if (CHROME_TEXT_RE.test(value)) return false;
@@ -372,10 +372,30 @@ function applyResidualPass({ code, file, ownerScope, usedPaths, componentName, r
             fields.push({ path: field, type: fieldType, value: text });
             applied++;
           }
-        } else if (!BROAD_CONTENT_CONTAINERS.has(lower)) {
-          if (ensureStaticOnLeaf(node, 'non-leaf-copy')) applied++;
-        } else if (wrapFirstLiteralAsStatic(node, 'container-copy')) {
-          applied++;
+        } else {
+          const nextChildren = [];
+          let wrapped = false;
+          for (const child of node.children || []) {
+            if (!wrapped && child.type === 'JSXText' && child.value.replace(/\s+/g, '').length) {
+              const leading = child.value.match(/^\s*/)?.[0] || '';
+              const trailing = child.value.match(/\s*$/)?.[0] || '';
+              if (leading) nextChildren.push(b.jsxText(leading));
+              nextChildren.push(wrapTextInEditableSpan(field, text.trim(), fieldType));
+              if (trailing) nextChildren.push(b.jsxText(trailing));
+              wrapped = true;
+              continue;
+            }
+            nextChildren.push(child);
+          }
+          if (wrapped) {
+            node.children = nextChildren;
+            fields.push({ path: field, type: fieldType, value: text.trim() });
+            applied++;
+          } else if (!BROAD_CONTENT_CONTAINERS.has(lower)) {
+            if (ensureStaticOnLeaf(node, 'non-leaf-copy')) applied++;
+          } else if (wrapFirstLiteralAsStatic(node, 'container-copy')) {
+            applied++;
+          }
         }
         this.traverse(pathNode);
         return;
