@@ -1,8 +1,7 @@
 'use client';
 
-import { HeritageCollage } from '@deneb-ui/ui';
+import { HeritageCollage, EditableText, EditableImage } from '@deneb-ui/ui';
 import { contentObject, contentText, contentList, useSiteData } from '@/lib/siteDataContext';
-import { withBasePath } from '@/lib/utils';
 
 export default function AboutPage() {
   const siteData = useSiteData();
@@ -13,14 +12,29 @@ export default function AboutPage() {
     <div data-preview-page-key="about_us">
       <section className="page-section split" data-design-section="about">
         <div className="split-copy">
-          <h1 className="section-title" data-preview-field-path="about.heading">{contentText(about.heading)}</h1>
-          <p data-preview-field-path="about.body">{contentText(about.body)}</p>
+          <EditableText
+            variant="h1"
+            size="4xl"
+            weight="bold"
+            color="heading"
+            className="section-title"
+            data-preview-field-path="about.heading"
+            defaultValue={contentText(about.heading)}
+          />
+          <EditableText
+            variant="lead"
+            color="muted"
+            data-preview-field-path="about.body"
+            defaultValue={contentText(about.body)}
+          />
         </div>
-        <img
+        <EditableImage
           className="split-image"
-          src={withBasePath(contentText(about.imageUrl) || '/placeholder.svg')}
-          alt=""
+          src={contentText(about.imageUrl) || '/placeholder.svg'}
+          alt="About DENEB-UI"
           data-preview-field-path="about.imageUrl"
+          radius="xl"
+          fit="cover"
         />
       </section>
 
