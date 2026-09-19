@@ -4,6 +4,7 @@ import React from 'react';
 import { Address } from './Address';
 import { MapLink } from './MapLink';
 import { EditableText } from '../EditableText';
+import { useShop, useSiteData } from '../SiteDataProvider';
 
 export interface LocationCardProps {
   name?: string | null;
@@ -28,6 +29,7 @@ export interface LocationCardProps {
 
 /**
  * Premium storefront LocationCard displaying address, pin icon, and Google Maps directions button.
+ * Automatically self-hydrates from live shop registration and site data when props are omitted.
  */
 export function LocationCard({
   name,
@@ -49,11 +51,22 @@ export function LocationCard({
   className = '',
   style,
 }: LocationCardProps) {
-  const explicitUrl = (addressUrl || mapUrl || url || '').trim();
-  const cardTitle = name || title || 'Our Location';
+  const liveShop = useShop();
+  const siteData = useSiteData();
+  const contact = (siteData?.content as any)?.contact || (siteData?.content as any)?.common?.contact || {};
+  const common = (siteData?.content as any)?.common || {};
+  const merchant = (siteData as any)?.merchant || {};
+
+  const effectiveAddress = address ?? liveShop?.address ?? contact.address ?? contact.location ?? merchant.address ?? '';
+  const effectiveCity = city ?? liveShop?.city ?? contact.city ?? merchant.city ?? '';
+  const effectiveState = state ?? '';
+  const effectiveCountry = country ?? contact.country ?? merchant.country ?? '';
+  const effectivePostalCode = postalCode ?? contact.postalCode ?? '';
+  const explicitUrl = (addressUrl || mapUrl || url || liveShop?.mapLocation || contact.googleMapLink || contact.mapLocation || merchant.mapLocation || merchant.googleMapLink || '').trim();
+  const effectiveName = name ?? liveShop?.name ?? common.websiteTitle ?? merchant.businessName ?? title ?? 'Our Location';
   const resolvedTitleFieldPath = nameFieldPath || titleFieldPath || (fieldPath ? `${fieldPath}.name` : 'contact.locationTitle');
 
-  if (!address && !city && !country && !explicitUrl && !name) {
+  if (!effectiveAddress && !effectiveCity && !effectiveCountry && !explicitUrl && !effectiveName) {
     return null;
   }
 
@@ -94,31 +107,31 @@ export function LocationCard({
 
       <EditableText
         as="h3"
-        id={titleFieldPath || (fieldPath ? `${fieldPath}.title` : 'contact.locationTitle')}
-        defaultValue={cardTitle}
+        id={resolvedTitleFieldPath}
+        defaultValue={effectiveName}
         style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: 'var(--color-text, #0f172a)' }}
       />
 
       <Address
-        address={address}
-        city={city}
-        country={country}
-        postalCode={postalCode}
+        address={effectiveAddress}
+        city={effectiveCity}
+        country={effectiveCountry}
+        postalCode={effectivePostalCode}
         fieldPath={fieldPath}
         addressFieldPath={addressFieldPath}
       />
 
       <div style={{ marginTop: '0.5rem', width: '100%' }}>
         <MapLink
-          name={name}
+          name={effectiveName}
           mapUrl={explicitUrl}
           addressUrl={explicitUrl}
           url={explicitUrl}
-          address={address}
-          city={city}
-          state={state}
-          country={country}
-          postalCode={postalCode}
+          address={effectiveAddress}
+          city={effectiveCity}
+          state={effectiveState}
+          country={effectiveCountry}
+          postalCode={effectivePostalCode}
           label={directionsLabel}
           urlFieldPath={mapUrlFieldPath}
           variant="primary"

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useReviews, useSiteData } from './SiteDataProvider';
 
 export interface CustomerReviewItem {
   id?: string | number;
@@ -88,21 +89,57 @@ const DEFAULT_REVIEWS: CustomerReviewItem[] = [
  */
 export function EditableCustomerReviews({
   sectionPath = 'home',
-  title = 'Loved by Athletes & Runners Worldwide',
-  subtitle = 'Verified Customer Reviews',
-  averageRating = '4.9',
-  totalReviews = '1,420+',
-  reviews = DEFAULT_REVIEWS,
+  title,
+  subtitle,
+  averageRating,
+  totalReviews,
+  reviews,
   className = '',
   style,
   ...props
 }: EditableCustomerReviewsProps) {
   const [selectedStarFilter, setSelectedStarFilter] = useState<number | null>(null);
+  const liveReviews = useReviews();
+  const siteData = useSiteData();
+  const siteReviews = (siteData?.content as any)?.[sectionPath]?.reviews || (siteData?.content as any)?.reviews || (siteData?.content as any)?.home?.reviews;
+
+  const rawReviews = (reviews && reviews.length > 0)
+    ? reviews
+    : (liveReviews && liveReviews.length > 0)
+      ? liveReviews
+      : (Array.isArray(siteReviews) && siteReviews.length > 0)
+        ? siteReviews
+        : DEFAULT_REVIEWS;
+
+  const normalizedReviews: CustomerReviewItem[] = useMemo(() => {
+    return rawReviews.map((r: any, idx: number) => ({
+      id: r.id ?? idx + 1,
+      author: r.author || r.name || r.customerName || 'Customer',
+      rating: typeof r.rating === 'number' ? r.rating : (parseInt(r.rating, 10) || 5),
+      date: r.date || r.timeAgo || 'Recently',
+      comment: r.comment || r.body || r.feedback || r.quote || '',
+      verified: r.verified !== false,
+      productName: r.productName || r.item || undefined,
+      helpfulCount: r.helpfulCount || undefined,
+    }));
+  }, [rawReviews]);
+
+  const calculatedAvg = useMemo(() => {
+    if (!normalizedReviews.length) return '5.0';
+    const sum = normalizedReviews.reduce((acc, r) => acc + (Number(r.rating) || 5), 0);
+    return (sum / normalizedReviews.length).toFixed(1);
+  }, [normalizedReviews]);
+
+  const hasLive = (liveReviews && liveReviews.length > 0) || (reviews && reviews.length > 0);
+  const resolvedAverageRating = averageRating ?? (hasLive ? calculatedAvg : '4.9');
+  const resolvedTotalReviews = totalReviews ?? (hasLive ? `${normalizedReviews.length}+` : '1,420+');
+  const resolvedTitle = title ?? (siteData?.content as any)?.[sectionPath]?.reviewsTitle ?? (siteData?.content as any)?.home?.reviewsTitle ?? 'Loved by Customers Worldwide';
+  const resolvedSubtitle = subtitle ?? (siteData?.content as any)?.[sectionPath]?.reviewsSubtitle ?? (siteData?.content as any)?.home?.reviewsSubtitle ?? 'Verified Customer Reviews';
 
   const filteredReviews = useMemo(() => {
-    if (selectedStarFilter === null) return reviews;
-    return reviews.filter((r) => r.rating === selectedStarFilter);
-  }, [reviews, selectedStarFilter]);
+    if (selectedStarFilter === null) return normalizedReviews;
+    return normalizedReviews.filter((r) => r.rating === selectedStarFilter);
+  }, [normalizedReviews, selectedStarFilter]);
 
   return (
     <section
@@ -118,7 +155,7 @@ export function EditableCustomerReviews({
             data-preview-field-path={`${sectionPath}.reviewsSubtitle`}
             className="text-xs font-black tracking-widest uppercase text-emerald-600 dark:text-lime-400 block mb-2"
           >
-            {subtitle}
+            {resolvedSubtitle}
           </span>
         )}
         <h2
@@ -134,10 +171,10 @@ export function EditableCustomerReviews({
             {'★★★★★'}
           </div>
           <span className="text-slate-900 dark:text-white font-extrabold text-lg">
-            <span data-preview-field-path={`${sectionPath}.reviewsAverage`}>{averageRating}</span> / 5.0
+            <span data-preview-field-path={`${sectionPath}.reviewsAverage`}>{resolvedAverageRating}</span> / 5.0
           </span>
           <span className="text-slate-500 dark:text-slate-400 text-sm">
-            (<span data-preview-field-path={`${sectionPath}.reviewsCount`}>{totalReviews}</span> reviews)
+            (<span data-preview-field-path={`${sectionPath}.reviewsCount`}>{resolvedTotalReviews}</span> reviews)
           </span>
         </div>
       </div>

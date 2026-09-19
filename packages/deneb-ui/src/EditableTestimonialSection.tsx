@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { useReviews, useSiteData } from './SiteDataProvider';
 import type { TestimonialItem } from './EditableTestimonialCard';
 
 export interface TestimonialSectionItem extends TestimonialItem {
@@ -201,33 +202,41 @@ function TestimonialCard({
 export function EditableTestimonialSection({
   basePath = 'testimonials',
   badge = 'WORDS OF ACCLAIM',
-  heading = 'WHAT THE CRITICS ARE SAYING',
-  subheading = 'Reflections from international cuppers, culinary masters, and dedicated regulars.',
-  testimonials = DEFAULT_TESTIMONIALS,
+  heading,
+  subheading,
+  testimonials,
   maxStars = 5,
   className = '',
   cardClassName = '',
   style,
   ...props
 }: EditableTestimonialSectionProps) {
-  const items = useMemo(() => {
-    const list = Array.isArray(testimonials) ? testimonials : [];
-    if (list.length === 0) {
-      return DEFAULT_TESTIMONIALS;
-    }
-    return list.map((item, index) => {
-      const fallback = DEFAULT_TESTIMONIALS[index % DEFAULT_TESTIMONIALS.length] || DEFAULT_TESTIMONIALS[0];
-      if (!item || typeof item !== 'object') {
-        return { ...fallback, id: `fallback-${index}` };
-      }
-      return {
-        ...fallback,
-        ...item,
-        id: item.id || `testimonial-${index}`,
-        rating: item.rating !== undefined && item.rating !== null ? item.rating : 5,
-      };
-    });
-  }, [testimonials]);
+  const liveReviews = useReviews();
+  const siteData = useSiteData();
+  const siteTestimonials = (siteData?.content as any)?.[basePath]?.testimonials || (siteData?.content as any)?.[basePath]?.reviews || (siteData?.content as any)?.reviews;
+
+  const rawTestimonials = (testimonials && testimonials.length > 0)
+    ? testimonials
+    : (liveReviews && liveReviews.length > 0)
+      ? liveReviews
+      : (Array.isArray(siteTestimonials) && siteTestimonials.length > 0)
+        ? siteTestimonials
+        : DEFAULT_TESTIMONIALS;
+
+  const items: TestimonialSectionItem[] = useMemo(() => {
+    return rawTestimonials.map((t: any, index: number) => ({
+      id: t.id ?? index + 1,
+      author: t.author || t.name || t.customerName || 'Customer',
+      role: t.role || (t.verified !== false ? 'Verified Customer' : 'Customer'),
+      quote: t.quote || t.comment || t.feedback || t.body || '',
+      avatar: t.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(t.author || t.name || String(index))}`,
+      rating: typeof t.rating === 'number' ? t.rating : (parseInt(t.rating, 10) || 5),
+      tag: t.tag || 'Verified Buyer',
+    }));
+  }, [rawTestimonials]);
+
+  const effectiveHeading = heading ?? (siteData?.content as any)?.[basePath]?.heading ?? 'WHAT OUR CUSTOMERS ARE SAYING';
+  const effectiveSubheading = subheading ?? (siteData?.content as any)?.[basePath]?.subheading ?? 'Reflections and feedback from verified customers and dedicated regulars.';
 
   const hasCustomPy = /(^|\s)(p|py|pt)-/.test(className);
   const defaultPadding = hasCustomPy ? '' : 'py-6 sm:py-8';
@@ -281,3 +290,7 @@ export function EditableTestimonialSection({
     </section>
   );
 }
+
+
+// Canonical alias
+export const TestimonialSection = EditableTestimonialSection;

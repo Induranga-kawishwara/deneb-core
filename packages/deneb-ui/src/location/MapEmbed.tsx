@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { MapLink } from './MapLink';
+import { useShop, useSiteData } from '../SiteDataProvider';
 
 export interface MapEmbedProps {
   embedUrl?: string | null;
@@ -19,6 +20,7 @@ export interface MapEmbedProps {
 /**
  * Safe, responsive Google Maps Embed component with automatic fallback to MapLink
  * when an embed URL is not yet configured by the merchant.
+ * Automatically self-hydrates from live shop registration and site data when props are omitted.
  */
 export function MapEmbed({
   embedUrl,
@@ -32,6 +34,17 @@ export function MapEmbed({
   className = '',
   style,
 }: MapEmbedProps) {
+  const liveShop = useShop();
+  const siteData = useSiteData();
+  const contact = (siteData?.content as any)?.contact || (siteData?.content as any)?.common?.contact || {};
+  const merchant = (siteData as any)?.merchant || {};
+
+  const effectiveEmbedUrl = embedUrl ?? contact.mapEmbedUrl ?? merchant.mapEmbedUrl ?? '';
+  const effectiveMapUrl = (mapUrl || liveShop?.mapLocation || contact.googleMapLink || contact.mapLocation || merchant.mapLocation || '').trim();
+  const effectiveAddress = address ?? liveShop?.address ?? contact.address ?? contact.location ?? merchant.address ?? '';
+  const effectiveCity = city ?? liveShop?.city ?? contact.city ?? merchant.city ?? '';
+  const effectiveCountry = country ?? contact.country ?? merchant.country ?? '';
+
   const containerStyles: React.CSSProperties = {
     width: '100%',
     height: typeof height === 'number' ? `${height}px` : height,
@@ -46,7 +59,7 @@ export function MapEmbed({
     ...style,
   };
 
-  if (embedUrl && (embedUrl.startsWith('http://') || embedUrl.startsWith('https://'))) {
+  if (effectiveEmbedUrl && (effectiveEmbedUrl.startsWith('http://') || effectiveEmbedUrl.startsWith('https://'))) {
     return (
       <div
         className={`deneb-map-embed ${className}`.trim()}
@@ -54,7 +67,7 @@ export function MapEmbed({
       >
         <iframe
           data-preview-field-path={fieldPath}
-          src={embedUrl}
+          src={effectiveEmbedUrl}
           title={title}
           width="100%"
           height="100%"
@@ -81,13 +94,13 @@ export function MapEmbed({
           </svg>
         </div>
         <p data-preview-static="map-placeholder-title" style={{ margin: '0 0 0.75rem 0', fontWeight: 500, color: 'var(--color-text, #0f172a)' }}>
-          {address ? `${address}${city ? `, ${city}` : ''}` : 'Location Map'}
+          {effectiveAddress ? `${effectiveAddress}${effectiveCity ? `, ${effectiveCity}` : ''}` : 'Location Map'}
         </p>
         <MapLink
-          mapUrl={mapUrl}
-          address={address}
-          city={city}
-          country={country}
+          mapUrl={effectiveMapUrl}
+          address={effectiveAddress}
+          city={effectiveCity}
+          country={effectiveCountry}
           label="Open in Google Maps ↗"
           variant="primary"
           size="sm"

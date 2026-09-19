@@ -341,6 +341,8 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
       setSiteData((current) => {
         const currentContent = isRecord(current.content) ? current.content : {};
         const currentHome = isRecord(currentContent.home) ? currentContent.home : null;
+        const currentCommon = isRecord(currentContent.common) ? currentContent.common : {};
+        const currentContact = isRecord(currentContent.contact) ? currentContent.contact : {};
 
         const nextProducts = Array.isArray(live.products)
           ? live.products
@@ -348,25 +350,116 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
         const nextServices = Array.isArray(live.services)
           ? live.services
           : currentContent.services;
+        const nextReviews = Array.isArray(live.reviews)
+          ? live.reviews
+          : null;
+
+        // Shop / Merchant profile live synchronization
+        let nextShop = isRecord(current.shop) ? { ...current.shop } : {};
+        let nextMerchant = isRecord(current.merchant) ? { ...current.merchant } : {};
+        let nextCommon = { ...currentCommon };
+        let nextContact = { ...currentContact };
+        let nextHome = currentHome ? { ...currentHome } : {};
+
+        if (isRecord(live.shop)) {
+          nextShop = mergeSiteData(nextShop, live.shop) as GenericRecord;
+          nextMerchant = mergeSiteData(nextMerchant, live.shop) as GenericRecord;
+
+          const contact = isRecord(live.shop.contact) ? live.shop.contact : null;
+          const address = isRecord(live.shop.address) ? live.shop.address : null;
+
+          if (contact) {
+            if (typeof contact.phone === 'string' && contact.phone.trim()) {
+              nextContact.phone = contact.phone;
+              nextContact.contactNumber = contact.phone;
+              nextCommon.contactNumber = contact.phone;
+            }
+            if (typeof contact.whatsapp === 'string' && contact.whatsapp.trim()) {
+              nextContact.whatsapp = contact.whatsapp;
+              nextCommon.whatsapp = contact.whatsapp;
+              const cleanWa = contact.whatsapp.replace(/\D/g, '');
+              if (cleanWa) {
+                nextContact.whatsappNumber = cleanWa;
+                nextCommon.whatsappNumber = cleanWa;
+
+                // Dynamically update any hardcoded or static wa.me URLs across home
+                const waRegex = /(https?:\/\/(?:wa\.me|api\.whatsapp\.com\/send\?phone=))\d+/gi;
+                for (const key of ['whatsappCtaUrl', 'whatsappOrderUrl', 'whatsappUrl']) {
+                  if (typeof nextHome[key] === 'string' && waRegex.test(nextHome[key])) {
+                    nextHome[key] = nextHome[key].replace(waRegex, `$1${cleanWa}`);
+                  }
+                }
+              }
+            }
+            if (typeof contact.email === 'string' && contact.email.trim()) {
+              nextContact.email = contact.email;
+              nextCommon.email = contact.email;
+            }
+          }
+
+          if (address) {
+            const street = address.street || address.line1;
+            if (typeof street === 'string' && street.trim()) {
+              nextContact.address = street;
+              nextCommon.address = street;
+            }
+            if (typeof address.mapLocation === 'string' && address.mapLocation.trim()) {
+              nextContact.googleMapLink = address.mapLocation;
+              nextContact.mapLocation = address.mapLocation;
+              nextContact.mapUrl = address.mapLocation;
+            }
+          }
+
+          if (live.shop.openingHours) {
+            nextContact.hours = live.shop.openingHours;
+            nextContact.openingHours = live.shop.openingHours;
+            nextCommon.openingHours = live.shop.openingHours;
+            nextHome.businessHours = live.shop.openingHours;
+          }
+
+          if (typeof live.shop.businessName === 'string' && live.shop.businessName.trim()) {
+            nextCommon.websiteTitle = live.shop.businessName;
+          }
+
+          if (typeof live.shop.logoUrl === 'string' && live.shop.logoUrl.trim()) {
+            nextCommon.logoUrl = live.shop.logoUrl;
+          }
+        }
+
+        // Reviews / Testimonials live synchronization
+        if (nextReviews) {
+          nextHome.reviews = nextReviews;
+          nextHome.testimonials = nextReviews;
+          nextHome.feedbacks = nextReviews;
+        }
 
         return {
           ...current,
+          shop: nextShop,
+          merchant: nextMerchant,
+          reviews: nextReviews ?? (current as any).reviews,
           content: {
             ...currentContent,
+            common: nextCommon,
+            contact: nextContact,
             ...(nextProducts !== undefined ? { products: nextProducts } : {}),
             ...(nextServices !== undefined ? { services: nextServices } : {}),
-            ...(currentHome
+            ...(nextReviews !== null ? { reviews: nextReviews, testimonials: nextReviews, feedbacks: nextReviews } : {}),
+            ...(currentHome || Object.keys(nextHome).length > 0
               ? {
                   home: {
-                    ...currentHome,
-                    ...(nextProducts !== undefined && 'products' in currentHome
+                    ...nextHome,
+                    ...(nextProducts !== undefined && 'products' in (currentHome || {})
                       ? { products: nextProducts }
                       : {}),
-                    ...(nextServices !== undefined && 'services' in currentHome
+                    ...(nextServices !== undefined && 'services' in (currentHome || {})
                       ? { services: nextServices }
                       : {}),
-                    ...(nextProducts !== undefined && 'featuredProducts' in currentHome
+                    ...(nextProducts !== undefined && 'featuredProducts' in (currentHome || {})
                       ? { featuredProducts: nextProducts }
+                      : {}),
+                    ...(nextServices !== undefined && 'featuredServices' in (currentHome || {})
+                      ? { featuredServices: nextServices }
                       : {}),
                   },
                 }
@@ -757,4 +850,51 @@ export function useSiteCatalog() {
     siteInstance: siteData?.siteInstance ?? null,
     api: siteData?.api ?? null,
   };
+}
+
+
+/**
+ * Hook to retrieve shop profile cleanly from SiteData, supporting both
+ * top-level siteData.shop and siteData.merchant.
+ */
+export function useShop(fallback: GenericRecord = {}): GenericRecord {
+  const siteData = useSiteData();
+  if (isRecord(siteData?.shop)) return siteData.shop;
+  if (isRecord(siteData?.merchant)) return siteData.merchant;
+  return fallback;
+}
+
+/**
+ * Hook to retrieve customer reviews / testimonials cleanly from SiteData.
+ */
+export function useReviews(fallback: GenericRecord[] = []): GenericRecord[] {
+  const siteData = useSiteData();
+  const content = isRecord(siteData?.content) ? siteData.content : null;
+  if (content) {
+    if (Array.isArray(content.reviews) && content.reviews.length > 0) {
+      return content.reviews as GenericRecord[];
+    }
+    if (Array.isArray(content.testimonials) && content.testimonials.length > 0) {
+      return content.testimonials as GenericRecord[];
+    }
+    if (Array.isArray(content.customerReviews) && content.customerReviews.length > 0) {
+      return content.customerReviews as GenericRecord[];
+    }
+    const home = isRecord(content.home) ? content.home : null;
+    if (home) {
+      if (Array.isArray(home.reviews) && home.reviews.length > 0) {
+        return home.reviews as GenericRecord[];
+      }
+      if (Array.isArray(home.testimonials) && home.testimonials.length > 0) {
+        return home.testimonials as GenericRecord[];
+      }
+      if (Array.isArray(home.feedbacks) && home.feedbacks.length > 0) {
+        return home.feedbacks as GenericRecord[];
+      }
+    }
+  }
+  if (Array.isArray((siteData as any)?.reviews) && (siteData as any).reviews.length > 0) {
+    return (siteData as any).reviews as GenericRecord[];
+  }
+  return fallback;
 }

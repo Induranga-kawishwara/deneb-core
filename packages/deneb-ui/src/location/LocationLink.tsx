@@ -3,6 +3,7 @@
 import React from 'react';
 import { Address } from './Address';
 import { MapLink } from './MapLink';
+import { useShop, useSiteData } from '../SiteDataProvider';
 
 export interface LocationLinkProps {
   address?: string | null;
@@ -20,6 +21,7 @@ export interface LocationLinkProps {
 
 /**
  * Combines physical address with an interactive "Get Directions" action.
+ * Automatically self-hydrates from live shop registration and site data when props are omitted.
  */
 export function LocationLink({
   address,
@@ -34,7 +36,17 @@ export function LocationLink({
   className = '',
   style,
 }: LocationLinkProps) {
-  if (!address && !city && !country && !mapUrl) {
+  const liveShop = useShop();
+  const siteData = useSiteData();
+  const contact = (siteData?.content as any)?.contact || (siteData?.content as any)?.common?.contact || {};
+  const merchant = (siteData as any)?.merchant || {};
+
+  const effectiveAddress = address ?? liveShop?.address ?? contact.address ?? contact.location ?? merchant.address ?? '';
+  const effectiveCity = city ?? liveShop?.city ?? contact.city ?? merchant.city ?? '';
+  const effectiveCountry = country ?? contact.country ?? merchant.country ?? '';
+  const effectiveMapUrl = (mapUrl || liveShop?.mapLocation || contact.googleMapLink || contact.mapLocation || merchant.mapLocation || '').trim();
+
+  if (!effectiveAddress && !effectiveCity && !effectiveCountry && !effectiveMapUrl) {
     return null;
   }
 
@@ -50,18 +62,18 @@ export function LocationLink({
     <div className={`deneb-location-link ${className}`.trim()} style={containerStyles}>
       {showAddress && (
         <Address
-          address={address}
-          city={city}
-          country={country}
+          address={effectiveAddress}
+          city={effectiveCity}
+          country={effectiveCountry}
           fieldPath={fieldPath}
           addressFieldPath={addressFieldPath}
         />
       )}
       <MapLink
-        mapUrl={mapUrl}
-        address={address}
-        city={city}
-        country={country}
+        mapUrl={effectiveMapUrl}
+        address={effectiveAddress}
+        city={effectiveCity}
+        country={effectiveCountry}
         label={directionsLabel}
         fieldPath={mapUrlFieldPath}
         variant="outline"

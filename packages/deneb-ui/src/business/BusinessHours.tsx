@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { useShop, useSiteData } from '../SiteDataProvider';
 
 export interface DaySchedule {
   open?: string | null;
@@ -30,10 +31,19 @@ const DAYS_OF_WEEK = [
   'sunday',
 ];
 
+const DEFAULT_HOURS: WeeklyHours = {
+  monday: { open: '09:00', close: '18:00', closed: false },
+  tuesday: { open: '09:00', close: '18:00', closed: false },
+  wednesday: { open: '09:00', close: '18:00', closed: false },
+  thursday: { open: '09:00', close: '18:00', closed: false },
+  friday: { open: '09:00', close: '18:00', closed: false },
+  saturday: { open: '10:00', close: '16:00', closed: false },
+  sunday: { closed: true },
+};
+
 function formatTime(timeStr?: string | null): string {
   if (!timeStr) return '';
   const clean = timeStr.trim();
-  // If already contains AM/PM
   if (/am|pm/i.test(clean)) return clean;
 
   const [hourStr, minStr = '00'] = clean.split(':');
@@ -47,6 +57,7 @@ function formatTime(timeStr?: string | null): string {
 
 /**
  * BusinessHours component displaying weekly operating schedule with live Open/Closed status.
+ * Automatically self-hydrates from live shop registration and site data when props are omitted.
  */
 export function BusinessHours({
   hours,
@@ -57,13 +68,27 @@ export function BusinessHours({
   className = '',
   style,
 }: BusinessHoursProps) {
-  // Determine current day and status
+  const liveShop = useShop();
+  const siteData = useSiteData();
+  const contact = (siteData?.content as any)?.contact || (siteData?.content as any)?.common?.contact || {};
+  const common = (siteData?.content as any)?.common || {};
+  const merchant = (siteData as any)?.merchant || {};
+
+  const effectiveHours: WeeklyHours =
+    hours ||
+    liveShop?.openingHours ||
+    contact.hours ||
+    contact.openingHours ||
+    common.openingHours ||
+    merchant.openingHours ||
+    DEFAULT_HOURS;
+
   const currentStatus = useMemo(() => {
-    if (!hours) return null;
+    if (!effectiveHours) return null;
     const now = new Date();
-    const dayIndex = (now.getDay() + 6) % 7; // Convert 0(Sun)-6(Sat) to 0(Mon)-6(Sun)
+    const dayIndex = (now.getDay() + 6) % 7;
     const todayName = DAYS_OF_WEEK[dayIndex];
-    const todaySched = hours[todayName];
+    const todaySched = effectiveHours[todayName];
 
     if (!todaySched) return { todayName, isOpen: false };
 
@@ -84,9 +109,7 @@ export function BusinessHours({
 
     const isOpen = currentMinutes >= openMinutes && currentMinutes < closeMinutes;
     return { todayName, isOpen };
-  }, [hours]);
-
-  if (!hours) return null;
+  }, [effectiveHours]);
 
   const containerStyles: React.CSSProperties = {
     padding: compact ? '1rem' : '1.5rem',
@@ -135,7 +158,7 @@ export function BusinessHours({
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? '0.35rem' : '0.5rem' }}>
         {DAYS_OF_WEEK.map((day) => {
-          const sched = hours[day];
+          const sched = effectiveHours[day];
           const isToday = currentStatus?.todayName === day;
           const dayLabel = day.charAt(0).toUpperCase() + day.slice(1);
 
