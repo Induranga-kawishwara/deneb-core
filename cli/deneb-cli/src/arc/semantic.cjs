@@ -1,5 +1,5 @@
-'use strict';
-
+const fs = require('fs');
+const path = require('path');
 const recast = require('recast');
 const {
   parseSource,
@@ -9,6 +9,7 @@ const {
   hasJsxAttribute,
   collectJsxText,
   findJsxAttribute,
+  unwrapExpr,
 } = require('./ast.cjs');
 const {
   activeAdapters,
@@ -28,6 +29,7 @@ const {
   DECORATIVE_TAGS,
 } = require('./adapters.cjs');
 const { shortHash } = require('./fs-utils.cjs');
+const { resolveImportSpecifier } = require('./scanner.cjs');
 const { BROAD_CONTENT_CONTAINERS } = require('./fivora-contract.cjs');
 
 const TECHNICAL_TEXT_RE = /^(true|false|null|undefined|px|rem|em|auto|hidden|flex|grid|sr-only)$/i;
@@ -48,6 +50,26 @@ const USER_FACING_PROP_NAMES = new Set([
   'summary',
 ]);
 
+const importedDataCache = new Map();
+
+function resolveImportedBinding(specifier, identifierName, currentFileAbs, profile) {
+  if (!specifier || !profile?.root || !currentFileAbs) return null;
+  const resolved = resolveImportSpecifier(profile, currentFileAbs, specifier);
+  if (!resolved || !fs.existsSync(resolved)) return null;
+  if (importedDataCache.has(resolved)) {
+    return importedDataCache.get(resolved).get(identifierName) || null;
+  }
+  try {
+    const src = fs.readFileSync(resolved, 'utf8');
+    const importedAst = parseSource(src, resolved);
+    const importedBindings = collectStringBindings(importedAst);
+    importedDataCache.set(resolved, importedBindings);
+    return importedBindings.get(identifierName) || null;
+  } catch {
+    return null;
+  }
+}
+
 function fingerprintCandidate(features) {
   return shortHash(JSON.stringify(features));
 }
@@ -56,9 +78,10 @@ function normalizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
-function isStaticSkipText(text) {
+function isStaticSkipText(text, isLogoContext = false) {
   const value = normalizeText(text);
-  if (!value || value.length < 2) return true;
+  if (!value) return true;
+  if (value.length < 2 && !isLogoContext) return true;
   if (TECHNICAL_TEXT_RE.test(value)) return true;
   if (/^[{}`\\]/.test(value)) return true;
   if (/^https?:\/\/(localhost|127\.0\.0\.1)/i.test(value)) return true;
@@ -364,6 +387,7 @@ function collectItemFieldUsage(callback, itemParam) {
   }
 
   let usesItemAsComponent = false;
+  let usesDirectItem = false;
   const componentProps = new Set();
   recast.types.visit(callback, {
     visitJSXOpeningElement(pathNode) {
@@ -378,6 +402,11 @@ function collectItemFieldUsage(callback, itemParam) {
       this.traverse(pathNode);
     },
     visitJSXExpressionContainer(pathNode) {
+      const rawExpr = pathNode.node.expression;
+      const unwrapped = unwrapTypeCasts(rawExpr);
+      if (unwrapped && (unwrapped.type === 'Identifier' || unwrapped.type === 'JSXIdentifier') && unwrapped.name === itemParam) {
+        usesDirectItem = true;
+      }
       const properties = findItemMemberProperties(pathNode.node.expression);
       for (const property of properties) {
         if (componentProps.has(property)) continue;
@@ -399,7 +428,7 @@ function collectItemFieldUsage(callback, itemParam) {
     },
   });
 
-  return { usage, usesItemAsComponent };
+  return { usage, usesItemAsComponent, usesDirectItem };
 }
 
 function classNameOf(node) {
@@ -499,7 +528,14 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
       const mapInfo = inMapCallback(pathNode);
       let apiOwned = false;
       if (mapInfo && mapInfo.objectName) {
-        const binding = bindings.get(mapInfo.objectName);
+        let binding = bindings.get(mapInfo.objectName);
+        if (!binding && imports[mapInfo.objectName]) {
+          const currentFileAbs = profile?.root ? path.join(profile.root, relativeFile) : null;
+          binding = resolveImportedBinding(imports[mapInfo.objectName], mapInfo.objectName, currentFileAbs, profile);
+          if (binding) {
+            bindings.set(mapInfo.objectName, binding);
+          }
+        }
         if (!binding || binding.kind !== 'array') apiOwned = true;
       }
 
@@ -528,11 +564,24 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
       const parents = parentNames(pathNode);
       const actionNode = resolveActionWithAdapters(node, adapters) || (ACTION_TAGS.has(name) ? node : null);
 
+      const isHeaderNav =
+        parents.some((p) => /header|nav|navbar/i.test(p)) ||
+        /header|nav|navbar/i.test(name) ||
+        /header|nav/i.test(relativeFile) ||
+        componentMeta?.role === 'navigation';
+      const ariaLabel = getJsxAttributeLiteral(node, 'aria-label') || '';
+      const isExplicitLogo = /\b(site-logo|brand-logo|nav-logo|header-logo|monogram)\b/i.test(className);
+      const isLogoContext =
+        isExplicitLogo ||
+        (isHeaderNav && /\blogo\b/i.test(className)) ||
+        (isHeaderNav && /\b(logo|home)\b/i.test(ariaLabel)) ||
+        (isHeaderNav && (href === '/' || href === ''));
+
       const baseMeta = {
         loc,
         tag: name,
         file: relativeFile,
-        ownerScope,
+        ownerScope: (isLogoContext && isHeaderNav) ? 'common' : ownerScope,
         componentName: componentMeta?.name,
         role: componentMeta?.role,
         className,
@@ -542,6 +591,43 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
         apiOwned,
         fromBinding: textInfo.fromBinding,
       };
+
+      if (isLogoContext) {
+        if ((IMAGE_TAGS.has(name) || recognition?.kind === 'image') && src && !src.startsWith('{')) {
+          usedLocs.add(loc);
+          candidates.push({
+            ...baseMeta,
+            kind: 'image',
+            operation: 'extract-image',
+            value: src,
+            extra: { alt: alt || 'Logo', isBrandLogo: true },
+            confidence: 0.98,
+            reason: 'brand-logo-image',
+            fingerprint: fingerprintCandidate({ tag: name, kind: 'logo-image' }),
+          });
+          this.traverse(pathNode);
+          return;
+        }
+
+        if (name === 'Link' || name === 'a' || name === 'span') {
+          const logoText = textInfo.text || collectJsxText(node);
+          if (logoText && !isStaticSkipText(logoText, true)) {
+            usedLocs.add(loc);
+            candidates.push({
+              ...baseMeta,
+              kind: 'text',
+              operation: 'extract-text',
+              value: logoText,
+              extra: { tag: name, isBrandLogo: true },
+              confidence: 0.98,
+              reason: 'brand-logo-text',
+              fingerprint: fingerprintCandidate({ tag: name, kind: 'logo-text', text: logoText }),
+            });
+            this.traverse(pathNode);
+            return;
+          }
+        }
+      }
 
       if ((IMAGE_TAGS.has(name) || recognition?.kind === 'image') && src && !src.startsWith('{')) {
         usedLocs.add(loc);
@@ -787,13 +873,15 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
         bindings.get(mapInfo.objectName)?.kind === 'array'
       ) {
         const arr = bindings.get(mapInfo.objectName);
-        const { usage: itemUsage, usesItemAsComponent } = collectItemFieldUsage(mapInfo.callback, mapInfo.itemParam);
+        const { usage: itemUsage, usesItemAsComponent, usesDirectItem } = collectItemFieldUsage(mapInfo.callback, mapInfo.itemParam);
         const objectItems = arr.items.every((item) => item.type === 'object');
+        const stringItems = arr.items.every((item) => item.type === 'string');
         const boundProperties = [...itemUsage.keys()];
         const convertible =
-          objectItems &&
-          boundProperties.length > 0 &&
-          arr.items.some((item) => boundProperties.some((key) => key in item.value));
+          (objectItems &&
+            boundProperties.length > 0 &&
+            arr.items.some((item) => boundProperties.some((key) => key in item.value))) ||
+          (stringItems && usesDirectItem);
 
         candidates.push({
           ...baseMeta,
@@ -802,10 +890,11 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
           value: arr.items,
           extra: {
             staticCollection: true,
+            isPrimitiveArray: stringItems && usesDirectItem,
             binding: mapInfo.objectName,
             itemParam: mapInfo.itemParam,
             indexParam: mapInfo.indexParam,
-            itemFields: [...itemUsage.entries()].map(([key, role]) => ({ key, role })),
+            itemFields: stringItems ? [] : [...itemUsage.entries()].map(([key, role]) => ({ key, role })),
             objectItems,
             hasComponentRef: usesItemAsComponent,
           },
@@ -817,7 +906,7 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
           reason: usesItemAsComponent
             ? 'collection-holds-component-ref'
             : convertible
-              ? 'static-array-map'
+              ? (stringItems ? 'static-primitive-array-map' : 'static-array-map')
               : 'collection-shape-partial',
           fingerprint: fingerprintCandidate({ tag: name, kind: 'collection', size: arr.items.length }),
         });

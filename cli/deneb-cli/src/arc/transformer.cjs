@@ -19,6 +19,8 @@ const {
   jsxPreviewAttr,
   jsxTemplatePathAttr,
   wrapTextInEditableSpan,
+  unwrapExpr,
+  extractItemMemberName,
   jsxStyleAttrs,
   ensureStyleAttrs,
   b,
@@ -409,7 +411,11 @@ function applyCollectionTransform(ast, transform, isClient = false, isTypeScript
     );
   }
 
-  markItemFields(callback, { listPath, binding, indexName });
+  if (transform.isPrimitiveArray) {
+    markPrimitiveItemFields(callback, { listPath, binding, indexName });
+  } else {
+    markItemFields(callback, { listPath, binding, indexName });
+  }
   markComponentRefItemsStatic(callback, binding);
 
   const container = findListContainer(mapCall);
@@ -547,9 +553,66 @@ function markComponentRefItemsStatic(callback, binding) {
 }
 
 function itemMemberName(expr, binding) {
-  if (!expr || expr.type !== 'MemberExpression' || expr.computed) return null;
-  if (expr.object?.type !== 'Identifier' || expr.object.name !== binding) return null;
-  return expr.property?.name || null;
+  return extractItemMemberName(expr, binding);
+}
+
+function isDirectItemExpr(expr, binding) {
+  if (!expr) return false;
+  const unwrapped = unwrapExpr(expr);
+  return Boolean(
+    unwrapped &&
+      (unwrapped.type === 'Identifier' || unwrapped.type === 'JSXIdentifier') &&
+      unwrapped.name === binding
+  );
+}
+
+function markPrimitiveItemFields(callback, { listPath, binding, indexName }) {
+  recast.types.visit(callback, {
+    visitJSXElement(pathNode) {
+      const node = pathNode.node;
+      const textChild = (node.children || []).find(
+        (child) => child.type === 'JSXExpressionContainer' && isDirectItemExpr(child.expression, binding)
+      );
+      if (textChild && !hasJsxAttribute(node, 'data-preview-field-path')) {
+        const tagName = getJsxName(node);
+        if (
+          node.children.length === 1 &&
+          (tagName === 'span' || tagName === 'p' || tagName === 'li') &&
+          !hasJsxAttribute(node, 'data-preview-item-path')
+        ) {
+          node.openingElement.attributes.push(
+            jsxTemplatePathAttr('data-preview-field-path', listPath, indexName, '')
+          );
+        } else {
+          wrapPrimitiveItemFieldInSpan(node, textChild, listPath, indexName);
+        }
+      }
+      this.traverse(pathNode);
+    },
+  });
+}
+
+function wrapPrimitiveItemFieldInSpan(node, textChild, listPath, indexName) {
+  const nextChildren = [];
+  for (const child of node.children || []) {
+    if (child === textChild) {
+      nextChildren.push(
+        b.jsxElement(
+          b.jsxOpeningElement(
+            b.jsxIdentifier('span'),
+            [jsxTemplatePathAttr('data-preview-field-path', listPath, indexName, '')],
+            false
+          ),
+          b.jsxClosingElement(b.jsxIdentifier('span')),
+          [child],
+          false
+        )
+      );
+    } else {
+      nextChildren.push(child);
+    }
+  }
+  node.children = nextChildren;
 }
 
 /** The nearest JSX element that wraps the map expression. */
@@ -653,6 +716,61 @@ function bindArrayDeclaration(ast, mapCallPath, listPath, isClient = false, merg
       return false;
     },
   });
+
+  if (!bound) {
+    recast.types.visit(ast, {
+      visitImportDeclaration(pathNode) {
+        if (bound) return false;
+        const node = pathNode.node;
+        const spec = (node.specifiers || []).find(
+          (s) => (s.local?.name || s.imported?.name) === arrayName
+        );
+        if (!spec) {
+          this.traverse(pathNode);
+          return;
+        }
+
+        const defaultName = 'DEFAULT_' + arrayName;
+        if (spec.type === 'ImportSpecifier') {
+          spec.local = b.identifier(defaultName);
+        } else if (spec.type === 'ImportDefaultSpecifier') {
+          spec.local = b.identifier(defaultName);
+        }
+
+        const fnPath = findEnclosingFunction(mapCallPath);
+        if (fnPath && fnPath.node.body?.type === 'BlockStatement') {
+          const body = fnPath.node.body.body;
+          const already = body.some(
+            (stmt) =>
+              recast.print(stmt).code.includes(`const ${arrayName} =`) ||
+              recast.print(stmt).code.includes(`const ${arrayName}:`)
+          );
+          if (!already) {
+            const localId = b.identifier(arrayName);
+            if (isTypeScript) {
+              localId.typeAnnotation = b.tsTypeAnnotation(b.tsArrayType(b.tsAnyKeyword()));
+            }
+            const localDecl = b.variableDeclaration('const', [
+              b.variableDeclarator(
+                localId,
+                mergeDefaultRefs
+                  ? mergeDefaultItemRefsBinding(listPath.split('.'), defaultName)
+                  : siteDataListBinding(listPath.split('.'), b.identifier(defaultName))
+              ),
+            ]);
+            const hookIdx = body.findIndex((stmt) => recast.print(stmt).code.includes('useSiteData'));
+            if (hookIdx >= 0) {
+              body.splice(hookIdx + 1, 0, localDecl);
+            } else {
+              body.unshift(localDecl);
+            }
+          }
+        }
+        bound = true;
+        return false;
+      },
+    });
+  }
 
   return bound;
 }
@@ -930,6 +1048,8 @@ function applyFilePlan(filePlan, profile) {
   healEmptyStateConditionals(ast);
   healHiddenPreviewMarkers(ast);
   healLegacyProductDetailLinks(ast);
+  healSectionOverflowHidden(ast);
+  healDecorativeOverlays(ast);
 
   // Page keys are stamped in a separate route-driven pass so App Router and
   // Pages Router projects are handled by the same logic.
@@ -1431,8 +1551,9 @@ function sanitizeContradictoryMarkersInSource(code, relativeFile) {
   const healedEmpty = healEmptyStateConditionals(ast);
   const healedHidden = healHiddenPreviewMarkers(ast);
   const healedOverflow = healSectionOverflowHidden(ast);
-  if (cleaned === 0 && healedBroad === 0 && healedEmpty === 0 && healedHidden === 0 && healedOverflow === 0) return { code, updated: false };
-  return { code: printSource(ast, code), updated: true, count: cleaned + healedBroad + healedEmpty + healedHidden + healedOverflow };
+  const healedOverlay = healDecorativeOverlays(ast);
+  if (cleaned === 0 && healedBroad === 0 && healedEmpty === 0 && healedHidden === 0 && healedOverflow === 0 && healedOverlay === 0) return { code, updated: false };
+  return { code: printSource(ast, code), updated: true, count: cleaned + healedBroad + healedEmpty + healedHidden + healedOverflow + healedOverlay };
 }
 
 function healBroadContainerMarkers(ast) {
@@ -1724,6 +1845,71 @@ function healSectionOverflowHidden(ast) {
   return healed;
 }
 
+function healDecorativeOverlays(ast) {
+  let healed = 0;
+  recast.types.visit(ast, {
+    visitJSXElement(pathNode) {
+      const node = pathNode.node;
+      const tag = getJsxName(node);
+      const lower = String(tag || '').toLowerCase();
+      if (lower !== 'div' && lower !== 'span') {
+        this.traverse(pathNode);
+        return;
+      }
+      const hasRealChildren = (node.children || []).some(
+        (c) => c.type === 'JSXElement' || (c.type === 'JSXText' && c.value.trim().length > 0)
+      );
+      if (hasRealChildren) {
+        this.traverse(pathNode);
+        return;
+      }
+      const classAttr = (node.openingElement.attributes || []).find(
+        (a) => a.type === 'JSXAttribute' && a.name && (a.name.name === 'className' || a.name.name === 'class')
+      );
+      if (!classAttr || !classAttr.value) {
+        this.traverse(pathNode);
+        return;
+      }
+      let modified = false;
+      const overlayPattern = /\b(?:bg-gradient-|bg-black\/|bg-white\/|bg-slate-\d+\/|backdrop-blur)/;
+      const isAbsolute = /\babsolute\b/;
+      const hasPointerEvents = /\bpointer-events-(?:none|auto)\b/;
+
+      if (classAttr.value.type === 'StringLiteral' || classAttr.value.type === 'Literal') {
+        const val = String(classAttr.value.value || '');
+        if (isAbsolute.test(val) && overlayPattern.test(val) && !hasPointerEvents.test(val)) {
+          classAttr.value.value = `${val} pointer-events-none`;
+          modified = true;
+        }
+      } else if (classAttr.value.type === 'JSXExpressionContainer') {
+        const expr = classAttr.value.expression;
+        if (expr && (expr.type === 'StringLiteral' || expr.type === 'Literal')) {
+          const val = String(expr.value || '');
+          if (isAbsolute.test(val) && overlayPattern.test(val) && !hasPointerEvents.test(val)) {
+            expr.value = `${val} pointer-events-none`;
+            modified = true;
+          }
+        } else if (expr && expr.type === 'TemplateLiteral') {
+          const fullText = (expr.quasis || []).map((q) => q.value?.raw || '').join(' ');
+          if (isAbsolute.test(fullText) && overlayPattern.test(fullText) && !hasPointerEvents.test(fullText)) {
+            const lastQuasi = expr.quasis[expr.quasis.length - 1];
+            if (lastQuasi && lastQuasi.value) {
+              lastQuasi.value.raw = `${lastQuasi.value.raw} pointer-events-none`;
+              if (lastQuasi.value.cooked) {
+                lastQuasi.value.cooked = `${lastQuasi.value.cooked} pointer-events-none`;
+              }
+              modified = true;
+            }
+          }
+        }
+      }
+      if (modified) healed++;
+      this.traverse(pathNode);
+    },
+  });
+  return healed;
+}
+
 function healMissingSiteDataHooks(code, filePath = 'file.tsx') {
   if (!code.includes('siteData')) return code;
   try {
@@ -1753,6 +1939,7 @@ module.exports = {
   healEmptyStateConditionals,
   healHiddenPreviewMarkers,
   healSectionOverflowHidden,
+  healDecorativeOverlays,
   healLegacyProductDetailLinks,
   healMissingSiteDataHooks,
   injectSiteDataHook,

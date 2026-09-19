@@ -95,11 +95,12 @@ function inMapCallback(pathNode) {
   return false;
 }
 
-function isMeaningfulVisibleText(text) {
+function isMeaningfulVisibleText(text, isLogoOrList = false) {
   const value = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!value || value.length < 2) return false;
+  if (!value) return false;
+  if (value.length < 2 && !isLogoOrList) return false;
   if (!/\p{L}/u.test(value)) return false;
-  if (isStaticSkipText(value)) return false;
+  if (isStaticSkipText(value, isLogoOrList)) return false;
   if (CHROME_TEXT_RE.test(value)) return false;
   return true;
 }
@@ -126,8 +127,16 @@ function classifyResidual(node, text, tag) {
   if (IMAGE_TAGS.has(tag) && attrLiteral(node, 'src')) {
     return { bind: true, kind: 'image', value: attrLiteral(node, 'src') };
   }
-  if (isMeaningfulVisibleText(text)) {
-    return { bind: true, kind: 'text', value: text };
+  const isExplicitLogo = /\b(site-logo|brand-logo|nav-logo|header-logo|monogram)\b/i.test(className);
+  const ariaLabel = attrLiteral(node, 'aria-label');
+  const isLogoContext =
+    isExplicitLogo ||
+    ((tag === 'a' || tag === 'Link' || tag === 'span') &&
+      (attrLiteral(node, 'href') === '/' || /\b(logo|home)\b/i.test(ariaLabel)));
+  const isListContext = tag === 'li' || /list-item|bullet/i.test(className);
+
+  if (isMeaningfulVisibleText(text, isLogoContext || isListContext)) {
+    return { bind: true, kind: 'text', value: text, isBrandLogo: isLogoContext };
   }
   if (text && text.trim()) {
     return { bind: false, reason: 'decorative-copy' };
@@ -298,7 +307,8 @@ function applyResidualPass({ code, file, ownerScope, usedPaths, componentName, r
         applied++;
       }
 
-      if (decision && decision.bind && decision.kind === 'text' && isMeaningfulVisibleText(text)) {
+      if (decision && decision.bind && decision.kind === 'text') {
+        const isLogoText = Boolean(decision.isBrandLogo);
         const section = inferSection({
           componentName,
           fileName: file,
@@ -307,9 +317,9 @@ function applyResidualPass({ code, file, ownerScope, usedPaths, componentName, r
           role,
         });
         const field = buildFieldPath({
-          scope: ownerScope || 'home',
+          scope: (isLogoText && (role === 'navigation' || /header|footer|nav/i.test(file))) ? 'common' : (ownerScope || 'home'),
           section,
-          field: inferFieldName('text', tag, text, { tag }),
+          field: inferFieldName('text', tag, text, { tag, isBrandLogo: isLogoText }),
           used,
         });
         const fieldType = classifyFieldType('text', text);

@@ -240,6 +240,50 @@ function jsxTemplatePathAttr(attrName, prefix, indexName, suffix = '') {
   );
 }
 
+function unwrapExpr(node) {
+  let curr = node;
+  while (
+    curr &&
+    (curr.type === 'TSAsExpression' ||
+      curr.type === 'TSTypeAssertion' ||
+      curr.type === 'TypeCastExpression' ||
+      curr.type === 'TSNonNullExpression' ||
+      curr.type === 'ParenthesizedExpression')
+  ) {
+    curr = curr.expression;
+  }
+  return curr;
+}
+
+function extractItemMemberName(expr, binding) {
+  if (!expr) return null;
+  const unwrapped = unwrapExpr(expr);
+  if (!unwrapped) return null;
+
+  if (unwrapped.type === 'MemberExpression' && !unwrapped.computed) {
+    if (
+      (unwrapped.object?.type === 'Identifier' && unwrapped.object.name === binding) ||
+      (unwrapped.object?.type === 'JSXIdentifier' && unwrapped.object.name === binding)
+    ) {
+      return unwrapped.property?.name || null;
+    }
+  }
+
+  if (unwrapped.type === 'LogicalExpression' || unwrapped.type === 'BinaryExpression') {
+    return extractItemMemberName(unwrapped.left, binding) || extractItemMemberName(unwrapped.right, binding);
+  }
+
+  if (unwrapped.type === 'ConditionalExpression') {
+    return (
+      extractItemMemberName(unwrapped.consequent, binding) ||
+      extractItemMemberName(unwrapped.alternate, binding) ||
+      extractItemMemberName(unwrapped.test, binding)
+    );
+  }
+
+  return null;
+}
+
 function wrapTextInEditableSpan(fieldPath, fallback, fieldType) {
   return b.jsxElement(
     b.jsxOpeningElement(
@@ -489,6 +533,8 @@ module.exports = {
   jsxStaticAttr,
   jsxTemplatePathAttr,
   wrapTextInEditableSpan,
+  unwrapExpr,
+  extractItemMemberName,
   hasDirective,
   ensureImport,
   ensureDefaultImport,
