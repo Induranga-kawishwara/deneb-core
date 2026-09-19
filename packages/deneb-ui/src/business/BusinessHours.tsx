@@ -70,9 +70,10 @@ export function BusinessHours({
 }: BusinessHoursProps) {
   const liveShop = useShop();
   const siteData = useSiteData();
-  const contact = (siteData?.content as any)?.contact || (siteData?.content as any)?.common?.contact || {};
-  const common = (siteData?.content as any)?.common || {};
-  const merchant = (siteData as any)?.merchant || {};
+  const content = (siteData?.content && typeof siteData.content === 'object' ? siteData.content : {}) as Record<string, unknown>;
+  const common = (content.common && typeof content.common === 'object' ? content.common : {}) as Record<string, unknown>;
+  const contact = (content.contact && typeof content.contact === 'object' ? content.contact : (common.contact && typeof common.contact === 'object' ? common.contact : {})) as Record<string, unknown>;
+  const merchant = (siteData && 'merchant' in siteData && typeof (siteData as Record<string, unknown>).merchant === 'object' ? (siteData as Record<string, unknown>).merchant : {}) as Record<string, unknown>;
 
   const effectiveHours: WeeklyHours =
     hours ||

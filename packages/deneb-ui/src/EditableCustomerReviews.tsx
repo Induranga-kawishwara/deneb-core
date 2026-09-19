@@ -101,7 +101,8 @@ export function EditableCustomerReviews({
   const [selectedStarFilter, setSelectedStarFilter] = useState<number | null>(null);
   const liveReviews = useReviews();
   const siteData = useSiteData();
-  const siteReviews = (siteData?.content as any)?.[sectionPath]?.reviews || (siteData?.content as any)?.reviews || (siteData?.content as any)?.home?.reviews;
+  const contentRecord = (siteData?.content && typeof siteData.content === 'object' ? siteData.content : {}) as Record<string, Record<string, unknown>>;
+  const siteReviews = contentRecord[sectionPath]?.reviews || contentRecord.reviews || (contentRecord.home && typeof contentRecord.home === 'object' ? (contentRecord.home as Record<string, unknown>).reviews : undefined);
 
   const rawReviews = (reviews && reviews.length > 0)
     ? reviews
@@ -161,9 +162,7 @@ export function EditableCustomerReviews({
         <h2
           data-preview-field-path={`${sectionPath}.reviewsTitle`}
           className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight"
-        >
-          {title}
-        </h2>
+        >{resolvedTitle}</h2>
 
         {/* Aggregate Score Bar */}
         <div className="mt-4 flex items-center justify-center gap-3">

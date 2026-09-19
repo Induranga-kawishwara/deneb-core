@@ -53,17 +53,18 @@ export function LocationCard({
 }: LocationCardProps) {
   const liveShop = useShop();
   const siteData = useSiteData();
-  const contact = (siteData?.content as any)?.contact || (siteData?.content as any)?.common?.contact || {};
-  const common = (siteData?.content as any)?.common || {};
-  const merchant = (siteData as any)?.merchant || {};
+  const content = (siteData?.content && typeof siteData.content === 'object' ? siteData.content : {}) as Record<string, unknown>;
+  const common = (content.common && typeof content.common === 'object' ? content.common : {}) as Record<string, unknown>;
+  const contact = (content.contact && typeof content.contact === 'object' ? content.contact : (common.contact && typeof common.contact === 'object' ? common.contact : {})) as Record<string, unknown>;
+  const merchant = (siteData && 'merchant' in siteData && typeof (siteData as Record<string, unknown>).merchant === 'object' ? (siteData as Record<string, unknown>).merchant : {}) as Record<string, unknown>;
 
-  const effectiveAddress = address ?? liveShop?.address ?? contact.address ?? contact.location ?? merchant.address ?? '';
-  const effectiveCity = city ?? liveShop?.city ?? contact.city ?? merchant.city ?? '';
-  const effectiveState = state ?? '';
-  const effectiveCountry = country ?? contact.country ?? merchant.country ?? '';
-  const effectivePostalCode = postalCode ?? contact.postalCode ?? '';
-  const explicitUrl = (addressUrl || mapUrl || url || liveShop?.mapLocation || contact.googleMapLink || contact.mapLocation || merchant.mapLocation || merchant.googleMapLink || '').trim();
-  const effectiveName = name ?? liveShop?.name ?? common.websiteTitle ?? merchant.businessName ?? title ?? 'Our Location';
+  const effectiveAddress = (address ?? liveShop?.address ?? (typeof contact.address === 'string' ? contact.address : null) ?? (typeof contact.location === 'string' ? contact.location : null) ?? (typeof merchant.address === 'string' ? merchant.address : null) ?? '') as string;
+  const effectiveCity = (city ?? liveShop?.city ?? (typeof contact.city === 'string' ? contact.city : null) ?? (typeof merchant.city === 'string' ? merchant.city : null) ?? '') as string;
+  const effectiveState = (state ?? '') as string;
+  const effectiveCountry = (country ?? (typeof contact.country === 'string' ? contact.country : null) ?? (typeof merchant.country === 'string' ? merchant.country : null) ?? '') as string;
+  const effectivePostalCode = (postalCode ?? (typeof contact.postalCode === 'string' ? contact.postalCode : null) ?? '') as string;
+  const explicitUrl = (addressUrl || mapUrl || url || liveShop?.mapLocation || (typeof contact.googleMapLink === 'string' ? contact.googleMapLink : null) || (typeof contact.mapLocation === 'string' ? contact.mapLocation : null) || (typeof merchant.mapLocation === 'string' ? merchant.mapLocation : null) || (typeof merchant.googleMapLink === 'string' ? merchant.googleMapLink : null) || '').trim() as string;
+  const effectiveName = (name ?? liveShop?.name ?? (typeof common.websiteTitle === 'string' ? common.websiteTitle : null) ?? (typeof merchant.businessName === 'string' ? merchant.businessName : null) ?? title ?? 'Our Location') as string;
   const resolvedTitleFieldPath = nameFieldPath || titleFieldPath || (fieldPath ? `${fieldPath}.name` : 'contact.locationTitle');
 
   if (!effectiveAddress && !effectiveCity && !effectiveCountry && !explicitUrl && !effectiveName) {

@@ -357,9 +357,9 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
         // Shop / Merchant profile live synchronization
         let nextShop = isRecord(current.shop) ? { ...current.shop } : {};
         let nextMerchant = isRecord(current.merchant) ? { ...current.merchant } : {};
-        let nextCommon = { ...currentCommon };
-        let nextContact = { ...currentContact };
-        let nextHome = currentHome ? { ...currentHome } : {};
+        const nextCommon = { ...currentCommon };
+        const nextContact = { ...currentContact };
+        const nextHome = currentHome ? { ...currentHome } : {};
 
         if (isRecord(live.shop)) {
           nextShop = mergeSiteData(nextShop, live.shop) as GenericRecord;
