@@ -53,6 +53,99 @@ SELECTED PAGES
 4. Omit a CTA when its target page is unselected. If strict marker coverage requires a non-navigation fallback wrapper, keep the exact data-target-page on that wrapper so Fivora hides it completely. Never leave visible button-styled fallback text, href="#", or a disabled route control.
 5. Keep content genuinely consumed by a selected route. Home-page cards may remain editable even when their dedicated listing page is absent; hide only their controls that navigate to that page. When the page is selected, render those controls again.
 
+DENEB UI COMPONENTS — USE THESE, NEVER BUILD FROM SCRATCH
+Install:  npm install @deneb-ui/ui @deneb-ui/core
+Import:   import { ComponentName } from "@deneb-ui/ui";
+Docs:     https://deneb.fivora.site
+
+⚡ GOLDEN RULE — NEVER hardcode static store contact info, map URLs, or hours into JSX:
+  BAD:  <a href="https://wa.me/94771234567">WhatsApp</a>
+  BAD:  <a href="tel:+94771234567">Call Us</a>
+  BAD:  <iframe src="https://maps.google.com/...?q=Colombo" />
+  BAD:  <p>Open Mon–Fri 9am–6pm</p>
+  GOOD: <WhatsAppButton />   ← auto-uses live registered merchant WhatsApp
+  GOOD: <PhoneButton />      ← auto-uses live registered phone
+  GOOD: <LocationCard />     ← auto-uses live address + Google Maps link
+  GOOD: <BusinessHours />    ← auto-uses live hours + shows "Open Now / Closed"
+Auto-hydrating components self-populate from the shop owner's live Fivora Portal profile. When the merchant changes their phone, WhatsApp, address, hours, or map URL, their live storefront updates instantly with zero code rebuilds.
+
+SMART CONTACT & COMMERCE ACTIONS (all auto-hydrate from live merchant profile when props omitted)
+  <WhatsAppButton />           — Click-to-WhatsApp with pre-filled order/inquiry message
+  <PhoneButton />              — 1-tap tel: dial button
+  <EmailButton />              — mailto: button
+  <ContactActions />           — Combined bar: shows WhatsApp/Phone/Email/Maps for whichever channels the merchant has active
+  <FloatingContactWidget />    — Fixed-corner slide drawer with WhatsApp/Call/Email. Use on service & restaurant templates.
+  <CartDrawer />               — Slide-over cart with quantity steppers, free-shipping bar, 1-click WhatsApp order dispatch. Pair with useCart().
+
+LOCATION & MAPS (all auto-hydrate from live merchant address when props omitted)
+  <LocationCard />             — Street address, city, district, postal code, clickable Google Maps directions
+  <LocationLink />             — Minimal inline "View on Maps" text link
+  <MapEmbed />                 — Static Google Maps tile centered on address
+  <Address />                  — Semantic <address> block
+  <MapLink />                  — Standalone "Get Directions" button
+
+SOCIAL & BUSINESS
+  <BusinessHours />            — Weekly hours grid + live "Open Now / Closed" status based on visitor local time. Auto-uses live hours.
+  <SocialLinks />              — Renders all configured social icons from live merchant profile
+  <SocialButton platform="instagram" url="..." /> — Single social platform icon link
+  <HeritageCollage />          — Multi-image brand story / about collage for Heritage or About sections
+
+STOREFRONT SECTIONS
+  <Hero />                     — Full-width hero with image, headline, subheadline, CTA
+  <Navbar />                   — Responsive header with logo, nav links, search, cart icon
+  <Footer />                   — Site footer with links, social, contact
+  <AnnouncementBar />          — Dismissible top-of-page promotional banner
+  <ProductCard />              — Product tile with image, name, price, badge, Add-to-Cart
+  <ProductGrid />              — Paginated product grid with search + category filter. Auto-loads from useSiteCatalog() or accepts products array.
+  <ProductDetail />            — Full product detail layout
+  <PlatformProductDetail />    — Recommended for /products/detail route; auto-loads product by URL param via useSiteApi()
+  <ProductShowcase />          — Featured product carousel / grid section
+  <ProductQuickView />         — Modal overlay product preview triggered from grid
+  <FilterSidebar />            — Category / price / availability filter panel
+  <CategoryPills />            — Horizontal scrollable category filter chips
+  <CustomerReviews />          — Auto-pulls live Google + in-app reviews from useReviews()
+  <GoogleFeedback />           — Google review widget with star rating and review list
+  <TestimonialCard />          — Single testimonial with photo and quote
+  <TestimonialCarousel />      — Auto-playing testimonial slider
+  <TestimonialSection />       — Full testimonials section block
+  <ServiceCard />              — Service offering card with icon, title, description
+  <PricingCard />              — Pricing tier card with feature list and CTA
+  <FAQAccordion />             — Expandable FAQ list
+  <ContactForm />              — Multi-field inquiry form
+  <TrustBadges />              — Payment / security / delivery trust badge row
+  <StickyMobileBar />          — Bottom-fixed mobile bar with WhatsApp/Call/Cart. Add to every mobile commerce template.
+  <BookingModal />             — Appointment booking modal with date/time picker
+  <BeforeAfterSlider />        — Drag-to-compare before/after image slider
+  <CookieConsentBanner />      — GDPR/cookie consent banner
+
+DATA & THEME ENGINE
+  <SiteDataProvider>           — Wraps entire app. Handles FIVORA_PREVIEW_SITE_DATA live-sync. Must wrap header + footer.
+  <ThemeStyles />              — Reads theme from siteData, computes WCAG contrast, injects :root CSS variables
+  <ThemeToggle />              — Light/dark mode toggle
+  <PlatformAdditionalPages />  — Renders Fivora-managed extra pages (Terms, Privacy, etc.)
+  useSiteData()                — Access full siteData tree inside any Client Component
+  useProducts(fallback?)       — Live product catalog from siteData; falls back to provided array
+  useSiteCatalog()             — Advanced catalog hook with search and filter state built in
+  useServices(fallback?)       — Live services list
+  useSiteApi()                 — Fetches a specific product by URL param for the detail route
+  useCart()                    — Cart state: items, totals, add/remove/update. Pair with <CartDrawer />.
+  useShop()                    — Live merchant profile: phone, whatsapp, email, address, hours, reviews
+  useReviews()                 — Live Google + in-app reviews array
+
+COMPONENT REPLACEMENT RULES — FOLLOW WITHOUT EXCEPTION
+1. Any custom WhatsApp link → <WhatsAppButton />. Never write raw wa.me URLs.
+2. Any custom phone link → <PhoneButton />. Never write raw tel: hrefs.
+3. Any custom email link → <EmailButton />. Never write raw mailto: hrefs.
+4. Any custom map iframe or directions link → <LocationCard />, <MapEmbed />, or <MapLink />.
+5. Any custom business hours text block → <BusinessHours />.
+6. Any custom product grid/card → <ProductGrid /> + <ProductCard />.
+7. Any custom cart UI → <CartDrawer /> + useCart().
+8. Any custom review section → <CustomerReviews /> or <GoogleFeedback />.
+9. Any custom social icon row → <SocialLinks /> or <SocialButton />.
+10. Add <StickyMobileBar /> to every template targeting mobile commerce.
+11. Add <FloatingContactWidget /> to every service, restaurant, or hospitality template.
+12. Wrap entire app in <SiteDataProvider> in root layout. Add <ThemeStyles /> immediately inside it.
+
 STATIC BUILD
 1. Configure output: 'export', trailingSlash, images.unoptimized: true, and basePath/assetPrefix from the manifest environment variable.
 2. Prefix local public assets and imperative navigation with the base path. Test a non-empty base path.
