@@ -37,6 +37,13 @@ export function EditableBeforeAfterSlider({
   const [sliderPos, setSliderPos] = useState(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setContainerWidth(containerRef.current.clientWidth);
+    }
+  }, []);
 
   const updatePosition = useCallback((clientX: number) => {
     if (!containerRef.current) return;
@@ -163,7 +170,7 @@ export function EditableBeforeAfterSlider({
             position: 'absolute',
             top: 0,
             left: 0,
-            width: containerRef.current ? `${containerRef.current.clientWidth}px` : '100%',
+            width: containerWidth ? `${containerWidth}px` : '100%',
             height: '100%',
           }}
         >

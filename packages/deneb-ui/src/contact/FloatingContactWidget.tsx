@@ -35,11 +35,12 @@ export function FloatingContactWidget({
   const { siteData } = useSiteData();
   const [isOpen, setIsOpen] = useState(false);
 
-  const contactData = (siteData as any)?.contact || {};
+  const sdRecord = (siteData && typeof siteData === 'object' ? siteData : {}) as Record<string, unknown>;
+  const contactData = (sdRecord.contact && typeof sdRecord.contact === 'object' ? sdRecord.contact : {}) as Record<string, string>;
   const phone = contactData.phone || defaultPhone || '';
   const whatsapp = contactData.whatsapp || defaultWhatsApp || phone;
   const email = contactData.email || defaultEmail || '';
-  const storeName = (siteData as any)?.site?.name || 'Support';
+  const storeName = typeof (sdRecord.site as Record<string, unknown> | undefined)?.name === 'string' ? ((sdRecord.site as Record<string, unknown>).name as string) : 'Support';
 
   const hasWhatsApp = Boolean(whatsapp && whatsapp.trim().length > 0);
   const hasPhone = Boolean(phone && phone.trim().length > 0);

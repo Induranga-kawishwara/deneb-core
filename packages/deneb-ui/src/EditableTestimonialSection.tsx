@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useReviews, useSiteData } from './SiteDataProvider';
 import type { TestimonialItem } from './EditableTestimonialCard';
@@ -235,8 +234,9 @@ export function EditableTestimonialSection({
     }));
   }, [rawTestimonials]);
 
-  const effectiveHeading = heading ?? (siteData?.content as any)?.[basePath]?.heading ?? 'WHAT OUR CUSTOMERS ARE SAYING';
-  const effectiveSubheading = subheading ?? (siteData?.content as any)?.[basePath]?.subheading ?? 'Reflections and feedback from verified customers and dedicated regulars.';
+  const contentRecord = (siteData?.content && typeof siteData.content === 'object' ? siteData.content : {}) as Record<string, Record<string, unknown>>;
+  const effectiveHeading = heading ?? (contentRecord[basePath]?.heading as string | undefined) ?? 'WHAT OUR CUSTOMERS ARE SAYING';
+  const effectiveSubheading = subheading ?? (contentRecord[basePath]?.subheading as string | undefined) ?? 'Reflections and feedback from verified customers and dedicated regulars.';
 
   const hasCustomPy = /(^|\s)(p|py|pt)-/.test(className);
   const defaultPadding = hasCustomPy ? '' : 'py-6 sm:py-8';
@@ -260,15 +260,11 @@ export function EditableTestimonialSection({
           <h2
             data-preview-field-path={`testimonials.heading`}
             className="font-heading text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white tracking-tight"
-          >
-            {heading}
-          </h2>
+          >{effectiveHeading}</h2>
           <p
             data-preview-field-path={`testimonials.subheading`}
             className="text-xs sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto"
-          >
-            {subheading}
-          </p>
+          >{effectiveSubheading}</p>
         </div>
 
         {/* Testimonials Grid */}

@@ -53,7 +53,6 @@ export function MapLink({
   const resolvedLabelFieldPath = labelFieldPath || resolvedUrlFieldPath.replace(/Url$/, 'Label');
   const explicitUrl = (addressUrl || mapUrl || url || '').trim();
   const resolvedHref = createMapUrl({ name, mapUrl: explicitUrl, addressUrl: explicitUrl, url: explicitUrl, address, city, state, country, postalCode });
-  const urlText = explicitUrl || resolvedHref;
   const finalHref = resolvedHref || '#';
 
   if (!finalHref && !label) return null;
