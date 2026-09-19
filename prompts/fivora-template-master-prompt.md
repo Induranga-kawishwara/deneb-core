@@ -67,6 +67,9 @@ Docs:     https://deneb.fivora.site
   GOOD: <PhoneButton />      ← auto-uses live registered phone
   GOOD: <LocationCard />     ← auto-uses live address + Google Maps link
   GOOD: <BusinessHours />    ← auto-uses live hours + shows "Open Now / Closed"
+  GOOD: <SocialLinks />      ← auto-uses live Facebook/Instagram/TikTok/YouTube links
+  GOOD: {useCurrency()}      ← auto-uses live store currency (LKR/USD/EUR)
+  GOOD: {useShopImage()}     ← auto-uses live shop front / cover image URL
 Auto-hydrating components self-populate from the shop owner's live Fivora Portal profile. When the merchant changes their phone, WhatsApp, address, hours, or map URL, their live storefront updates instantly with zero code rebuilds.
 
 SMART CONTACT & COMMERCE ACTIONS (all auto-hydrate from live merchant profile when props omitted)
@@ -130,6 +133,9 @@ DATA & THEME ENGINE
   useSiteApi()                 — Fetches a specific product by URL param for the detail route
   useCart()                    — Cart state: items, totals, add/remove/update. Pair with <CartDrawer />.
   useShop()                    — Live merchant profile: phone, whatsapp, email, address, hours, reviews
+  useSocial()                  — Live social links map { facebook, instagram, tiktok, youtube, linkedin, website }. Auto-hydrates from merchant portal.
+  useCurrency()                — Live store currency code (e.g. "LKR", "USD"). Auto-hydrates from merchant portal.
+  useShopImage()               — Live shop front / cover / banner image URL. Auto-hydrates from merchant portal.
   useReviews()                 — Live Google + in-app reviews array
 
 COMPONENT REPLACEMENT RULES — FOLLOW WITHOUT EXCEPTION
