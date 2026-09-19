@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useReviews, useSiteData } from './SiteDataProvider';
 
 export interface FeedbackItem {
   id?: string | number;
@@ -259,13 +260,13 @@ function FeedbackCard({
 }
 
 export function EditableGoogleFeedback({
-  heading = 'Loved by Customers Worldwide',
-  subheading = 'Real stories and verified 5-star reviews from our official Google Business profile.',
+  heading,
+  subheading,
   badgeTitle = 'Google Reviews',
-  badgeRating = '4.9',
-  badgeReviewsCount = '128 verified reviews',
+  badgeRating,
+  badgeReviewsCount,
   badgeIcon,
-  feedbacks = DEFAULT_FEEDBACKS,
+  feedbacks,
   maxStars = 5,
   className = '',
   cardClassName = '',
@@ -273,7 +274,41 @@ export function EditableGoogleFeedback({
   basePath = 'feedback',
   ...props
 }: EditableGoogleFeedbackProps) {
-  const items = Array.isArray(feedbacks) && feedbacks.length > 0 ? feedbacks : DEFAULT_FEEDBACKS;
+  const liveReviews = useReviews();
+  const siteData = useSiteData();
+  const siteFeedback = (siteData?.content as any)?.[basePath]?.feedbacks || (siteData?.content as any)?.[basePath]?.reviews || (siteData?.content as any)?.reviews;
+
+  const rawFeedbacks = (feedbacks && feedbacks.length > 0)
+    ? feedbacks
+    : (liveReviews && liveReviews.length > 0)
+      ? liveReviews
+      : (Array.isArray(siteFeedback) && siteFeedback.length > 0)
+        ? siteFeedback
+        : DEFAULT_FEEDBACKS;
+
+  const items: FeedbackItem[] = useMemo(() => {
+    return rawFeedbacks.map((f: any, index: number) => ({
+      id: f.id ?? index + 1,
+      name: f.name || f.author || f.customerName || 'Customer',
+      avatar: f.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(f.name || f.author || String(index))}`,
+      rating: typeof f.rating === 'number' ? f.rating : (parseInt(f.rating, 10) || 5),
+      date: f.date || f.timeAgo || 'Recently',
+      comment: f.comment || f.body || f.feedback || f.quote || '',
+      verified: f.verified !== false,
+    }));
+  }, [rawFeedbacks]);
+
+  const calculatedAvg = useMemo(() => {
+    if (!items.length) return '5.0';
+    const sum = items.reduce((acc, r) => acc + (Number(r.rating) || 5), 0);
+    return (sum / items.length).toFixed(1);
+  }, [items]);
+
+  const hasLive = (liveReviews && liveReviews.length > 0) || (feedbacks && feedbacks.length > 0);
+  const effectiveBadgeRating = badgeRating ?? (hasLive ? calculatedAvg : '4.9');
+  const effectiveBadgeCount = badgeReviewsCount ?? (hasLive ? `${items.length} verified reviews` : '128 verified reviews');
+  const effectiveHeading = heading ?? (siteData?.content as any)?.[basePath]?.heading ?? 'Loved by Customers Worldwide';
+  const effectiveSubheading = subheading ?? (siteData?.content as any)?.[basePath]?.subheading ?? 'Real stories and verified 5-star reviews from our official Google Business profile.';
   const hasCustomPy = /(^|\s)(p|py|pt)-/.test(className);
   const defaultPadding = hasCustomPy ? '' : 'py-6 sm:py-8';
 
@@ -308,7 +343,7 @@ export function EditableGoogleFeedback({
                   data-preview-field-path={`feedback.badgeRating`}
                   className="text-xs font-black text-amber-600 dark:text-amber-400"
                 >
-                  {badgeRating}
+                  {effectiveBadgeRating}
                 </span>
                 <div className="flex items-center gap-[2px]">
                   {Array.from({ length: 5 }).map((_, sIdx) => (
@@ -317,7 +352,7 @@ export function EditableGoogleFeedback({
                 </div>
               </div>
               <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium hidden sm:inline">
-                (<span data-preview-field-path={`feedback.badgeReviewsCount`}>{badgeReviewsCount}</span>)
+                (<span data-preview-field-path={`feedback.badgeReviewsCount`}>{effectiveBadgeCount}</span>)
               </span>
             </div>
 
@@ -325,13 +360,13 @@ export function EditableGoogleFeedback({
               data-preview-field-path={`feedback.heading`}
               className="font-heading text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white tracking-tight"
             >
-              {heading}
+              {effectiveHeading}
             </h2>
             <p
               data-preview-field-path={`feedback.subheading`}
               className="text-xs sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed"
             >
-              {subheading}
+              {effectiveSubheading}
             </p>
           </div>
 
@@ -382,3 +417,7 @@ export function EditableGoogleFeedback({
     </section>
   );
 }
+
+
+// Canonical alias
+export const GoogleFeedback = EditableGoogleFeedback;

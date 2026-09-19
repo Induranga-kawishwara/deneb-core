@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ContactButton, ContactButtonProps } from './ContactButton';
+import { useShop, useSiteData } from '../SiteDataProvider';
 
 export interface PhoneButtonProps extends Omit<ContactButtonProps, 'type'> {
   phoneNumber?: string | null;
@@ -15,14 +16,27 @@ export function PhoneButton({
   variant = 'primary',
   ...rest
 }: PhoneButtonProps) {
-  const number = phoneNumber ?? value;
+  const liveShop = useShop();
+  const siteData = useSiteData();
+  const contact = (siteData?.content as any)?.contact || (siteData?.content as any)?.common?.contact || {};
+  const common = (siteData?.content as any)?.common || {};
+  const merchant = (siteData as any)?.merchant || {};
 
-  if (!number && !fieldPath) return null;
+  const effectiveNumber =
+    phoneNumber ||
+    value ||
+    liveShop?.contact?.phone ||
+    contact.phone ||
+    common.phone ||
+    merchant.phone ||
+    '';
+
+  if (!effectiveNumber && !fieldPath) return null;
 
   return (
     <ContactButton
       type="phone"
-      value={number}
+      value={effectiveNumber}
       label={label}
       fieldPath={fieldPath}
       variant={variant}

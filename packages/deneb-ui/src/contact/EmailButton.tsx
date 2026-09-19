@@ -2,32 +2,44 @@
 
 import React from 'react';
 import { ContactButton, ContactButtonProps } from './ContactButton';
+import { useShop, useSiteData } from '../SiteDataProvider';
 
 export interface EmailButtonProps extends Omit<ContactButtonProps, 'type'> {
-  emailAddress?: string | null;
+  email?: string | null;
 }
 
 export function EmailButton({
-  emailAddress,
+  email,
   value,
   label = 'Email Us',
   fieldPath = 'common.business.email',
-  variant = 'secondary',
-  subject,
+  variant = 'outline',
   ...rest
 }: EmailButtonProps) {
-  const email = emailAddress || value;
+  const liveShop = useShop();
+  const siteData = useSiteData();
+  const contact = (siteData?.content as any)?.contact || (siteData?.content as any)?.common?.contact || {};
+  const common = (siteData?.content as any)?.common || {};
+  const merchant = (siteData as any)?.merchant || {};
 
-  if (!email && !fieldPath) return null;
+  const effectiveEmail =
+    email ||
+    value ||
+    liveShop?.contact?.email ||
+    contact.email ||
+    common.email ||
+    merchant.email ||
+    '';
+
+  if (!effectiveEmail && !fieldPath) return null;
 
   return (
     <ContactButton
       type="email"
-      value={email}
+      value={effectiveEmail}
       label={label}
       fieldPath={fieldPath}
       variant={variant}
-      subject={subject}
       {...rest}
     />
   );

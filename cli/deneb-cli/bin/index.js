@@ -572,7 +572,7 @@ function getComponentRegistry(importPkg) {
     'product-card': {
       file: 'ProductCard.tsx',
       component: 'EditableProductCard',
-      code: `'use client';\n\nimport { EditableProductCard, type EditableProductCardProps } from '${importPkg}';\n\nexport function ProductCard(props: EditableProductCardProps) {\n  return <EditableProductCard {...props} />;\n}\n`,
+      code: `'use client';\n\nimport { EditableProductCard, ProductCard, type EditableProductCardProps, type ProductItem } from '${importPkg}';\n\nexport { EditableProductCard, ProductCard, type EditableProductCardProps, type ProductItem };\n`,
     },
     'product-grid': {
       file: 'ProductGrid.tsx',
@@ -586,13 +586,47 @@ function getComponentRegistry(importPkg) {
     },
     'product-detail': {
       file: 'ProductDetail.tsx',
-      component: 'EditableProductDetail',
-      code: `'use client';\n\nimport { EditableProductDetail, ProductDetail, type EditableProductDetailProps, type ProductDetailItem } from '${importPkg}';\n\nexport { EditableProductDetail, ProductDetail, type EditableProductDetailProps, type ProductDetailItem };\n`,
+      component: 'PlatformProductDetail',
+      code: `'use client';\n\nimport { PlatformProductDetail, usePlatformProductDetail, platformProductDetailHref, type PlatformProductDetailProps } from '${importPkg}';\n\nexport function ProductDetail(props: PlatformProductDetailProps) {
+  return <PlatformProductDetail {...props} />;
+}
+
+export { PlatformProductDetail, usePlatformProductDetail, platformProductDetailHref, type PlatformProductDetailProps };\n`,
+    },
+    'platform-product-detail': {
+      file: 'PlatformProductDetail.tsx',
+      component: 'PlatformProductDetail',
+      code: `'use client';\n\nimport { PlatformProductDetail, usePlatformProductDetail, platformProductDetailHref, type PlatformProductDetailProps } from '${importPkg}';\n\nexport { PlatformProductDetail, usePlatformProductDetail, platformProductDetailHref, type PlatformProductDetailProps };\n`,
     },
     'customer-reviews': {
       file: 'CustomerReviews.tsx',
       component: 'EditableCustomerReviews',
       code: `'use client';\n\nimport { EditableCustomerReviews, CustomerReviews, type EditableCustomerReviewsProps, type CustomerReviewItem } from '${importPkg}';\n\nexport { EditableCustomerReviews, CustomerReviews, type EditableCustomerReviewsProps, type CustomerReviewItem };\n`,
+    },
+    'reviews': {
+      file: 'CustomerReviews.tsx',
+      component: 'CustomerReviews',
+      code: `'use client';\n\nimport { EditableCustomerReviews, CustomerReviews, type EditableCustomerReviewsProps, type CustomerReviewItem } from '${importPkg}';\n\nexport { EditableCustomerReviews, CustomerReviews, type EditableCustomerReviewsProps, type CustomerReviewItem };\n`,
+    },
+    'google-feedback': {
+      file: 'GoogleFeedback.tsx',
+      component: 'GoogleFeedback',
+      code: `'use client';\n\nimport { EditableGoogleFeedback, GoogleFeedback, type EditableGoogleFeedbackProps, type FeedbackItem } from '${importPkg}';\n\nexport { EditableGoogleFeedback, GoogleFeedback, type EditableGoogleFeedbackProps, type FeedbackItem };\n`,
+    },
+    'feedback': {
+      file: 'GoogleFeedback.tsx',
+      component: 'GoogleFeedback',
+      code: `'use client';\n\nimport { EditableGoogleFeedback, GoogleFeedback, type EditableGoogleFeedbackProps, type FeedbackItem } from '${importPkg}';\n\nexport { EditableGoogleFeedback, GoogleFeedback, type EditableGoogleFeedbackProps, type FeedbackItem };\n`,
+    },
+    'testimonial-section': {
+      file: 'TestimonialSection.tsx',
+      component: 'TestimonialSection',
+      code: `'use client';\n\nimport { EditableTestimonialSection, TestimonialSection, type EditableTestimonialSectionProps, type TestimonialSectionItem } from '${importPkg}';\n\nexport { EditableTestimonialSection, TestimonialSection, type EditableTestimonialSectionProps, type TestimonialSectionItem };\n`,
+    },
+    'testimonials': {
+      file: 'TestimonialSection.tsx',
+      component: 'TestimonialSection',
+      code: `'use client';\n\nimport { EditableTestimonialSection, TestimonialSection, type EditableTestimonialSectionProps, type TestimonialSectionItem } from '${importPkg}';\n\nexport { EditableTestimonialSection, TestimonialSection, type EditableTestimonialSectionProps, type TestimonialSectionItem };\n`,
     },
     'cart-drawer': {
       file: 'CartDrawer.tsx',
@@ -607,39 +641,68 @@ function getComponentRegistry(importPkg) {
     'pricing-card': {
       file: 'PricingCard.tsx',
       component: 'EditablePricingCard',
-      code: `'use client';\n\nimport { EditablePricingCard, type EditablePricingCardProps } from '${importPkg}';\n\nexport function PricingCard(props: EditablePricingCardProps) {\n  return <EditablePricingCard {...props} />;\n}\n`,
+      code: `'use client';\n\nimport { EditablePricingCard, type EditablePricingCardProps } from '${importPkg}';\n\nexport function PricingCard(props: EditablePricingCardProps) {
+  return <EditablePricingCard {...props} />;
+}
+`,
     },
     'testimonial-card': {
       file: 'TestimonialCard.tsx',
       component: 'EditableTestimonialCard',
-      code: `'use client';\n\nimport { EditableTestimonialCard, type EditableTestimonialCardProps } from '${importPkg}';\n\nexport function TestimonialCard(props: EditableTestimonialCardProps) {\n  return <EditableTestimonialCard {...props} />;\n}\n`,
+      code: `'use client';\n\nimport { EditableTestimonialCard, type EditableTestimonialCardProps } from '${importPkg}';\n\nexport function TestimonialCard(props: EditableTestimonialCardProps) {
+  return <EditableTestimonialCard {...props} />;
+}
+`,
     },
     'contact-form': {
       file: 'ContactForm.tsx',
       component: 'EditableContactForm',
-      code: `'use client';\n\nimport { EditableContactForm, type EditableContactFormProps } from '${importPkg}';\n\nexport function ContactForm(props: EditableContactFormProps) {\n  return <EditableContactForm {...props} />;\n}\n`,
+      code: `'use client';\n\nimport { EditableContactForm, type EditableContactFormProps } from '${importPkg}';\n\nexport function ContactForm(props: EditableContactFormProps) {
+  return <EditableContactForm {...props} />;
+}
+`,
     },
     'faq': {
       file: 'FAQAccordion.tsx',
       component: 'EditableFAQAccordion',
-      code: `'use client';\n\nimport { EditableFAQAccordion, EditableFAQItem, type EditableFAQAccordionProps } from '${importPkg}';\n\nexport function FAQAccordion(props: EditableFAQAccordionProps) {\n  return <EditableFAQAccordion {...props} />;\n}\n\nexport { EditableFAQItem };\n`,
+      code: `'use client';\n\nimport { EditableFAQAccordion, EditableFAQItem, type EditableFAQAccordionProps } from '${importPkg}';\n\nexport function FAQAccordion(props: EditableFAQAccordionProps) {
+  return <EditableFAQAccordion {...props} />;
+}
+\nexport { EditableFAQItem };\n`,
     },
     'navbar': {
       file: 'Navbar.tsx',
       component: 'EditableNavbar',
-      code: `'use client';\n\nimport { EditableNavbar, type EditableNavbarProps } from '${importPkg}';\n\nexport function Navbar(props: EditableNavbarProps) {\n  return <EditableNavbar {...props} />;\n}\n`,
+      code: `'use client';\n\nimport { EditableNavbar, type EditableNavbarProps } from '${importPkg}';\n\nexport function Navbar(props: EditableNavbarProps) {
+  return <EditableNavbar {...props} />;
+}
+`,
     },
     'footer': {
       file: 'Footer.tsx',
       component: 'EditableFooter',
-      code: `'use client';\n\nimport { EditableFooter, type EditableFooterProps } from '${importPkg}';\n\nexport function Footer(props: EditableFooterProps) {\n  return <EditableFooter {...props} />;\n}\n`,
+      code: `'use client';\n\nimport { EditableFooter, type EditableFooterProps } from '${importPkg}';\n\nexport function Footer(props: EditableFooterProps) {
+  return <EditableFooter {...props} />;
+}
+`,
     },
     'hero': {
       file: 'Hero.tsx',
       component: 'EditableHeroCentered',
-      code: `'use client';\n\nimport { EditableHeroCentered, EditableHeroSplit, type EditableHeroCenteredProps, type EditableHeroSplitProps } from '${importPkg}';\n\nexport function HeroCentered(props: EditableHeroCenteredProps) {\n  return <EditableHeroCentered {...props} />;\n}\n\nexport function HeroSplit(props: EditableHeroSplitProps) {\n  return <EditableHeroSplit {...props} />;\n}\n`,
+      code: `'use client';\n\nimport { EditableHeroCentered, EditableHeroSplit, type EditableHeroCenteredProps, type EditableHeroSplitProps } from '${importPkg}';\n\nexport function HeroCentered(props: EditableHeroCenteredProps) {
+  return <EditableHeroCentered {...props} />;
+}
+\nexport function HeroSplit(props: EditableHeroSplitProps) {
+  return <EditableHeroSplit {...props} />;
+}
+`,
     },
     'whatsapp-button': {
+      file: 'WhatsAppButton.tsx',
+      component: 'WhatsAppButton',
+      code: `'use client';\n\nimport { WhatsAppButton, type WhatsAppButtonProps } from '${importPkg}';\n\nexport { WhatsAppButton, type WhatsAppButtonProps };\n`,
+    },
+    'whatsapp': {
       file: 'WhatsAppButton.tsx',
       component: 'WhatsAppButton',
       code: `'use client';\n\nimport { WhatsAppButton, type WhatsAppButtonProps } from '${importPkg}';\n\nexport { WhatsAppButton, type WhatsAppButtonProps };\n`,
@@ -647,9 +710,14 @@ function getComponentRegistry(importPkg) {
     'whatsapp-order-button': {
       file: 'WhatsAppOrderButton.tsx',
       component: 'WhatsAppOrderButton',
-      code: `'use client';\n\nimport React from 'react';\nimport { useSiteData } from '${importPkg}';\nimport { MessageCircle } from 'lucide-react';\n\nexport interface WhatsAppOrderButtonProps {\n  product: { name: string; price?: string | number; brand?: string; condition?: string; [key: string]: any };\n  selectedColor?: string;\n  selectedStorage?: string;\n  className?: string;\n  showText?: boolean;\n}\n\nexport function WhatsAppOrderButton({\n  product,\n  selectedColor,\n  selectedStorage,\n  className = '',\n  showText = true,\n}: WhatsAppOrderButtonProps) {\n  const siteData = useSiteData();\n  const rawTarget =\n    siteData?.content?.home?.whatsappOrderUrl ||\n    siteData?.content?.home?.whatsappNumber ||\n    siteData?.content?.common?.business?.whatsapp ||\n    'https://wa.me/15550192834';\n  const orderLabel = siteData?.content?.home?.whatsappOrderLabel ?? 'Order via WhatsApp';\n\n  const handleWhatsAppClick = (e: React.MouseEvent) => {\n    e.stopPropagation();\n    const color = selectedColor || product.colors?.[0]?.name || 'Default';\n    const storage = selectedStorage || product.storageOptions?.[0] || 'Default';\n    const message = \`Hi, I would like to order the following product:\\n\\n*\${product.name}*\\nBrand: \${product.brand || 'Store'}\\nCondition: \${product.condition || 'New'}\\nColor: \${color}\\nStorage: \${storage}\\nPrice: Rs \${product.price}\\n\\nIs it available?\`;\n\n    let targetUrl = (rawTarget || '').trim();\n    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {\n      const cleanNum = targetUrl.replace(/[^0-9]/g, '');\n      targetUrl = \`https://wa.me/\${cleanNum || '15550192834'}\`;\n    }\n    const sep = targetUrl.includes('?') ? '&' : '?';\n    const url = \`\${targetUrl}\${sep}text=\${encodeURIComponent(message)}\`;\n    window.open(url, '_blank', 'noopener,noreferrer');\n  };\n\n  return (\n    <button type=\"button\" onClick={handleWhatsAppClick} className={className}>\n      <MessageCircle className=\"h-4 w-4\" />\n      {showText && (\n        <span data-preview-field-path=\"home.whatsappOrderLabel\" data-preview-style-target=\"home.whatsappOrderLabel\" data-preview-style-type=\"text\">\n          {orderLabel}\n        </span>\n      )}\n    </button>\n  );\n}\n`,
+      code: `'use client';\n\nimport React from 'react';\nimport { useSiteData } from '${importPkg}';\nimport { MessageCircle } from 'lucide-react';\n\nexport interface WhatsAppOrderButtonProps {\n  product: { name: string; price?: string | number; brand?: string; condition?: string; [key: string]: any };\n  selectedColor?: string;\n  selectedStorage?: string;\n  className?: string;\n  showText?: boolean;\n}\n\nexport function WhatsAppOrderButton({\n  product,\n  selectedColor,\n  selectedStorage,\n  className = '',\n  showText = true,\n}: WhatsAppOrderButtonProps) {\n  const siteData = useSiteData();\n  const rawTarget =\n    siteData?.content?.home?.whatsappOrderUrl ||\n    siteData?.content?.home?.whatsappNumber ||\n    siteData?.content?.common?.business?.whatsapp ||\n    'https://wa.me/15550192834';\n  const orderLabel = siteData?.content?.home?.whatsappOrderLabel ?? 'Order via WhatsApp';\n\n  const handleWhatsAppClick = (e: React.MouseEvent) => {\n    e.stopPropagation();\n    const color = selectedColor || product.colors?.[0]?.name || 'Default';\n    const storage = selectedStorage || product.storageOptions?.[0] || 'Default';\n    const message = \`Hi, I would like to order the following product:\\n\\n*\${product.name}*\\nBrand: \${product.brand || 'Store'}\\nCondition: \${product.condition || 'New'}\\nColor: \${color}\\nStorage: \${storage}\\nPrice: Rs \${product.price}\\n\\nIs it available?\`;\n\n    let targetUrl = (rawTarget || '').trim();\n    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {\n      const cleanNum = targetUrl.replace(/[^0-9]/g, '');\n      targetUrl = \`https://wa.me/\${cleanNum || '15550192834'}\`;\n    }\n    const sep = targetUrl.includes('?') ? '&' : '?';\n    const url = \`\${targetUrl}\${sep}text=\${encodeURIComponent(message)}\`;\n    window.open(url, '_blank', 'noopener,noreferrer');\n  };\n\n  return (\n    <button type="button" onClick={handleWhatsAppClick} className={className}>\n      <MessageCircle className="h-4 w-4" />\n      {showText && (\n        <span data-preview-field-path="home.whatsappOrderLabel" data-preview-style-target="home.whatsappOrderLabel" data-preview-style-type="text">\n          {orderLabel}\n        </span>\n      )}\n    </button>\n  );\n}\n`,
     },
     'phone-button': {
+      file: 'PhoneButton.tsx',
+      component: 'PhoneButton',
+      code: `'use client';\n\nimport { PhoneButton, type PhoneButtonProps } from '${importPkg}';\n\nexport { PhoneButton, type PhoneButtonProps };\n`,
+    },
+    'phone': {
       file: 'PhoneButton.tsx',
       component: 'PhoneButton',
       code: `'use client';\n\nimport { PhoneButton, type PhoneButtonProps } from '${importPkg}';\n\nexport { PhoneButton, type PhoneButtonProps };\n`,
@@ -659,12 +727,27 @@ function getComponentRegistry(importPkg) {
       component: 'EmailButton',
       code: `'use client';\n\nimport { EmailButton, type EmailButtonProps } from '${importPkg}';\n\nexport { EmailButton, type EmailButtonProps };\n`,
     },
+    'email': {
+      file: 'EmailButton.tsx',
+      component: 'EmailButton',
+      code: `'use client';\n\nimport { EmailButton, type EmailButtonProps } from '${importPkg}';\n\nexport { EmailButton, type EmailButtonProps };\n`,
+    },
     'contact-actions': {
       file: 'ContactActions.tsx',
       component: 'ContactActions',
       code: `'use client';\n\nimport { ContactActions, type ContactActionsProps } from '${importPkg}';\n\nexport { ContactActions, type ContactActionsProps };\n`,
     },
+    'contact': {
+      file: 'ContactActions.tsx',
+      component: 'ContactActions',
+      code: `'use client';\n\nimport { ContactActions, type ContactActionsProps } from '${importPkg}';\n\nexport { ContactActions, type ContactActionsProps };\n`,
+    },
     'location-card': {
+      file: 'LocationCard.tsx',
+      component: 'LocationCard',
+      code: `'use client';\n\nimport { LocationCard, type LocationCardProps } from '${importPkg}';\n\nexport { LocationCard, type LocationCardProps };\n`,
+    },
+    'location': {
       file: 'LocationCard.tsx',
       component: 'LocationCard',
       code: `'use client';\n\nimport { LocationCard, type LocationCardProps } from '${importPkg}';\n\nexport { LocationCard, type LocationCardProps };\n`,
@@ -692,7 +775,12 @@ function getComponentRegistry(importPkg) {
     'business-hours': {
       file: 'BusinessHours.tsx',
       component: 'BusinessHours',
-      code: `'use client';\n\nimport { BusinessHours, type BusinessHoursProps } from '${importPkg}';\n\nexport { BusinessHours, type BusinessHoursProps };\n`,
+      code: `'use client';\n\nimport { BusinessHours, type BusinessHoursProps, type WeeklyHours, type DaySchedule } from '${importPkg}';\n\nexport { BusinessHours, type BusinessHoursProps, type WeeklyHours, type DaySchedule };\n`,
+    },
+    'hours': {
+      file: 'BusinessHours.tsx',
+      component: 'BusinessHours',
+      code: `'use client';\n\nimport { BusinessHours, type BusinessHoursProps, type WeeklyHours, type DaySchedule } from '${importPkg}';\n\nexport { BusinessHours, type BusinessHoursProps, type WeeklyHours, type DaySchedule };\n`,
     },
     'announcement-bar': {
       file: 'AnnouncementBar.tsx',
@@ -733,26 +821,6 @@ function getComponentRegistry(importPkg) {
       file: 'DenebAction.tsx',
       component: 'DenebAction',
       code: `'use client';\n\nimport { DenebAction, type DenebActionProps } from '${importPkg}';\n\nexport { DenebAction, type DenebActionProps };\n`,
-    },
-    'product-card': {
-      file: 'ProductCard.tsx',
-      component: 'EditableProductCard',
-      code: `'use client';\n\nimport { EditableProductCard, type EditableProductCardProps, type ProductItem } from '${importPkg}';\n\nexport function ProductCard(props: EditableProductCardProps) {\n  return <EditableProductCard {...props} />;\n}\n\nexport { EditableProductCard, type EditableProductCardProps, type ProductItem };\n`,
-    },
-    'product-grid': {
-      file: 'ProductGrid.tsx',
-      component: 'EditableProductGrid',
-      code: `'use client';\n\nimport { EditableProductGrid, ProductGrid, type EditableProductGridProps } from '${importPkg}';\n\nexport { EditableProductGrid, ProductGrid, type EditableProductGridProps };\n`,
-    },
-    'product-detail': {
-      file: 'ProductDetail.tsx',
-      component: 'PlatformProductDetail',
-      code: `'use client';\n\nimport { PlatformProductDetail, usePlatformProductDetail, platformProductDetailHref, type PlatformProductDetailProps } from '${importPkg}';\n\nexport function ProductDetail(props: PlatformProductDetailProps) {\n  return <PlatformProductDetail {...props} />;\n}\n\nexport { PlatformProductDetail, usePlatformProductDetail, platformProductDetailHref, type PlatformProductDetailProps };\n`,
-    },
-    'platform-product-detail': {
-      file: 'PlatformProductDetail.tsx',
-      component: 'PlatformProductDetail',
-      code: `'use client';\n\nimport { PlatformProductDetail, usePlatformProductDetail, platformProductDetailHref, type PlatformProductDetailProps } from '${importPkg}';\n\nexport { PlatformProductDetail, usePlatformProductDetail, platformProductDetailHref, type PlatformProductDetailProps };\n`,
     },
   };
 }
@@ -989,6 +1057,40 @@ async function initProject(targetInput, options = {}) {
     } catch (layoutErr) {
       // Non-blocking layout instrumentation
     }
+  }
+
+
+  // 4.7. Auto-scaffold core ready-to-use DENEB UI components in src/components/ui/
+  const uiDir = path.join(targetDir, 'src', 'components', 'ui');
+  if (!fs.existsSync(uiDir)) {
+    fs.mkdirSync(uiDir, { recursive: true });
+  }
+  const compRegistry = getComponentRegistry(importPkg);
+  const coreToScaffold = [
+    'product-grid',
+    'product-card',
+    'customer-reviews',
+    'google-feedback',
+    'location-card',
+    'location-link',
+    'whatsapp-button',
+    'contact-actions',
+    'business-hours',
+    'map-embed',
+  ];
+  let scaffoldedCount = 0;
+  for (const key of coreToScaffold) {
+    const item = compRegistry[key];
+    if (item) {
+      const targetFile = path.join(uiDir, item.file);
+      if (!fs.existsSync(targetFile)) {
+        fs.writeFileSync(targetFile, item.code, 'utf8');
+        scaffoldedCount++;
+      }
+    }
+  }
+  if (scaffoldedCount > 0) {
+    console.log(`\x1b[32m✔ Auto-installed\x1b[0m ${scaffoldedCount} essential DENEB UI components in src/components/ui/ (ProductGrid, CustomerReviews, GoogleFeedback, LocationCard, WhatsAppButton, BusinessHours, etc.)`);
   }
 
   // 4. Update package.json scripts
