@@ -1,18 +1,41 @@
-import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
-import siteData from '@/data/site-data.json';
-import { SiteDataProvider, ThemeStyles } from '@/lib/siteDataContext';
-import SiteChrome from '@/components/SiteChrome';
-import './globals.css';
-import '../fonts/deneb-fonts.css';
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import siteData from "@/data/site-data.json";
+import { SiteDataProvider, ThemeStyles } from "@/lib/siteDataContext";
+import SiteChrome from "@/components/SiteChrome";
+import "./globals.css";
+import "../fonts/deneb-fonts.css";
 
-export const metadata: Metadata = {
-  title: siteData.content.common.websiteTitle,
-  description: siteData.content.common.shortDescription,
-  icons: {
-    icon: '/fivora-icon.svg',
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const sd = siteData as any;
+  const common = sd?.content?.common;
+  const shop = sd?.shop;
+
+  const title =
+    common?.websiteTitle ||
+    shop?.businessName ||
+    "Storefront";
+
+  const description =
+    common?.shortDescription ||
+    shop?.description ||
+    "A modern digital storefront powered by Fivora DENEB UI.";
+
+  const icon =
+    common?.logoUrl ||
+    shop?.logoUrl ||
+    "/fivora-icon.svg";
+
+  return {
+    title,
+    description,
+    icons: {
+      icon,
+      shortcut: icon,
+      apple: icon,
+    },
+  };
+}
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const initialTheme =
