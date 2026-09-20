@@ -25,7 +25,7 @@ const layout = fs.readFileSync(layoutPath, 'utf8');
 
 const checks = [
   [fs.existsSync(fontsCssPath), `missing ${fontsCssPath}`],
-  [layout.includes("import '../fonts/deneb-fonts.css'") || layout.includes('import "../fonts/deneb-fonts.css"'), 'layout must import ../fonts/deneb-fonts.css'],
+  [/import\s+['"][^'"]*deneb-fonts\.css['"]/.test(layout), 'layout must import ../fonts/deneb-fonts.css'],
   [!layout.includes("import './fonts/deneb-fonts.css'"), 'layout must not use the stale ./fonts import'],
   [layout.includes('suppressHydrationWarning'), 'layout must set suppressHydrationWarning on html/body'],
   [fs.existsSync(path.join(dest, 'fivora-template.json')), 'missing fivora-template.json'],
