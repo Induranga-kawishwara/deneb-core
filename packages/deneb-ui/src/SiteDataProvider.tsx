@@ -344,9 +344,17 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
         const currentCommon = isRecord(currentContent.common) ? currentContent.common : {};
         const currentContact = isRecord(currentContent.contact) ? currentContent.contact : {};
 
-        const nextProducts = Array.isArray(live.products)
-          ? live.products
-          : currentContent.products;
+        const rawLiveProducts = Array.isArray(live.products) ? live.products : currentContent.products;
+        const nextProducts = Array.isArray(rawLiveProducts)
+          ? rawLiveProducts.map((p: any) => {
+              if (!isRecord(p)) return p;
+              const customData = isRecord(p.customData) ? p.customData : {};
+              return {
+                ...customData,
+                ...p,
+              };
+            })
+          : rawLiveProducts;
         const nextServices = Array.isArray(live.services)
           ? live.services
           : currentContent.services;
@@ -382,12 +390,18 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
                 nextContact.whatsappNumber = cleanWa;
                 nextCommon.whatsappNumber = cleanWa;
 
-                // Dynamically update any hardcoded or static wa.me URLs across home
+                // Dynamically update any hardcoded or static wa.me URLs across home and common
                 const waRegex = /(https?:\/\/(?:wa\.me|api\.whatsapp\.com\/send\?phone=))\d+/gi;
                 for (const key of ['whatsappCtaUrl', 'whatsappOrderUrl', 'whatsappUrl']) {
                   if (typeof nextHome[key] === 'string' && waRegex.test(nextHome[key])) {
                     nextHome[key] = nextHome[key].replace(waRegex, `$1${cleanWa}`);
                   }
+                  if (typeof nextCommon[key] === 'string' && waRegex.test(nextCommon[key])) {
+                    nextCommon[key] = nextCommon[key].replace(waRegex, `$1${cleanWa}`);
+                  }
+                }
+                if (!nextCommon.whatsappUrl || waRegex.test(nextCommon.whatsappUrl)) {
+                  nextCommon.whatsappUrl = `https://wa.me/${cleanWa}`;
                 }
               }
             }
@@ -402,6 +416,7 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
             if (typeof street === 'string' && street.trim()) {
               nextContact.address = street;
               nextCommon.address = street;
+              nextCommon.footerAddress = street;
             }
             if (typeof address.mapLocation === 'string' && address.mapLocation.trim()) {
               nextContact.googleMapLink = address.mapLocation;
@@ -789,19 +804,30 @@ export function useProducts(fallback: ProductItem[] = []): ProductItem[] {
   const content = isRecord(siteData?.content) ? siteData.content : null;
   if (!content) return fallback;
 
+  let rawList: ProductItem[] | null = null;
   if (Array.isArray(content.products) && content.products.length > 0) {
-    return content.products as ProductItem[];
-  }
-  const home = isRecord(content.home) ? content.home : null;
-  if (home) {
-    if (Array.isArray(home.products) && home.products.length > 0) {
-      return home.products as ProductItem[];
+    rawList = content.products as ProductItem[];
+  } else {
+    const home = isRecord(content.home) ? content.home : null;
+    if (home) {
+      if (Array.isArray(home.products) && home.products.length > 0) {
+        rawList = home.products as ProductItem[];
+      } else if (Array.isArray(home.featuredProducts) && home.featuredProducts.length > 0) {
+        rawList = home.featuredProducts as ProductItem[];
+      }
     }
-    if (Array.isArray(home.featuredProducts) && home.featuredProducts.length > 0) {
-      return home.featuredProducts as ProductItem[];
-    }
   }
-  return fallback;
+
+  if (!rawList) return fallback;
+
+  return rawList.map((p) => {
+    if (!isRecord(p)) return p;
+    const customData = isRecord(p.customData) ? p.customData : {};
+    return {
+      ...customData,
+      ...p,
+    } as ProductItem;
+  });
 }
 
 /**
