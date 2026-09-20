@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { withBasePath } from './utils';
 import { resolveProductOptions, MeasurementUnit } from './utils/productOptions';
 import { createWhatsAppUrl } from './utils/urls';
@@ -40,7 +40,7 @@ export interface ProductDetailItem {
   sizes?: (string | number)[] | string;
   sizesText?: string;
   sizesLabel?: string;
-  colors?: Array<string | { name: string; hex?: string }> | string;
+  colors?: Array<string | { name: string; hex?: string; image?: string }> | string;
   colorsText?: string;
   colorsLabel?: string;
 
@@ -59,14 +59,16 @@ export interface EditableProductDetailProps extends React.HTMLAttributes<HTMLEle
   product: ProductDetailItem;
 
   /**
-   * Available sizes (e.g. ['40', '41', '42', '43', '44', '45', '46']).
+   * Optional custom available sizes or options (e.g. ['S', 'M', 'L'] or ['50ml', '100ml']).
+   * If omitted, resolved dynamically from the product object.
    */
   sizes?: string[];
 
   /**
-   * Available color swatches.
+   * Optional custom color swatches.
+   * If omitted, resolved dynamically from the product object.
    */
-  colors?: Array<{ name: string; hex: string }>;
+  colors?: Array<{ name: string; hex: string; image?: string }>;
 
   /**
    * Callback on adding product to selection or cart.
@@ -86,46 +88,124 @@ export interface EditableProductDetailProps extends React.HTMLAttributes<HTMLEle
  * engineered for high-conversion commerce and 100% compliant with Fivora Visual Editing.
  *
  * Features:
- * - Multi-image gallery with active thumbnail selector and basePath resolution
- * - Floating badges with conditional rendering (zero hidden marker contract violations)
- * - Live synchronized field paths for Title, Price, Description, CTAs, and Policies
- * - Interactive size & color pickers
- * - Direct WhatsApp Click-to-Order integration
- * - Specifications and Shipping & Returns tabs
+ * - Truly Adaptive: Seamlessly renders shoes/apparel (sizes), liquids/cosmetics (ml, L),
+ *   food/groceries (g, kg), single-dimension items, and simple products without variants.
+ * - Multi-image gallery with active thumbnail selector and basePath resolution.
+ * - Dynamic color swatches with optional color-to-image auto-switching.
+ * - Floating badges with conditional rendering (zero hidden marker contract violations).
+ * - Live synchronized field paths for Title, Price, Description, CTAs, and Policies.
+ * - Direct WhatsApp Click-to-Order integration with dynamic variant snippets.
+ * - Context-aware specifications and Shipping & Returns tabs.
  *
  * Created by Chamika Gayashan & Induranga Kawishwara
  */
 export function EditableProductDetail({
   sectionPath = 'product',
   product,
-  sizes = ['40', '41', '42', '43', '44', '45', '46'],
-  colors = [
-    { name: 'Ivory', hex: '#F0EFEB' },
-    { name: 'Obsidian', hex: '#1C2541' },
-  ],
+  sizes,
+  colors,
   onAddToSelection,
   whatsappUrl,
   className = '',
   style,
   ...props
 }: EditableProductDetailProps) {
-  const images = (product.gallery && product.gallery.length > 0)
-    ? product.gallery
-    : [product.featuredImage || product.imageUrl || '/products/vanta-aero-x.jpg'];
+  // 1. Resolve Images: Support gallery, images array, and single image fields
+  const validImages = useMemo(() => {
+    const rawList = (product.gallery && product.gallery.length > 0)
+      ? product.gallery
+      : (product.images && product.images.length > 0)
+        ? product.images
+        : [product.featuredImage || product.imageUrl || product.image || '/products/vanta-aero-x.jpg'];
+    return (rawList as string[]).filter(Boolean);
+  }, [product.gallery, product.images, product.featuredImage, product.imageUrl, product.image]);
 
+  // 2. Resolve Options (Sizes, Volumes, Weights, Counts)
   const resolved = resolveProductOptions(product);
-  const effectiveOptions =
-    product.options || product.optionsText
-      ? resolved.options
-      : (product.sizes || product.sizesText)
-        ? resolved.options
-        : sizes;
-  const effectiveOptionsLabel = resolved.optionsLabel || 'Available Sizes';
 
-  const [activeImage, setActiveImage] = useState(images[0] || '');
+  const effectiveOptions: string[] = useMemo(() => {
+    const hasProductOptions = Boolean(
+      (product.options && product.options.length > 0) ||
+      (typeof product.optionsText === 'string' && product.optionsText.trim()) ||
+      (product.sizes && (Array.isArray(product.sizes) ? product.sizes.length > 0 : Boolean(product.sizes))) ||
+      (typeof product.sizesText === 'string' && product.sizesText.trim()) ||
+      (typeof product.measurement === 'string' && product.measurement.trim())
+    );
+
+    if (hasProductOptions) {
+      return resolved.options;
+    }
+    if (sizes && sizes.length > 0) {
+      return sizes;
+    }
+    return [];
+  }, [product.options, product.optionsText, product.sizes, product.sizesText, product.measurement, resolved.options, sizes]);
+
+  const effectiveOptionsLabel = resolved.optionsLabel || 'Available Options';
+
+  // 3. Resolve Colors
+  const effectiveColors: Array<{ name: string; hex?: string; image?: string }> = useMemo(() => {
+    if (Array.isArray(product.colors) && product.colors.length > 0) {
+      return product.colors.map((c) => {
+        if (typeof c === 'string') {
+          return { name: c.trim(), hex: undefined };
+        }
+        return c;
+      });
+    }
+
+    if (typeof product.colorsText === 'string' && product.colorsText.trim()) {
+      return product.colorsText
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((name) => ({ name, hex: undefined }));
+    }
+
+    if (colors && colors.length > 0) {
+      return colors;
+    }
+
+    return [];
+  }, [product.colors, product.colorsText, colors]);
+
+  // Component States
+  const [activeImage, setActiveImage] = useState(validImages[0] || '');
   const [selectedSize, setSelectedSize] = useState(effectiveOptions[0] || '');
-  const [selectedColor, setSelectedColor] = useState(colors[0]?.name || '');
+  const [selectedColor, setSelectedColor] = useState(effectiveColors[0]?.name || '');
   const [activeTab, setActiveTab] = useState<'specs' | 'shipping'>('specs');
+
+  // Keep active image in sync when product or images change
+  useEffect(() => {
+    if (validImages.length > 0 && !validImages.includes(activeImage)) {
+      setActiveImage(validImages[0]);
+    }
+  }, [validImages, activeImage]);
+
+  // Keep selected size in sync when options change
+  useEffect(() => {
+    if (effectiveOptions.length > 0 && (!selectedSize || !effectiveOptions.includes(selectedSize))) {
+      setSelectedSize(effectiveOptions[0]);
+    } else if (effectiveOptions.length === 0 && selectedSize) {
+      setSelectedSize('');
+    }
+  }, [effectiveOptions, selectedSize]);
+
+  // Keep selected color in sync when colors change
+  useEffect(() => {
+    if (effectiveColors.length > 0 && (!selectedColor || !effectiveColors.some((c) => c.name === selectedColor))) {
+      setSelectedColor(effectiveColors[0]?.name || '');
+    } else if (effectiveColors.length === 0 && selectedColor) {
+      setSelectedColor('');
+    }
+  }, [effectiveColors, selectedColor]);
+
+  const handleSelectColor = (c: { name: string; hex?: string; image?: string }) => {
+    setSelectedColor(c.name);
+    if (c.image) {
+      setActiveImage(c.image);
+    }
+  };
 
   const name = String(product.name || product.title || 'Product Title');
   const price = product.price !== undefined ? String(product.price) : 'LKR 0';
@@ -143,7 +223,11 @@ export function EditableProductDetail({
     product.shippingReturns || '14-day hassle-free exchanges for unworn items in original packaging.'
   );
 
-  const orderSnippet = resolved.formatOrderSnippet(selectedSize, selectedColor);
+  const orderSnippet = resolved.formatOrderSnippet(
+    effectiveOptions.length > 0 ? selectedSize : undefined,
+    effectiveColors.length > 0 ? selectedColor : undefined
+  );
+
   const resolvedWhatsappUrl = whatsappUrl || (
     product.whatsappNumber
       ? createWhatsAppUrl(
@@ -152,6 +236,23 @@ export function EditableProductDetail({
         )
       : ''
   );
+
+  // Dynamic Specs: Use explicit specs if provided, else fallback to available product metadata
+  const effectiveSpecs = useMemo(() => {
+    if (product.specs && product.specs.length > 0) {
+      return product.specs;
+    }
+    const dynamic: Array<{ label: string; value: string }> = [];
+    if (product.brand) dynamic.push({ label: 'Brand', value: String(product.brand) });
+    if (product.category) dynamic.push({ label: 'Category', value: String(product.category) });
+    if (product.unit && product.unit !== 'size') {
+      dynamic.push({ label: 'Measurement Unit', value: String(product.unit).toUpperCase() });
+    }
+    if (product.measurement) {
+      dynamic.push({ label: 'Measurement', value: String(product.measurement) });
+    }
+    return dynamic;
+  }, [product.specs, product.brand, product.category, product.unit, product.measurement]);
 
   return (
     <section
@@ -163,17 +264,17 @@ export function EditableProductDetail({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
         {/* Gallery Column */}
         <div className="lg:col-span-7 flex flex-col-reverse md:flex-row gap-4">
-          {/* Thumbnails */}
-          {images.length > 1 && (
+          {/* Thumbnails (Only rendered when more than 1 image is available) */}
+          {validImages.length > 1 && (
             <div className="deneb-product-detail-gallery flex md:flex-col gap-3 overflow-x-auto md:overflow-y-auto max-h-[580px] pb-2 md:pb-0 scrollbar-none">
-              {images.map((img, idx) => (
+              {validImages.map((img, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => setActiveImage(img)}
                   className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 transition-all duration-200 flex-shrink-0 bg-slate-900/40 p-2 ${
                     activeImage === img
-                      ? 'border-brand-primary scale-98 shadow-md'
+                      ? 'border-lime-400 scale-98 shadow-md ring-2 ring-lime-400/20'
                       : 'border-slate-800/80 opacity-60 hover:opacity-100 hover:border-slate-700'
                   }`}
                 >
@@ -254,33 +355,39 @@ export function EditableProductDetail({
               </p>
             )}
 
-            {/* Color Swatches */}
-            {colors.length > 0 && (
+            {/* Color Swatches (Only rendered when product has colors) */}
+            {effectiveColors.length > 0 && (
               <div className="mt-8">
                 <span className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
                   Color — <span className="text-white">{selectedColor}</span>
                 </span>
-                <div className="flex gap-3">
-                  {colors.map((c) => (
+                <div className="flex flex-wrap gap-3">
+                  {effectiveColors.map((c) => (
                     <button
                       key={c.name}
                       type="button"
-                      onClick={() => setSelectedColor(c.name)}
-                      className={`w-9 h-9 rounded-full border-2 transition-all p-0.5 ${
+                      onClick={() => handleSelectColor(c)}
+                      className={`w-9 h-9 rounded-full border-2 transition-all p-0.5 relative flex items-center justify-center ${
                         selectedColor === c.name
                           ? 'border-lime-400 ring-2 ring-lime-400/30 scale-105'
                           : 'border-slate-700 hover:border-slate-500'
                       }`}
-                      style={{ backgroundColor: c.hex }}
+                      style={{ backgroundColor: c.hex || '#334155' }}
                       title={c.name}
                       aria-label={c.name}
-                    />
+                    >
+                      {!c.hex && (
+                        <span className="text-[9px] font-bold text-white uppercase px-1 truncate">
+                          {c.name.slice(0, 3)}
+                        </span>
+                      )}
+                    </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Options / Size / Measurement Selector */}
+            {/* Options / Size / Measurement Selector (Only rendered when product has options) */}
             {effectiveOptions.length > 0 && (
               <div className="mt-8">
                 <div className="flex items-center justify-between mb-3">
@@ -294,15 +401,15 @@ export function EditableProductDetail({
                     {resolved.formatSelectedDisplay(selectedSize)}
                   </span>
                 </div>
-                <div className="deneb-product-detail-sizes grid grid-cols-3 sm:grid-cols-6 md:grid-cols-7 gap-2">
+                <div className="deneb-product-detail-sizes flex flex-wrap gap-2.5">
                   {effectiveOptions.map((s) => (
                     <button
                       key={s}
                       type="button"
                       onClick={() => setSelectedSize(s)}
-                      className={`py-2.5 px-2 rounded-xl font-bold text-sm transition-all duration-150 ${
+                      className={`py-2.5 px-3.5 min-w-[48px] rounded-xl font-bold text-sm transition-all duration-150 text-center ${
                         selectedSize === s
-                          ? 'bg-white text-slate-950 shadow-md font-extrabold scale-102'
+                          ? 'bg-white text-slate-950 shadow-md font-extrabold scale-102 ring-2 ring-white/20'
                           : 'bg-slate-900/60 text-slate-300 border border-slate-800 hover:bg-slate-800 hover:text-white'
                       }`}
                     >
@@ -318,7 +425,7 @@ export function EditableProductDetail({
               <button
                 type="button"
                 disabled={!isAvailable}
-                onClick={() => onAddToSelection?.(product, selectedSize, selectedColor)}
+                onClick={() => onAddToSelection?.(product, selectedSize || undefined, selectedColor || undefined)}
                 className="w-full py-4 px-6 rounded-2xl font-black text-sm uppercase tracking-wider bg-lime-400 text-slate-950 hover:bg-lime-300 active:scale-98 transition-all duration-150 shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 disabled:shadow-none"
               >
                 <span data-preview-field-path={`${sectionPath}.addToSelectionLabel`}>
@@ -367,8 +474,8 @@ export function EditableProductDetail({
 
               {activeTab === 'specs' ? (
                 <div className="space-y-3">
-                  {product.specs && product.specs.length > 0 ? (
-                    product.specs.map((spec, i) => (
+                  {effectiveSpecs.length > 0 ? (
+                    effectiveSpecs.map((spec, i) => (
                       <div key={i} className="flex justify-between text-xs py-1 border-b border-slate-900">
                         <span className="text-slate-400 font-medium">{spec.label}</span>
                         <span className="text-slate-200 font-semibold">{spec.value}</span>
@@ -377,17 +484,15 @@ export function EditableProductDetail({
                   ) : (
                     <div className="text-xs text-slate-400 space-y-2">
                       <div className="flex justify-between py-1 border-b border-slate-800/50">
-                        <span>Upper Material</span>
-                        <span className="text-slate-200 font-semibold">Engineered breathable mesh</span>
+                        <span>Status</span>
+                        <span className="text-slate-200 font-semibold">{isAvailable ? 'Verified Authentic & In Stock' : 'Out of Stock'}</span>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-slate-800/50">
-                        <span>Midsole Technology</span>
-                        <span className="text-slate-200 font-semibold">Dual-density responsive foam</span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-slate-800/50">
-                        <span>Outsole Grip</span>
-                        <span className="text-slate-200 font-semibold">High-abrasion tactical rubber</span>
-                      </div>
+                      {product.category && (
+                        <div className="flex justify-between py-1 border-b border-slate-800/50">
+                          <span>Category</span>
+                          <span className="text-slate-200 font-semibold">{String(product.category)}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
