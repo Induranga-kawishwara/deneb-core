@@ -131,10 +131,12 @@ export function EditableFooter({
   const common = (content?.common || {}) as Record<string, any>;
   const contact = (content?.contact || {}) as Record<string, any>;
   const business = (common?.business || {}) as Record<string, any>;
+  const shop = (siteData?.shop || {}) as Record<string, any>;
+  const shopContact = (shop?.contact || {}) as Record<string, any>;
 
   // Auto-synchronized with Header
-  const siteName = String(common?.websiteTitle || common?.siteName || 'Storefront');
-  const logoUrl = String(common?.logoUrl || '');
+  const siteName = String(common?.websiteTitle || common?.siteName || shop?.businessName || 'Storefront');
+  const logoUrl = String(common?.logoUrl || shop?.logoUrl || '');
   const navLabels = (common?.navLabels || {}) as Record<string, string>;
 
   // Footer-specific editable fields
@@ -145,9 +147,9 @@ export function EditableFooter({
   const copyright = String(common?.copyright || `© ${new Date().getFullYear()} ${siteName}. All rights reserved.`);
 
   // Contact / business values
-  const phone = String(business?.phone || common?.phone || contact?.phone || '');
-  const emailContact = String(business?.email || common?.email || contact?.email || '');
-  const address = String(business?.location?.address || common?.address || contact?.address || '');
+  const phone = String(shopContact?.phone || shop?.businessPhone || business?.phone || common?.phone || contact?.phone || '');
+  const emailContact = String(shopContact?.email || shop?.businessEmail || business?.email || common?.email || contact?.email || '');
+  const address = String(shop?.address?.line1 || business?.location?.address || common?.address || contact?.address || '');
 
   // Social media mapping with live editable URL bindings
   const rawSocial = (common?.socialMedia || content?.socialMedia || props.socialMedia || {}) as Record<string, string>;

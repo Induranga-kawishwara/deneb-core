@@ -696,6 +696,41 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
     return () => window.removeEventListener('message', onMessage);
   }, []);
 
+  // Synchronize document.title and favicon in client environments (both preview and live)
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const sd = siteData as unknown as GenericRecord;
+    const common = isRecord(sd?.content?.common) ? (sd.content.common as GenericRecord) : null;
+    const shop = isRecord(sd?.shop) ? (sd.shop as GenericRecord) : null;
+    const site = isRecord(sd?.site) ? (sd.site as GenericRecord) : null;
+
+    const candidateTitle =
+      (typeof common?.websiteTitle === "string" && common.websiteTitle.trim()) ||
+      (typeof shop?.businessName === "string" && shop.businessName.trim()) ||
+      (typeof site?.name === "string" && site.name.trim());
+
+    if (candidateTitle) {
+      document.title = candidateTitle;
+    }
+
+    const candidateIcon =
+      (typeof common?.logoUrl === "string" && common.logoUrl.trim()) ||
+      (typeof shop?.logoUrl === "string" && shop.logoUrl.trim()) ||
+      (typeof site?.logoUrl === "string" && site.logoUrl.trim());
+
+    if (candidateIcon) {
+      let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      if (link.href !== candidateIcon) {
+        link.href = candidateIcon;
+      }
+    }
+  }, [siteData]);
+
   const value = useMemo(() => siteData as SiteData, [siteData]);
   return (
     <SiteDataContext.Provider value={value}>

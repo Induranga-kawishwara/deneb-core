@@ -36,11 +36,54 @@ export function FloatingContactWidget({
   const [isOpen, setIsOpen] = useState(false);
 
   const sdRecord = (siteData && typeof siteData === 'object' ? siteData : {}) as Record<string, unknown>;
+  const content = (sdRecord.content && typeof sdRecord.content === 'object' ? sdRecord.content : {}) as Record<string, unknown>;
+  const common = (content.common && typeof content.common === 'object' ? content.common : {}) as Record<string, unknown>;
+  const contentContact = (content.contact && typeof content.contact === 'object' ? content.contact : {}) as Record<string, unknown>;
+  const shop = (sdRecord.shop && typeof sdRecord.shop === 'object' ? sdRecord.shop : {}) as Record<string, unknown>;
+  const shopContact = (shop.contact && typeof shop.contact === 'object' ? shop.contact : {}) as Record<string, unknown>;
   const contactData = (sdRecord.contact && typeof sdRecord.contact === 'object' ? sdRecord.contact : {}) as Record<string, string>;
-  const phone = contactData.phone || defaultPhone || '';
-  const whatsapp = contactData.whatsapp || defaultWhatsApp || phone;
-  const email = contactData.email || defaultEmail || '';
-  const storeName = typeof (sdRecord.site as Record<string, unknown> | undefined)?.name === 'string' ? ((sdRecord.site as Record<string, unknown>).name as string) : 'Support';
+
+  const phone = String(
+    contentContact.phone ||
+    contentContact.contactNumber ||
+    common.contactNumber ||
+    shopContact.phone ||
+    shop.businessPhone ||
+    contactData.phone ||
+    defaultPhone ||
+    ''
+  ).trim();
+
+  const whatsapp = String(
+    common.whatsapp ||
+    common.whatsappNumber ||
+    contentContact.whatsapp ||
+    contentContact.whatsappNumber ||
+    shopContact.whatsapp ||
+    shop.businessWhatsapp ||
+    shop.whatsapp ||
+    contactData.whatsapp ||
+    defaultWhatsApp ||
+    phone ||
+    ''
+  ).trim();
+
+  const email = String(
+    contentContact.email ||
+    common.email ||
+    shopContact.email ||
+    shop.businessEmail ||
+    contactData.email ||
+    defaultEmail ||
+    ''
+  ).trim();
+
+  const storeName = String(
+    common.websiteTitle ||
+    shop.businessName ||
+    (sdRecord.site as Record<string, unknown> | undefined)?.name ||
+    'Support'
+  ).trim();
 
   const hasWhatsApp = Boolean(whatsapp && whatsapp.trim().length > 0);
   const hasPhone = Boolean(phone && phone.trim().length > 0);

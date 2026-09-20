@@ -50,9 +50,10 @@ export function EditableNavbar({
 
   const content = (siteData?.content || {}) as Record<string, any>;
   const common = (content?.common || {}) as Record<string, any>;
+  const shop = (siteData?.shop || {}) as Record<string, any>;
 
-  const siteName = String(common?.websiteTitle || common?.siteName || 'Storefront');
-  const logoUrl = String(common?.logoUrl || '');
+  const siteName = String(common?.websiteTitle || common?.siteName || shop?.businessName || 'Storefront');
+  const logoUrl = String(common?.logoUrl || shop?.logoUrl || '');
   const headerCtaLabel = String(common?.headerCtaLabel || 'Get in Touch');
   const navLabels = (common?.navLabels || {}) as Record<string, string>;
 
