@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import siteData from "@/data/site-data.json";
 import { SiteDataProvider, ThemeStyles } from "@/lib/siteDataContext";
 import SiteChrome from "@/components/SiteChrome";
-import "./globals.css";
-import "../fonts/deneb-fonts.css";
+import './globals.css';
+import '../fonts/deneb-fonts.css';
 
 export async function generateMetadata(): Promise<Metadata> {
   const sd = siteData as any;

@@ -709,3 +709,4 @@ export function EditableProductGrid({
 
 // Canonical alias
 export const ProductGrid = EditableProductGrid;
+export type ProductGridItem = ProductItem;
