@@ -170,6 +170,26 @@ function packageCleanZip(sourceDir, outputPath) {
     }
   }
 
+  // Preflight check: check if TypeScript catches undefined variables or SSR crashes
+  const tsconfigPath = path.join(sourceDir, 'tsconfig.json');
+  if (fs.existsSync(tsconfigPath)) {
+    try {
+      const { execSync } = require('child_process');
+      execSync('npx tsc --noEmit', { cwd: sourceDir, stdio: 'pipe' });
+    } catch (err) {
+      const out = (err.stdout?.toString() || '') + (err.stderr?.toString() || '');
+      if (out.trim()) {
+        console.warn('\n⚠️  [DENEB WARNING] TypeScript compiler detected errors in this storefront:');
+        const lines = out.trim().split('\n');
+        console.warn('   ' + lines.slice(0, 8).join('\n   '));
+        if (lines.length > 8) {
+          console.warn(`   ... and ${lines.length - 8} more errors.`);
+        }
+        console.warn('⚠️  CRITICAL: Undeclared variables and type errors break Next.js static pre-rendering ("Collecting page data") during portal preview warm-up!\n');
+      }
+    }
+  }
+
   addFolder(sourceDir, '');
   zip.writeZip(outputPath);
   console.log(`\n✓ Successfully packaged clean template ZIP: ${outputPath}`);
