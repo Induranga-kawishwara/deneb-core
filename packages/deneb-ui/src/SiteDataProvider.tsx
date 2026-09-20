@@ -924,3 +924,118 @@ export function useReviews(fallback: GenericRecord[] = []): GenericRecord[] {
   }
   return fallback;
 }
+
+
+/**
+ * Hook to retrieve common storefront metadata (website title, slogan, branding, etc.)
+ * with safe hierarchical fallbacks across content.common, shop profile, and user fallbacks.
+ * Never throws ReferenceError or crashes on missing data.
+ */
+export function useCommon(fallback: GenericRecord = {}): GenericRecord {
+  const siteData = useSiteData();
+  const content = isRecord(siteData?.content) ? siteData.content : null;
+  const common = isRecord(content?.common) ? content.common : {};
+  const contact = isRecord(content?.contact) ? content.contact : {};
+  const shop = useShop();
+
+  const websiteTitle =
+    (typeof common.websiteTitle === 'string' && common.websiteTitle.trim()) ||
+    (typeof shop.name === 'string' && shop.name.trim()) ||
+    (typeof shop.businessName === 'string' && shop.businessName.trim()) ||
+    (typeof fallback.websiteTitle === 'string' && fallback.websiteTitle.trim()) ||
+    'Store';
+
+  const whatsappNumber =
+    (typeof common.whatsappNumber === 'string' && common.whatsappNumber.trim()) ||
+    (typeof contact.whatsappNumber === 'string' && contact.whatsappNumber.trim()) ||
+    (typeof shop.whatsappNumber === 'string' && shop.whatsappNumber.trim()) ||
+    (typeof shop.phone === 'string' && shop.phone.trim()) ||
+    (typeof fallback.whatsappNumber === 'string' && fallback.whatsappNumber.trim()) ||
+    '';
+
+  const cleanWa = whatsappNumber.replace(/\D+/g, '');
+  const whatsappUrl =
+    (typeof common.whatsappUrl === 'string' && common.whatsappUrl.trim()) ||
+    (cleanWa ? `https://wa.me/${cleanWa}` : '') ||
+    (typeof fallback.whatsappUrl === 'string' && fallback.whatsappUrl.trim()) ||
+    '';
+
+  const address =
+    (typeof common.address === 'string' && common.address.trim()) ||
+    (typeof common.footerAddress === 'string' && common.footerAddress.trim()) ||
+    (typeof contact.address === 'string' && contact.address.trim()) ||
+    (typeof shop.address === 'string' && shop.address.trim()) ||
+    (typeof fallback.address === 'string' && fallback.address.trim()) ||
+    '';
+
+  const logoUrl =
+    (typeof common.logoUrl === 'string' && common.logoUrl.trim()) ||
+    (typeof shop.logoUrl === 'string' && shop.logoUrl.trim()) ||
+    (typeof fallback.logoUrl === 'string' && fallback.logoUrl.trim()) ||
+    '';
+
+  return {
+    ...fallback,
+    ...common,
+    websiteTitle,
+    whatsappNumber,
+    whatsappUrl,
+    address,
+    logoUrl,
+  };
+}
+
+/**
+ * Hook to retrieve contact information (WhatsApp, phone, address, email, map link)
+ * with robust fallbacks across contact, common, and shop profile.
+ */
+export function useContact(fallback: GenericRecord = {}): GenericRecord {
+  const siteData = useSiteData();
+  const content = isRecord(siteData?.content) ? siteData.content : null;
+  const contact = isRecord(content?.contact) ? content.contact : {};
+  const common = isRecord(content?.common) ? content.common : {};
+  const shop = useShop();
+
+  const whatsappNumber =
+    (typeof contact.whatsappNumber === 'string' && contact.whatsappNumber.trim()) ||
+    (typeof common.whatsappNumber === 'string' && common.whatsappNumber.trim()) ||
+    (typeof shop.whatsappNumber === 'string' && shop.whatsappNumber.trim()) ||
+    (typeof shop.phone === 'string' && shop.phone.trim()) ||
+    (typeof fallback.whatsappNumber === 'string' && fallback.whatsappNumber.trim()) ||
+    '';
+
+  const cleanWa = whatsappNumber.replace(/\D+/g, '');
+  const whatsappUrl =
+    (typeof contact.whatsappUrl === 'string' && contact.whatsappUrl.trim()) ||
+    (typeof common.whatsappUrl === 'string' && common.whatsappUrl.trim()) ||
+    (cleanWa ? `https://wa.me/${cleanWa}` : '') ||
+    '';
+
+  const address =
+    (typeof contact.address === 'string' && contact.address.trim()) ||
+    (typeof common.address === 'string' && common.address.trim()) ||
+    (typeof shop.address === 'string' && shop.address.trim()) ||
+    (typeof fallback.address === 'string' && fallback.address.trim()) ||
+    '';
+
+  const email =
+    (typeof contact.email === 'string' && contact.email.trim()) ||
+    (typeof shop.email === 'string' && shop.email.trim()) ||
+    (typeof fallback.email === 'string' && fallback.email.trim()) ||
+    '';
+
+  const googleMapLink =
+    (typeof contact.googleMapLink === 'string' && contact.googleMapLink.trim()) ||
+    (typeof fallback.googleMapLink === 'string' && fallback.googleMapLink.trim()) ||
+    '';
+
+  return {
+    ...fallback,
+    ...contact,
+    whatsappNumber,
+    whatsappUrl,
+    address,
+    email,
+    googleMapLink,
+  };
+}
