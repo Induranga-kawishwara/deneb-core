@@ -9,16 +9,29 @@ export interface ProductItem {
   id?: string | number;
   name?: string;
   title?: string;
+  productName?: string;
+  itemTitle?: string;
   brand?: string;
   price?: string | number;
+  cost?: string | number;
+  amount?: string | number;
+  productPrice?: string | number;
+  compareAtPrice?: string | number;
   originalPrice?: string | number;
   currency?: string;
   description?: string;
+  desc?: string;
+  details?: string;
   category?: string;
   imageUrl?: string;
   image?: string;
+  photo?: string;
+  thumbnail?: string;
+  productImage?: string;
+  gallery?: string[];
   images?: string[];
   badge?: string;
+  tag?: string;
   rating?: number | string;
   reviewsCount?: number | string;
   isNew?: boolean;
@@ -227,20 +240,50 @@ export function EditableProductCard({
 }: EditableProductCardProps) {
   const cart = useOptionalCart();
 
-  const name = String(product?.name || product?.title || 'Untitled Product');
+  const titleKey = 'title' in (product || {}) && !('name' in (product || {}) && (product as any).name)
+    ? 'title'
+    : ('productName' in (product || {}) && !('name' in (product || {}) && (product as any).name)
+      ? 'productName'
+      : 'name');
+  const name = String(product?.name || product?.title || (product as any)?.productName || (product as any)?.itemTitle || 'Untitled Product');
   const brand = String(product?.brand || '');
-  const hasPrice = showPrice && product?.price !== undefined && product?.price !== null && String(product.price).trim() !== '';
 
-  const rawPrice = product?.price;
+  const rawPriceCandidate = product?.price ?? (product as any)?.cost ?? (product as any)?.amount ?? (product as any)?.productPrice;
+  const hasPrice = showPrice && rawPriceCandidate !== undefined && rawPriceCandidate !== null && String(rawPriceCandidate).trim() !== '';
+
+  const rawPrice = rawPriceCandidate;
   const priceNum = typeof rawPrice === 'number' ? rawPrice : parseFloat(String(rawPrice || '').replace(/[^0-9.]/g, '')) || 0;
   const formattedPrice = hasPrice ? (typeof rawPrice === 'string' && rawPrice.includes('LKR') ? rawPrice : formatCurrency(priceNum, currency)) : '';
 
-  const originalPrice = product?.originalPrice !== undefined ? String(product.originalPrice) : '';
-  const description = String(product?.description || '');
+  const priceKey = 'cost' in (product || {}) && !('price' in (product || {}) && (product as any).price !== undefined)
+    ? 'cost'
+    : ('amount' in (product || {}) && !('price' in (product || {}) && (product as any).price !== undefined)
+      ? 'amount'
+      : 'price');
+
+  const rawOriginalPrice = product?.originalPrice ?? (product as any)?.compareAtPrice;
+  const originalPrice = rawOriginalPrice !== undefined && rawOriginalPrice !== null ? String(rawOriginalPrice) : '';
+  const originalPriceKey = 'compareAtPrice' in (product || {}) && !('originalPrice' in (product || {}) && (product as any).originalPrice !== undefined)
+    ? 'compareAtPrice'
+    : 'originalPrice';
+
+  const descriptionKey = 'desc' in (product || {}) && !('description' in (product || {}) && (product as any).description)
+    ? 'desc'
+    : 'description';
+  const description = String(product?.description || (product as any)?.desc || (product as any)?.details || '');
+
   const category = String(product?.category || '');
-  const badge = String(product?.badge || '');
+  const badgeKey = 'tag' in (product || {}) && !('badge' in (product || {}) && (product as any).badge) ? 'tag' : 'badge';
+  const badge = String(product?.badge || (product as any)?.tag || '');
+
   const fallbackImage = imageFallback || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80';
-  const imageUrl = String(product?.imageUrl || product?.image || fallbackImage);
+  const rawImage = product?.imageUrl || product?.image || (product as any)?.photo || (product as any)?.thumbnail || (product as any)?.productImage || (Array.isArray(product?.gallery) && product.gallery[0]) || (Array.isArray(product?.images) && product.images[0]);
+  const imageUrl = String(rawImage || fallbackImage);
+  const imageKey = 'image' in (product || {}) && !('imageUrl' in (product || {}) && (product as any).imageUrl)
+    ? 'image'
+    : ('photo' in (product || {}) && !('imageUrl' in (product || {}) && (product as any).imageUrl)
+      ? 'photo'
+      : 'imageUrl');
 
   // Resolved phone number for WhatsApp
   const resolvedPhone = String(product?.whatsappNumber || whatsappNumber || '94770000000');
@@ -346,8 +389,8 @@ export function EditableProductCard({
         }}
       >
         <EditableImage
-          id={`${itemPath}.imageUrl`}
-          data-preview-field-path={`${itemPath}.imageUrl`}
+          id={`${itemPath}.${imageKey}`}
+          data-preview-field-path={`${itemPath}.${imageKey}`}
           src={imageUrl}
           fallbackSrc={imageFallback}
           alt={name}
@@ -361,8 +404,8 @@ export function EditableProductCard({
         {badge && (
           <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 10 }}>
             <EditableBadge
-              id={`${itemPath}.badge`}
-              data-preview-field-path={`${itemPath}.badge`}
+              id={`${itemPath}.${badgeKey}`}
+              data-preview-field-path={`${itemPath}.${badgeKey}`}
               defaultValue={badge}
               badgeVariant="primary"
             />
@@ -423,8 +466,8 @@ export function EditableProductCard({
           {/* Product Title */}
           <EditableText
             as="h3"
-            id={`${itemPath}.name`}
-            data-preview-field-path={`${itemPath}.name`}
+            id={`${itemPath}.${titleKey}`}
+            data-preview-field-path={`${itemPath}.${titleKey}`}
             defaultValue={name}
             style={{
               fontSize: '1.125rem',
@@ -439,8 +482,8 @@ export function EditableProductCard({
           {showDescription && description ? (
             <EditableText
               as="p"
-              id={`${itemPath}.description`}
-              data-preview-field-path={`${itemPath}.description`}
+              id={`${itemPath}.${descriptionKey}`}
+              data-preview-field-path={`${itemPath}.${descriptionKey}`}
               defaultValue={description}
               style={{
                 fontSize: '0.875rem',
@@ -472,8 +515,8 @@ export function EditableProductCard({
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
               <EditableText
                 as="span"
-                id={`${itemPath}.price`}
-                data-preview-field-path={`${itemPath}.price`}
+                id={`${itemPath}.${priceKey}`}
+                data-preview-field-path={`${itemPath}.${priceKey}`}
                 defaultValue={formattedPrice}
                 style={{
                   fontSize: '1.3rem',
@@ -485,8 +528,8 @@ export function EditableProductCard({
               {originalPrice ? (
                 <EditableText
                   as="span"
-                  id={`${itemPath}.originalPrice`}
-                  data-preview-field-path={`${itemPath}.originalPrice`}
+                  id={`${itemPath}.${originalPriceKey}`}
+                  data-preview-field-path={`${itemPath}.${originalPriceKey}`}
                   defaultValue={originalPrice}
                   style={{
                     fontSize: '0.875rem',

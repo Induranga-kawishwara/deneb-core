@@ -460,6 +460,18 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
             ...(nextProducts !== undefined ? { products: nextProducts } : {}),
             ...(nextServices !== undefined ? { services: nextServices } : {}),
             ...(nextReviews !== null ? { reviews: nextReviews, testimonials: nextReviews, feedbacks: nextReviews } : {}),
+            ...(currentContent?.shop && typeof currentContent.shop === 'object' && nextProducts !== undefined
+              ? { shop: { ...currentContent.shop, products: nextProducts } }
+              : {}),
+            ...(currentContent?.catalog && typeof currentContent.catalog === 'object' && nextProducts !== undefined
+              ? { catalog: { ...currentContent.catalog, products: nextProducts } }
+              : {}),
+            ...(currentContent?.menu && typeof currentContent.menu === 'object' && nextProducts !== undefined
+              ? { menu: { ...currentContent.menu, items: nextProducts, products: nextProducts } }
+              : {}),
+            ...(currentContent?.store && typeof currentContent.store === 'object' && nextProducts !== undefined
+              ? { store: { ...currentContent.store, products: nextProducts } }
+              : {}),
             ...(currentHome || Object.keys(nextHome).length > 0
               ? {
                   home: {
@@ -836,20 +848,27 @@ export type DenebData = SiteData;
  */
 export function useProducts(fallback: ProductItem[] = []): ProductItem[] {
   const siteData = useSiteData();
-  const content = isRecord(siteData?.content) ? siteData.content : null;
+  const content = isRecord(siteData?.content) ? (siteData.content as Record<string, unknown>) : null;
   if (!content) return fallback;
 
   let rawList: ProductItem[] | null = null;
-  if (Array.isArray(content.products) && content.products.length > 0) {
-    rawList = content.products as ProductItem[];
-  } else {
-    const home = isRecord(content.home) ? content.home : null;
-    if (home) {
-      if (Array.isArray(home.products) && home.products.length > 0) {
-        rawList = home.products as ProductItem[];
-      } else if (Array.isArray(home.featuredProducts) && home.featuredProducts.length > 0) {
-        rawList = home.featuredProducts as ProductItem[];
-      }
+  const candidates: unknown[] = [
+    content.products,
+    (content.shop as Record<string, unknown> | undefined)?.products,
+    (content.home as Record<string, unknown> | undefined)?.products,
+    (content.home as Record<string, unknown> | undefined)?.featuredProducts,
+    (content.catalog as Record<string, unknown> | undefined)?.products,
+    (content.menu as Record<string, unknown> | undefined)?.items,
+    (content.menu as Record<string, unknown> | undefined)?.products,
+    (content.store as Record<string, unknown> | undefined)?.products,
+    (content.shop as Record<string, unknown> | undefined)?.items,
+    (siteData.shop as Record<string, unknown> | undefined)?.products,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      rawList = candidate as ProductItem[];
+      break;
     }
   }
 
@@ -871,21 +890,24 @@ export function useProducts(fallback: ProductItem[] = []): ProductItem[] {
  */
 export function useServices(fallback: ServiceItem[] = []): ServiceItem[] {
   const siteData = useSiteData();
-  const content = isRecord(siteData?.content) ? siteData.content : null;
+  const content = isRecord(siteData?.content) ? (siteData.content as Record<string, unknown>) : null;
   if (!content) return fallback;
 
-  if (Array.isArray(content.services) && content.services.length > 0) {
-    return content.services as ServiceItem[];
-  }
-  const home = isRecord(content.home) ? content.home : null;
-  if (home) {
-    if (Array.isArray(home.services) && home.services.length > 0) {
-      return home.services as ServiceItem[];
+  const candidates: unknown[] = [
+    content.services,
+    (content.servicesPage as Record<string, unknown> | undefined)?.services,
+    (content.home as Record<string, unknown> | undefined)?.services,
+    (content.home as Record<string, unknown> | undefined)?.featuredServices,
+    (content.company as Record<string, unknown> | undefined)?.services,
+    (content.business as Record<string, unknown> | undefined)?.services,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      return candidate as ServiceItem[];
     }
-    if (Array.isArray(home.featuredServices) && home.featuredServices.length > 0) {
-      return home.featuredServices as ServiceItem[];
-    }
   }
+
   return fallback;
 }
 
