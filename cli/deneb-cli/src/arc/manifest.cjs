@@ -279,6 +279,24 @@ function collectFieldsFromPlan(plan) {
       if (t.labelField) {
         fields.push({ path: t.labelField, type: 'text', value: t.labelFallback });
       }
+      if (t.highlightField) {
+        fields.push({ path: t.highlightField, type: 'text', value: t.highlightFallback });
+      }
+      if (t.operation === 'bind-highlighted-heading' && t.field) {
+        const highlightFrag = (t.fragments || []).find((f) => f.type === 'span' || f.type === 'format');
+        if (highlightFrag) {
+          fields.push({ path: `${t.field}Highlight`, type: 'text', value: highlightFrag.text });
+        }
+      }
+      if (t.propTransforms) {
+        for (const [propName, propInfo] of Object.entries(t.propTransforms)) {
+          fields.push({
+            path: propInfo.field,
+            type: propInfo.type || 'text',
+            value: propInfo.fallback,
+          });
+        }
+      }
       if (t.listField) {
         fields.push({
           path: t.listField,

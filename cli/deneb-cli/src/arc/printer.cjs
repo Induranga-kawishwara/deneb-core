@@ -80,18 +80,31 @@ function printApply(result) {
 
 function printValidation(validation, coverage, design) {
   heading('Validating...');
-  if (validation.syntaxPassed) ok('AST');
+  if (validation.syntaxPassed) ok('AST syntax & component boundaries');
   else warn('AST validation reported parse issues');
   if (validation.contractPassed) ok('editable contracts');
   else warn('editable contract issues detected');
   if (validation.fivoraContractPassed) ok('Fivora strict contract');
   else warn('Fivora strict contract failed — package is not upload-ready');
-  ok('manifest');
+  ok('manifest schema & site-data integrity');
   if (validation.idempotencyPassed !== false) ok('idempotency');
   console.log('');
-  console.log(`  Visual coverage: ${coverage.visualCoverage != null ? coverage.visualCoverage : coverage.editableCoverage}%`);
-  console.log(`  Editable coverage: ${coverage.editableCoverage}%`);
-  console.log(`  Design preservation: ${design.score}%`);
+  heading('Deneb Editability Scorecard');
+  const contractStatus = validation.fivoraContractPassed ? `${C.green}100% (Passed Fivora Ingest Rules)${C.reset}` : `${C.red}Failed${C.reset}`;
+  console.log(`  Contract Validity:     ${contractStatus}`);
+  console.log(`  Editability Coverage:  ${C.bold}${coverage.visualCoverage != null ? coverage.visualCoverage : coverage.editableCoverage}%${C.reset}`);
+  if (coverage.visualCovered != null && coverage.visualRequired != null) {
+    console.log(`    • Visual Elements:   ${coverage.visualCovered}/${coverage.visualRequired} bound`);
+  }
+  if (coverage.uncoveredVisibleText > 0) {
+    console.log(`    • Uncovered Text:    ${coverage.uncoveredVisibleText} node(s)`);
+  }
+  console.log(`  Design Preservation:   ${design.score}%`);
+  if (validation.runtimeVerification) {
+    const runtimeScore = validation.runtimeVerification.runtimeEditabilityScore;
+    const runtimeColor = validation.runtimeVerification.passed ? C.green : C.yellow;
+    console.log(`  Runtime Editability:   ${runtimeColor}${runtimeScore}% (Live Mutation Contract)${C.reset}`);
+  }
 }
 
 function printExplain(plan) {

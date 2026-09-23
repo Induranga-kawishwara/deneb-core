@@ -27,16 +27,28 @@ const {
 } = require('./ast.cjs');
 const { toPosix } = require('./fs-utils.cjs');
 const { BROAD_CONTENT_CONTAINERS } = require('./fivora-contract.cjs');
+const {
+  hasMetadataExport,
+  hasClientDirective,
+  needsClientDirective,
+  canSafelyInjectClientDirective,
+  ensureClientDirective,
+} = require('./rsc-boundary.cjs');
 
-function findElementByLoc(ast, loc) {
-  if (!loc) return null;
-  const parts = loc.split(':');
+function findElementByLoc(ast, loc, tagName = null) {
+  if (!loc && !tagName) return null;
+  const parts = loc ? loc.split(':') : [];
   const targetLoc = parts.length > 4 ? parts.slice(0, 4).join(':') : loc;
   let found = null;
   recast.types.visit(ast, {
     visitJSXElement(pathNode) {
       const k = locKey(pathNode.node);
-      if (k === targetLoc || k === loc) {
+      const name = getJsxName(pathNode.node);
+      if (loc && (k === targetLoc || k === loc || (parts.length >= 2 && k && k.startsWith(`${parts[0]}:${parts[1]}`)))) {
+        found = pathNode;
+        return false;
+      }
+      if (!loc && tagName && (name === tagName || name.endsWith(`.${tagName}`))) {
         found = pathNode;
         return false;
       }
@@ -235,7 +247,18 @@ function applyTransformToElement(pathNode, transform) {
     ensurePreviewPath(node, transform.field);
     return;
   }
-  if (transform.operation === 'extract-image') {
+  if (transform.operation === 'extract-image' || transform.operation === 'extract-picture') {
+    const tagName = getJsxName(node);
+    if (tagName === 'picture') {
+      const children = node.children || [];
+      const imgChild = children.find((c) => c && c.type === 'JSXElement' && (getJsxName(c) === 'img' || getJsxName(c) === 'Image'));
+      if (imgChild) {
+        replaceAttrValue(imgChild, 'src', siteDataBinding(transform.field.split('.'), transform.fallback, 'image'));
+        ensurePreviewPath(imgChild, transform.field);
+      }
+      ensurePreviewPath(node, transform.field);
+      return;
+    }
     replaceAttrValue(node, 'src', siteDataBinding(transform.field.split('.'), transform.fallback, 'image'));
     ensurePreviewPath(node, transform.field);
     return;
@@ -254,6 +277,59 @@ function applyTransformToElement(pathNode, transform) {
     replaceAttrValue(node, propName, siteDataBinding(transform.field.split('.'), transform.fallback, transform.fieldType || 'text'));
     if (!hasJsxAttribute(node, 'data-preview-field-path') && !hasJsxAttribute(node, 'data-preview-list-path')) {
       ensurePreviewPath(node, transform.field);
+    }
+    return;
+  }
+  if (transform.operation === 'bind-button-with-icon') {
+    ensurePreviewPath(node, transform.field);
+    ensureStyleAttrs(node, transform.field, 'button');
+    for (let i = 0; i < (node.children || []).length; i++) {
+      const child = node.children[i];
+      if (child.type === 'JSXText' && child.value.trim().length > 0) {
+        node.children[i] = b.jsxExpressionContainer(
+          siteDataBinding(transform.field.split('.'), child.value.trim(), 'text')
+        );
+      }
+    }
+    return;
+  }
+  if (transform.operation === 'bind-highlighted-heading') {
+    ensurePreviewPath(node, transform.field);
+    ensureStyleAttrs(node, transform.field, 'text');
+    for (let i = 0; i < (node.children || []).length; i++) {
+      const child = node.children[i];
+      if (child.type === 'JSXText' && child.value.trim().length > 0) {
+        node.children[i] = b.jsxExpressionContainer(
+          siteDataBinding(transform.field.split('.'), child.value.trim(), 'text')
+        );
+      } else if (child.type === 'JSXElement') {
+        const highlightField = `${transform.field}Highlight`;
+        ensurePreviewPath(child, highlightField);
+        for (let j = 0; j < (child.children || []).length; j++) {
+          if (child.children[j].type === 'JSXText' && child.children[j].value.trim().length > 0) {
+            child.children[j] = b.jsxExpressionContainer(
+              siteDataBinding(highlightField.split('.'), child.children[j].value.trim(), 'text')
+            );
+          }
+        }
+      }
+    }
+    return;
+  }
+  if (transform.operation === 'prop-flow-callsite') {
+    if (transform.propTransforms) {
+      for (const [propName, propInfo] of Object.entries(transform.propTransforms)) {
+        replaceAttrValue(
+          node,
+          propName,
+          siteDataBinding(propInfo.field.split('.'), propInfo.fallback, propInfo.type || 'text')
+        );
+      }
+    }
+    if (transform.previewPath && !hasJsxAttribute(node, 'previewPath')) {
+      node.openingElement.attributes.push(
+        b.jsxAttribute(b.jsxIdentifier('previewPath'), b.stringLiteral(transform.previewPath))
+      );
     }
     return;
   }
@@ -283,6 +359,33 @@ function applyTransformToElement(pathNode, transform) {
       return;
     }
     ensureStyleAttrs(node, transform.stylePath, transform.styleKind || 'text');
+    return;
+  }
+  if (transform.operation === 'extract-tailwind-bg') {
+    const classAttr = findJsxAttribute(node, 'className') || findJsxAttribute(node, 'class');
+    if (classAttr && classAttr.value) {
+      if (classAttr.value.type === 'StringLiteral' || classAttr.value.type === 'Literal') {
+        const cleaned = String(classAttr.value.value).replace(/\bbg-\[url\([^)]+\)\]\s*/g, '').trim();
+        classAttr.value = b.stringLiteral(cleaned);
+      }
+    }
+    const urlParts = transform.field.split('.');
+    const styleExpr = b.objectExpression([
+      b.property(
+        'init',
+        b.identifier('backgroundImage'),
+        b.templateLiteral(
+          [
+            b.templateElement({ raw: 'url(', cooked: 'url(' }, false),
+            b.templateElement({ raw: ')', cooked: ')' }, true),
+          ],
+          [siteDataBinding(urlParts, transform.fallback || transform.bgUrl || '', 'image')]
+        )
+      ),
+    ]);
+    replaceAttrValue(node, 'style', styleExpr);
+    ensurePreviewPath(node, transform.field);
+    return;
   }
 }
 
@@ -392,6 +495,22 @@ function applyCollectionTransform(ast, transform, isClient = false, isTypeScript
   const itemRoot = findElementByLoc(ast, transform.loc);
   if (!itemRoot) return false;
 
+  const rootTagName = getJsxName(itemRoot.node);
+  const isCustomChild = /^[A-Z]/.test(rootTagName);
+
+  if (isCustomChild) {
+    if (!hasJsxAttribute(itemRoot.node, 'previewItemPath')) {
+      itemRoot.node.openingElement.attributes.push(
+        jsxTemplatePathAttr('previewItemPath', listPath, indexName)
+      );
+    }
+    if (!hasJsxAttribute(itemRoot.node, 'index')) {
+      itemRoot.node.openingElement.attributes.push(
+        b.jsxAttribute(b.jsxIdentifier('index'), b.jsxExpressionContainer(b.identifier(indexName)))
+      );
+    }
+  }
+
   if (!hasJsxAttribute(itemRoot.node, 'data-preview-item-path')) {
     itemRoot.node.openingElement.attributes.push(
       jsxTemplatePathAttr('data-preview-item-path', listPath, indexName)
@@ -416,7 +535,9 @@ function applyCollectionTransform(ast, transform, isClient = false, isTypeScript
   } else {
     markItemFields(callback, { listPath, binding, indexName });
   }
-  markComponentRefItemsStatic(callback, binding);
+  if (!isCustomChild) {
+    markComponentRefItemsStatic(callback, binding);
+  }
 
   const container = findListContainer(mapCall);
   if (container && !hasJsxAttribute(container, 'data-preview-list-path')) {
@@ -613,6 +734,469 @@ function wrapPrimitiveItemFieldInSpan(node, textChild, listPath, indexName) {
     }
   }
   node.children = nextChildren;
+}
+
+function instrumentChildCardComponent(ast, transform, isTypeScript = false) {
+  const componentName = transform.componentName;
+  const listPath = transform.listField || transform.listPath || '';
+  if (!componentName) return false;
+
+  let instrumented = false;
+
+  function updateTsInterface(rootAst, interfaceName) {
+    recast.types.visit(rootAst, {
+      visitTSInterfaceDeclaration(pathNode) {
+        if (pathNode.node.id?.name === interfaceName) {
+          const body = pathNode.node.body?.body || [];
+          if (!body.some((prop) => prop.key?.name === 'previewItemPath')) {
+            const sig1 = b.tsPropertySignature(b.identifier('previewItemPath'), b.tsTypeAnnotation(b.tsStringKeyword()));
+            sig1.optional = true;
+            body.push(sig1);
+            instrumented = true;
+          }
+          if (!body.some((prop) => prop.key?.name === 'index')) {
+            const sig2 = b.tsPropertySignature(b.identifier('index'), b.tsTypeAnnotation(b.tsNumberKeyword()));
+            sig2.optional = true;
+            body.push(sig2);
+            instrumented = true;
+          }
+        }
+        this.traverse(pathNode);
+      },
+      visitTSTypeAliasDeclaration(pathNode) {
+        if (pathNode.node.id?.name === interfaceName && pathNode.node.typeAnnotation?.type === 'TSTypeLiteral') {
+          const members = pathNode.node.typeAnnotation.members || [];
+          if (!members.some((m) => m.key?.name === 'previewItemPath')) {
+            const sig1 = b.tsPropertySignature(b.identifier('previewItemPath'), b.tsTypeAnnotation(b.tsStringKeyword()));
+            sig1.optional = true;
+            members.push(sig1);
+            instrumented = true;
+          }
+          if (!members.some((m) => m.key?.name === 'index')) {
+            const sig2 = b.tsPropertySignature(b.identifier('index'), b.tsTypeAnnotation(b.tsNumberKeyword()));
+            sig2.optional = true;
+            members.push(sig2);
+            instrumented = true;
+          }
+        }
+        this.traverse(pathNode);
+      },
+    });
+  }
+
+  function instrumentFunctionProps(fnNode, isTs) {
+    let changed = false;
+    let params = fnNode.params || [];
+    if (!params.length) {
+      fnNode.params = [
+        b.objectPattern([
+          b.property('init', b.identifier('previewItemPath'), b.identifier('previewItemPath')),
+          b.property('init', b.identifier('index'), b.identifier('index')),
+        ]),
+      ];
+      changed = true;
+    } else {
+      const firstParam = params[0];
+      if (firstParam.type === 'ObjectPattern') {
+        const hasPreviewPath = firstParam.properties.some(
+          (p) => p.key?.name === 'previewItemPath' || p.argument?.name === 'previewItemPath'
+        );
+        if (!hasPreviewPath) {
+          const prop = b.property('init', b.identifier('previewItemPath'), b.identifier('previewItemPath'));
+          prop.shorthand = true;
+          firstParam.properties.push(prop);
+          changed = true;
+        }
+        const hasIndex = firstParam.properties.some(
+          (p) => p.key?.name === 'index' || p.argument?.name === 'index'
+        );
+        if (!hasIndex) {
+          const prop = b.property('init', b.identifier('index'), b.identifier('index'));
+          prop.shorthand = true;
+          firstParam.properties.push(prop);
+          changed = true;
+        }
+
+        if (isTs && firstParam.typeAnnotation?.typeAnnotation) {
+          const typeAnn = firstParam.typeAnnotation.typeAnnotation;
+          if (typeAnn.type === 'TSTypeReference' && typeAnn.typeName?.name) {
+            updateTsInterface(ast, typeAnn.typeName.name);
+          }
+        }
+      } else if (firstParam.type === 'Identifier') {
+        const paramName = firstParam.name;
+        if (isTs && firstParam.typeAnnotation?.typeAnnotation) {
+          const typeAnn = firstParam.typeAnnotation.typeAnnotation;
+          if (typeAnn.type === 'TSTypeReference' && typeAnn.typeName?.name) {
+            updateTsInterface(ast, typeAnn.typeName.name);
+          }
+        }
+        recast.types.visit(fnNode.body || fnNode, {
+          visitVariableDeclarator(vPath) {
+            if (vPath.node.id?.type === 'ObjectPattern' && vPath.node.init?.name === paramName) {
+              const propsList = vPath.node.id.properties;
+              if (!propsList.some((p) => p.key?.name === 'previewItemPath')) {
+                const prop = b.property('init', b.identifier('previewItemPath'), b.identifier('previewItemPath'));
+                prop.shorthand = true;
+                propsList.push(prop);
+                changed = true;
+              }
+              if (!propsList.some((p) => p.key?.name === 'index')) {
+                const prop = b.property('init', b.identifier('index'), b.identifier('index'));
+                prop.shorthand = true;
+                propsList.push(prop);
+                changed = true;
+              }
+            }
+            this.traverse(vPath);
+          },
+        });
+      }
+    }
+    return changed;
+  }
+
+  recast.types.visit(ast, {
+    visitFunctionDeclaration(pathNode) {
+      if (pathNode.node.id?.name === componentName) {
+        if (instrumentFunctionProps(pathNode.node, isTypeScript)) instrumented = true;
+      }
+      this.traverse(pathNode);
+    },
+    visitVariableDeclarator(pathNode) {
+      if (pathNode.node.id?.name === componentName) {
+        const init = pathNode.node.init;
+        if (init && (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression')) {
+          if (instrumentFunctionProps(init, isTypeScript)) instrumented = true;
+        }
+      }
+      this.traverse(pathNode);
+    },
+    visitExportDefaultDeclaration(pathNode) {
+      const decl = pathNode.node.declaration;
+      if (decl && (decl.type === 'FunctionDeclaration' || decl.type === 'ArrowFunctionExpression' || decl.type === 'FunctionExpression')) {
+        const fnName = decl.id?.name;
+        if (!fnName || fnName === componentName) {
+          if (instrumentFunctionProps(decl, isTypeScript)) instrumented = true;
+        }
+      }
+      this.traverse(pathNode);
+    },
+  });
+
+  let rootElement = null;
+  recast.types.visit(ast, {
+    visitReturnStatement(pathNode) {
+      if (!rootElement && pathNode.node.argument) {
+        let arg = pathNode.node.argument;
+        if (arg.type === 'ParenthesizedExpression') arg = arg.expression;
+        if (arg.type === 'JSXElement') {
+          rootElement = arg;
+        }
+      }
+      this.traverse(pathNode);
+    },
+  });
+
+  if (rootElement) {
+    if (!hasJsxAttribute(rootElement, 'data-preview-item-path')) {
+      if (listPath) {
+        rootElement.openingElement.attributes.push(
+          jsxTemplatePathAttr('data-preview-item-path', listPath, 'index')
+        );
+      } else {
+        rootElement.openingElement.attributes.push(
+          b.jsxAttribute(
+            b.jsxIdentifier('data-preview-item-path'),
+            b.jsxExpressionContainer(b.identifier('previewItemPath'))
+          )
+        );
+      }
+      instrumented = true;
+    }
+  }
+
+  recast.types.visit(ast, {
+    visitJSXElement(pathNode) {
+      const node = pathNode.node;
+      const tagName = getJsxName(node);
+
+      const srcAttr = findJsxAttribute(node, 'src');
+      if (srcAttr && (tagName === 'img' || tagName === 'Image') && !hasJsxAttribute(node, 'data-preview-field-path')) {
+        const rawCode = recast.print(srcAttr.value).code;
+        if (/image|photo|avatar|thumb|img|src/i.test(rawCode)) {
+          const imgField = (transform.itemFields || []).find((f) => f.type === 'image' || /image|photo/i.test(f.key))?.key || 'image';
+          if (listPath) {
+            node.openingElement.attributes.push(
+              jsxTemplatePathAttr('data-preview-field-path', listPath, 'index', `.${imgField}`)
+            );
+          } else {
+            node.openingElement.attributes.push(
+              b.jsxAttribute(
+                b.jsxIdentifier('data-preview-field-path'),
+                b.jsxExpressionContainer(
+                  b.templateLiteral(
+                    [
+                      b.templateElement({ raw: '', cooked: '' }, false),
+                      b.templateElement({ raw: `.${imgField}`, cooked: `.${imgField}` }, true),
+                    ],
+                    [b.identifier('previewItemPath')]
+                  )
+                )
+              )
+            );
+          }
+          instrumented = true;
+        }
+      }
+
+      for (const child of node.children || []) {
+        if (child.type === 'JSXExpressionContainer') {
+          const exprCode = recast.print(child.expression).code;
+          if (!hasJsxAttribute(node, 'data-preview-field-path')) {
+            if (/name|title|heading/i.test(exprCode)) {
+              const nameField = (transform.itemFields || []).find((f) => /name|title|heading/i.test(f.key))?.key || 'name';
+              if (listPath) {
+                node.openingElement.attributes.push(
+                  jsxTemplatePathAttr('data-preview-field-path', listPath, 'index', `.${nameField}`)
+                );
+              } else {
+                node.openingElement.attributes.push(
+                  b.jsxAttribute(
+                    b.jsxIdentifier('data-preview-field-path'),
+                    b.jsxExpressionContainer(
+                      b.templateLiteral(
+                        [
+                          b.templateElement({ raw: '', cooked: '' }, false),
+                          b.templateElement({ raw: `.${nameField}`, cooked: `.${nameField}` }, true),
+                        ],
+                        [b.identifier('previewItemPath')]
+                      )
+                    )
+                  )
+                );
+              }
+              instrumented = true;
+              break;
+            } else if (/price|cost|amount/i.test(exprCode)) {
+              const priceField = (transform.itemFields || []).find((f) => /price|cost/i.test(f.key))?.key || 'price';
+              if (listPath) {
+                node.openingElement.attributes.push(
+                  jsxTemplatePathAttr('data-preview-field-path', listPath, 'index', `.${priceField}`)
+                );
+              } else {
+                node.openingElement.attributes.push(
+                  b.jsxAttribute(
+                    b.jsxIdentifier('data-preview-field-path'),
+                    b.jsxExpressionContainer(
+                      b.templateLiteral(
+                        [
+                          b.templateElement({ raw: '', cooked: '' }, false),
+                          b.templateElement({ raw: `.${priceField}`, cooked: `.${priceField}` }, true),
+                        ],
+                        [b.identifier('previewItemPath')]
+                      )
+                    )
+                  )
+                );
+              }
+              instrumented = true;
+              break;
+            } else if (/description|desc|subtitle/i.test(exprCode)) {
+              const descField = (transform.itemFields || []).find((f) => /desc/i.test(f.key))?.key || 'description';
+              if (listPath) {
+                node.openingElement.attributes.push(
+                  jsxTemplatePathAttr('data-preview-field-path', listPath, 'index', `.${descField}`)
+                );
+              } else {
+                node.openingElement.attributes.push(
+                  b.jsxAttribute(
+                    b.jsxIdentifier('data-preview-field-path'),
+                    b.jsxExpressionContainer(
+                      b.templateLiteral(
+                        [
+                          b.templateElement({ raw: '', cooked: '' }, false),
+                          b.templateElement({ raw: `.${descField}`, cooked: `.${descField}` }, true),
+                        ],
+                        [b.identifier('previewItemPath')]
+                      )
+                    )
+                  )
+                );
+              }
+              instrumented = true;
+              break;
+            }
+          }
+        }
+      }
+      this.traverse(pathNode);
+    },
+  });
+
+  return instrumented;
+}
+
+function instrumentReusableComponent(ast, transform, isTypeScript = false) {
+  const componentName = transform.componentName;
+  const propTransforms = transform.propTransforms || {};
+  const propNames = Object.keys(propTransforms);
+  if (!propNames.length) return false;
+
+  let instrumented = false;
+
+  function updateTsInterface(rootAst, interfaceName) {
+    recast.types.visit(rootAst, {
+      visitTSInterfaceDeclaration(pathNode) {
+        if (pathNode.node.id?.name === interfaceName) {
+          const body = pathNode.node.body?.body || [];
+          if (!body.some((m) => m.key?.name === 'previewPath')) {
+            const sig = b.tsPropertySignature(b.identifier('previewPath'), b.tsTypeAnnotation(b.tsStringKeyword()));
+            sig.optional = true;
+            body.push(sig);
+            instrumented = true;
+          }
+        }
+        this.traverse(pathNode);
+      },
+      visitTSTypeAliasDeclaration(pathNode) {
+        if (pathNode.node.id?.name === interfaceName && pathNode.node.typeAnnotation?.type === 'TSTypeLiteral') {
+          const members = pathNode.node.typeAnnotation.members || [];
+          if (!members.some((m) => m.key?.name === 'previewPath')) {
+            const sig = b.tsPropertySignature(b.identifier('previewPath'), b.tsTypeAnnotation(b.tsStringKeyword()));
+            sig.optional = true;
+            members.push(sig);
+            instrumented = true;
+          }
+        }
+        this.traverse(pathNode);
+      },
+    });
+  }
+
+  function instrumentFunctionProps(fnNode, isTs) {
+    let changed = false;
+    let params = fnNode.params || [];
+    if (!params.length) {
+      fnNode.params = [
+        b.objectPattern([
+          b.property('init', b.identifier('previewPath'), b.identifier('previewPath')),
+        ]),
+      ];
+      changed = true;
+    } else {
+      const firstParam = params[0];
+      if (firstParam.type === 'ObjectPattern') {
+        const hasPreviewPath = firstParam.properties.some(
+          (p) => p.key?.name === 'previewPath' || p.argument?.name === 'previewPath'
+        );
+        if (!hasPreviewPath) {
+          const prop = b.property('init', b.identifier('previewPath'), b.identifier('previewPath'));
+          prop.shorthand = true;
+          firstParam.properties.push(prop);
+          changed = true;
+        }
+        if (isTs && firstParam.typeAnnotation?.typeAnnotation) {
+          const typeAnn = firstParam.typeAnnotation.typeAnnotation;
+          if (typeAnn.type === 'TSTypeReference' && typeAnn.typeName?.name) {
+            updateTsInterface(ast, typeAnn.typeName.name);
+          }
+        }
+      } else if (firstParam.type === 'Identifier') {
+        const paramName = firstParam.name;
+        if (isTs && firstParam.typeAnnotation?.typeAnnotation) {
+          const typeAnn = firstParam.typeAnnotation.typeAnnotation;
+          if (typeAnn.type === 'TSTypeReference' && typeAnn.typeName?.name) {
+            updateTsInterface(ast, typeAnn.typeName.name);
+          }
+        }
+        recast.types.visit(fnNode.body || fnNode, {
+          visitVariableDeclarator(vPath) {
+            if (vPath.node.id?.type === 'ObjectPattern' && vPath.node.init?.name === paramName) {
+              const propsList = vPath.node.id.properties;
+              if (!propsList.some((p) => p.key?.name === 'previewPath')) {
+                const prop = b.property('init', b.identifier('previewPath'), b.identifier('previewPath'));
+                prop.shorthand = true;
+                propsList.push(prop);
+                changed = true;
+              }
+            }
+            this.traverse(vPath);
+          },
+        });
+      }
+    }
+    return changed;
+  }
+
+  recast.types.visit(ast, {
+    visitFunctionDeclaration(pathNode) {
+      if (!componentName || pathNode.node.id?.name === componentName) {
+        if (instrumentFunctionProps(pathNode.node, isTypeScript)) instrumented = true;
+      }
+      this.traverse(pathNode);
+    },
+    visitVariableDeclarator(pathNode) {
+      if (pathNode.node.id?.name === componentName) {
+        const init = pathNode.node.init;
+        if (init && (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression')) {
+          if (instrumentFunctionProps(init, isTypeScript)) instrumented = true;
+        }
+      }
+      this.traverse(pathNode);
+    },
+    visitExportDefaultDeclaration(pathNode) {
+      const decl = pathNode.node.declaration;
+      if (decl && (decl.type === 'FunctionDeclaration' || decl.type === 'ArrowFunctionExpression' || decl.type === 'FunctionExpression')) {
+        const fnName = decl.id?.name;
+        if (!fnName || fnName === componentName) {
+          if (instrumentFunctionProps(decl, isTypeScript)) instrumented = true;
+        }
+      }
+      this.traverse(pathNode);
+    },
+  });
+
+  recast.types.visit(ast, {
+    visitJSXElement(pathNode) {
+      const node = pathNode.node;
+      for (const child of node.children || []) {
+        if (child.type === 'JSXExpressionContainer') {
+          const expr = child.expression;
+          let propMatch = null;
+          if (expr && expr.type === 'Identifier' && propNames.includes(expr.name)) {
+            propMatch = expr.name;
+          } else if (expr && expr.type === 'LogicalExpression' && expr.left?.name && propNames.includes(expr.left.name)) {
+            propMatch = expr.left.name;
+          }
+          if (propMatch && !hasJsxAttribute(node, 'data-preview-field-path')) {
+            const previewAttr = b.jsxAttribute(
+              b.jsxIdentifier('data-preview-field-path'),
+              b.jsxExpressionContainer(
+                b.conditionalExpression(
+                  b.identifier('previewPath'),
+                  b.templateLiteral(
+                    [
+                      b.templateElement({ raw: '', cooked: '' }, false),
+                      b.templateElement({ raw: `.${propMatch}`, cooked: `.${propMatch}` }, true),
+                    ],
+                    [b.identifier('previewPath')]
+                  ),
+                  b.identifier('undefined')
+                )
+              )
+            );
+            node.openingElement.attributes.push(previewAttr);
+            instrumented = true;
+            break;
+          }
+        }
+      }
+      this.traverse(pathNode);
+    },
+  });
+
+  return instrumented;
 }
 
 /** The nearest JSX element that wraps the map expression. */
@@ -973,7 +1557,8 @@ function applyFilePlan(filePlan, profile) {
   }
 
   const ast = parseSource(filePlan.originalCode, filePlan.file);
-  const isClient = hasDirective(ast, 'use client') || /['"]use client['"]/.test(filePlan.originalCode.slice(0, 400));
+  let isClient = hasDirective(ast, 'use client') || hasClientDirective(ast) || /['"]use client['"]/.test(filePlan.originalCode.slice(0, 400));
+  const hasMetadata = hasMetadataExport(ast);
   let applied = 0;
   const failures = [];
 
@@ -982,6 +1567,7 @@ function applyFilePlan(filePlan, profile) {
     'form-submit-action',
     'extract-url',
     'extract-image',
+    'extract-picture',
     'extract-alt',
     'extract-placeholder',
     'extract-text',
@@ -989,6 +1575,12 @@ function applyFilePlan(filePlan, profile) {
     'wrap-text-span',
     'collection-conversion',
     'style-bind',
+    'extract-tailwind-bg',
+    'instrument-child-card',
+    'bind-button-with-icon',
+    'bind-highlighted-heading',
+    'prop-flow-callsite',
+    'instrument-reusable-component',
   ]);
 
   const isTypeScript = Boolean(filePlan.file && /\.(tsx|ts)$/.test(filePlan.file));
@@ -1005,6 +1597,24 @@ function applyFilePlan(filePlan, profile) {
     if (transform.decision === 'skip') continue;
     if (!supported.has(transform.operation)) continue;
 
+    if (transform.operation === 'instrument-child-card') {
+      try {
+        if (instrumentChildCardComponent(ast, transform, isTypeScript)) applied++;
+      } catch (err) {
+        failures.push({ loc: transform.loc, reason: err.message });
+      }
+      continue;
+    }
+
+    if (transform.operation === 'instrument-reusable-component') {
+      try {
+        if (instrumentReusableComponent(ast, transform, isTypeScript)) applied++;
+      } catch (err) {
+        failures.push({ loc: transform.loc, reason: err.message });
+      }
+      continue;
+    }
+
     if (transform.operation === 'collection-conversion') {
       try {
         if (applyCollectionTransform(ast, transform, isClient, isTypeScript)) applied++;
@@ -1015,7 +1625,7 @@ function applyFilePlan(filePlan, profile) {
       continue;
     }
 
-    const pathNode = findElementByLoc(ast, transform.loc);
+    const pathNode = findElementByLoc(ast, transform.loc, transform.componentName || transform.tag);
     if (!pathNode) {
       failures.push({ loc: transform.loc, reason: 'node-not-found' });
       continue;
@@ -1030,6 +1640,13 @@ function applyFilePlan(filePlan, profile) {
 
   if (applied === 0) {
     return { code: filePlan.originalCode, changed: false, applied, failures };
+  }
+
+  if (!isClient && profile?.router === 'next-app' && !hasMetadata && canSafelyInjectClientDirective(ast, filePlan.file, profile)) {
+    if (needsClientDirective(ast, filePlan.originalCode)) {
+      ensureClientDirective(ast);
+      isClient = true;
+    }
   }
 
   const siteDataImport = resolveSiteDataSpecifier(profile, filePlan.file);
@@ -2129,5 +2746,6 @@ module.exports = {
   healUnguardedModalConditionals,
   healUnguardedModalConditionalsInSource,
   injectSiteDataHook,
+  instrumentChildCardComponent,
 };
 

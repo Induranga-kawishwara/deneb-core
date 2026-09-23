@@ -30,6 +30,8 @@ const {
 } = require('./adapters.cjs');
 const { shortHash } = require('./fs-utils.cjs');
 const { resolveImportSpecifier } = require('./scanner.cjs');
+const { resolvePublicAssetUrl } = require('./ir-builder.cjs');
+const { analyzeElementFragments } = require('./text-fragment-analyzer.cjs');
 const { BROAD_CONTENT_CONTAINERS } = require('./fivora-contract.cjs');
 
 const TECHNICAL_TEXT_RE = /^(true|false|null|undefined|px|rem|em|auto|hidden|flex|grid|sr-only)$/i;
@@ -239,7 +241,34 @@ function isDynamicExpression(expr, bindings) {
   return true;
 }
 
+function getBindingVal(bindings, name) {
+  if (!bindings) return undefined;
+  if (typeof bindings.get === 'function') return bindings.get(name);
+  return bindings[name];
+}
+
+function hasDynamicExpressionChild(node, bindings) {
+  const children = node.children || [];
+  for (const child of children) {
+    if (!child) continue;
+    if (child.type === 'JSXExpressionContainer') {
+      const expr = child.expression;
+      if (!expr) continue;
+      if (expr.type === 'StringLiteral' || (expr.type === 'Literal' && typeof expr.value === 'string')) continue;
+      if (expr.type === 'NumericLiteral' || (expr.type === 'Literal' && typeof expr.value === 'number')) continue;
+      if (expr.type === 'TemplateLiteral' && (!expr.expressions || expr.expressions.length === 0)) continue;
+      if (expr.type === 'Identifier' && typeof getBindingVal(bindings, expr.name) === 'string') continue;
+      return true;
+    }
+  }
+  return false;
+}
+
 function resolveChildText(node, bindings) {
+  if (hasDynamicExpressionChild(node, bindings)) {
+    return { text: '', dynamic: true, fromBinding: false };
+  }
+
   const direct = collectJsxText(node);
   if (direct) return { text: direct, dynamic: false, fromBinding: false };
 
@@ -256,9 +285,14 @@ function resolveChildText(node, bindings) {
       if (!expr) continue;
       if (expr.type === 'StringLiteral' || (expr.type === 'Literal' && typeof expr.value === 'string')) {
         texts.push(String(expr.value));
-      } else if (expr.type === 'Identifier' && typeof bindings.get(expr.name) === 'string') {
-        texts.push(bindings.get(expr.name));
-        fromBinding = true;
+      } else if (expr.type === 'Identifier') {
+        const val = getBindingVal(bindings, expr.name);
+        if (typeof val === 'string') {
+          texts.push(val);
+          fromBinding = true;
+        } else {
+          return { text: '', dynamic: true, fromBinding: false };
+        }
       } else if (expr.type === 'TemplateLiteral' && expr.expressions.length === 0) {
         texts.push(expr.quasis.map((q) => q.value.cooked || '').join(''));
       } else {
@@ -496,7 +530,7 @@ function collectLooseText(code) {
   return /<(h[1-6]|p|Button|span)[^>]*>\s*[A-Za-z]/.test(code);
 }
 
-function analyzeFile({ code, relativeFile, profile, graph, ownerScope, componentMeta }) {
+function analyzeFile({ code, relativeFile, profile, graph, ownerScope, componentMeta, ir = profile?.ir || null }) {
   const adapters = activeAdapters(profile);
   const fileSkip = skipReasonForFile(relativeFile, code);
   if (fileSkip) {
@@ -598,13 +632,73 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
         return;
       }
 
+      const parents = parentNames(pathNode);
+
+      if (name === 'source' && (parents[0] === 'picture' || recognition?.kind === 'responsive-image-source')) {
+        candidates.push({
+          loc,
+          tag: name,
+          kind: 'decoration',
+          confidence: 0.95,
+          skip: true,
+          reason: 'picture-source-child',
+          file: relativeFile,
+          ownerScope,
+        });
+        this.traverse(pathNode);
+        return;
+      }
+
       const href = getJsxAttributeLiteral(node, 'href');
-      const src = getJsxAttributeLiteral(node, 'src');
+      let src = getJsxAttributeLiteral(node, 'src');
+      let importedAssetIdentifier = null;
+
+      if (name === 'picture') {
+        const children = node.children || [];
+        const imgChild = children.find((c) => c && c.type === 'JSXElement' && (getJsxName(c) === 'img' || getJsxName(c) === 'Image'));
+        if (imgChild) {
+          src = getJsxAttributeLiteral(imgChild, 'src');
+          if (!src && imgChild.openingElement) {
+            const srcAttr = findJsxAttribute(imgChild, 'src');
+            if (srcAttr && srcAttr.value?.type === 'JSXExpressionContainer') {
+              const expr = srcAttr.value.expression;
+              if (expr?.type === 'Identifier') {
+                const spec = imports[expr.name];
+                if (spec) {
+                  const currentFileAbs = profile?.root ? path.join(profile.root, relativeFile) : null;
+                  const publicUrl = resolvePublicAssetUrl(profile, currentFileAbs, spec);
+                  if (publicUrl) {
+                    src = publicUrl;
+                    importedAssetIdentifier = expr.name;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (!src && node.openingElement) {
+        const srcAttr = findJsxAttribute(node, 'src');
+        if (srcAttr && srcAttr.value?.type === 'JSXExpressionContainer') {
+          const expr = srcAttr.value.expression;
+          if (expr?.type === 'Identifier') {
+            const spec = imports[expr.name];
+            if (spec) {
+              const currentFileAbs = profile?.root ? path.join(profile.root, relativeFile) : null;
+              const publicUrl = resolvePublicAssetUrl(profile, currentFileAbs, spec);
+              if (publicUrl) {
+                src = publicUrl;
+                importedAssetIdentifier = expr.name;
+              }
+            }
+          }
+        }
+      }
       const alt = getJsxAttributeLiteral(node, 'alt');
       const placeholder = getJsxAttributeLiteral(node, 'placeholder');
       const className = classNameOf(node);
       const textInfo = resolveChildText(node, bindings);
-      const parents = parentNames(pathNode);
       const actionNode = resolveActionWithAdapters(node, adapters) || (ACTION_TAGS.has(name) ? node : null);
 
       const isHeaderNav =
@@ -679,10 +773,10 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
           kind: 'image',
           operation: 'extract-image',
           value: src,
-          extra: { alt },
+          extra: { alt, importedIdentifier: importedAssetIdentifier },
           confidence: confidenceFor('image', { dynamic: false }),
-          reason: 'literal-image-source',
-          fingerprint: fingerprintCandidate({ tag: name, kind: 'image', hasAlt: Boolean(alt) }),
+          reason: importedAssetIdentifier ? 'imported-static-asset-image' : 'literal-image-source',
+          fingerprint: fingerprintCandidate({ tag: name, kind: 'image', hasAlt: Boolean(alt), imported: Boolean(importedAssetIdentifier) }),
         });
         if (alt && !isStaticSkipText(alt)) {
           candidates.push({
@@ -712,8 +806,24 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
         });
       }
 
+      const bgMatch = className && className.match(/\bbg-\[url\(['"]?([^'"\)]+)['"]?\)\]/);
+      if (bgMatch && bgMatch[1] && !usedLocs.has(loc + ':bg')) {
+        usedLocs.add(loc + ':bg');
+        candidates.push({
+          ...baseMeta,
+          kind: 'image',
+          operation: 'extract-tailwind-bg',
+          value: bgMatch[1],
+          extra: { rawClass: className, bgUrl: bgMatch[1] },
+          confidence: 0.92,
+          reason: 'tailwind-arbitrary-background-image',
+          fingerprint: fingerprintCandidate({ tag: name, kind: 'bg-image', url: bgMatch[1] }),
+        });
+      }
+
       const isCustomComponent = Boolean(name && ((name[0] >= 'A' && name[0] <= 'Z') || name.includes('.')));
       if (isCustomComponent && !apiOwned && node.openingElement && Array.isArray(node.openingElement.attributes)) {
+        const passedLiteralProps = {};
         for (const attr of node.openingElement.attributes) {
           if (attr.type === 'JSXAttribute' && attr.name && USER_FACING_PROP_NAMES.has(attr.name.name)) {
             const propName = attr.name.name;
@@ -725,10 +835,13 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
                 const expr = attr.value.expression;
                 if (expr && (expr.type === 'StringLiteral' || expr.type === 'Literal')) {
                   propValue = String(expr.value || '');
+                } else if (expr && (expr.type === 'NumericLiteral' || (expr.type === 'Literal' && typeof expr.value === 'number'))) {
+                  propValue = expr.value;
                 }
               }
             }
-            if (propValue && !isStaticSkipText(propValue)) {
+            if (propValue && !isStaticSkipText(String(propValue))) {
+              passedLiteralProps[propName] = propValue;
               const propLoc = `${loc}:${propName}`;
               if (!usedLocs.has(propLoc)) {
                 usedLocs.add(propLoc);
@@ -745,6 +858,27 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
                 });
               }
             }
+          }
+        }
+        if (Object.keys(passedLiteralProps).length > 0 && !usedLocs.has(loc + ':prop-flow')) {
+          usedLocs.add(loc + ':prop-flow');
+          const compDef = (profile?.components || []).find((c) => c.name === name) ||
+            (ir && typeof ir.getComponent === 'function' && ir.getComponent(name));
+          if (compDef) {
+            candidates.push({
+              ...baseMeta,
+              kind: 'prop-flow',
+              operation: 'prop-flow-callsite',
+              value: passedLiteralProps,
+              extra: {
+                componentName: name,
+                componentFile: compDef.file,
+                literalProps: passedLiteralProps,
+              },
+              confidence: 0.95,
+              reason: `reusable-component-prop-flow-${name}`,
+              fingerprint: fingerprintCandidate({ tag: name, kind: 'prop-flow', props: Object.keys(passedLiteralProps) }),
+            });
           }
         }
       }
@@ -850,6 +984,47 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
         }
       }
 
+      const fragAnalysis = analyzeElementFragments(node);
+      if (fragAnalysis.isButtonWithIcon && !apiOwned && !textInfo.dynamic && !usedLocs.has(loc)) {
+        usedLocs.add(loc);
+        candidates.push({
+          ...baseMeta,
+          kind: 'text',
+          operation: 'bind-button-with-icon',
+          value: fragAnalysis.combinedText,
+          extra: { tag: name, cta: true, hasIcons: true },
+          confidence: 0.94,
+          reason: 'action-button-with-icon-preserved',
+          fingerprint: fingerprintCandidate({ tag: name, kind: 'btn-icon', text: fragAnalysis.combinedText }),
+        });
+        this.traverse(pathNode);
+        return;
+      }
+
+      if (fragAnalysis.isHighlightedHeading && !apiOwned && !textInfo.dynamic && !usedLocs.has(loc)) {
+        usedLocs.add(loc);
+        candidates.push({
+          ...baseMeta,
+          kind: 'text',
+          operation: 'bind-highlighted-heading',
+          value: fragAnalysis.combinedText,
+          extra: {
+            tag: name,
+            fragments: fragAnalysis.pureTextFragments.map((f) => ({
+              type: f.type,
+              text: f.text,
+              className: f.className || '',
+              tag: f.tag || 'span',
+            })),
+          },
+          confidence: 0.96,
+          reason: 'semantic-heading-with-highlight-span',
+          fingerprint: fingerprintCandidate({ tag: name, kind: 'heading-highlight', text: fragAnalysis.combinedText }),
+        });
+        this.traverse(pathNode);
+        return;
+      }
+
       const headingLike = HEADING_TAGS.has(name) || (recognition && recognition.kind === 'text' && HEADING_TAGS.has(recognition.tag || name));
       const textLike = TEXT_TAGS.has(name) || headingLike || name === 'Button' || name === 'button' || (recognition && recognition.kind === 'text');
       if (textLike && !isAction) {
@@ -919,12 +1094,33 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
         const { usage: itemUsage, usesItemAsComponent, usesDirectItem } = collectItemFieldUsage(mapInfo.callback, mapInfo.itemParam);
         const objectItems = arr.items.every((item) => item.type === 'object');
         const stringItems = arr.items.every((item) => item.type === 'string');
+        const rootTagName = getJsxName(mapInfo.rootElement);
+        const isChildCustomComponent = /^[A-Z]/.test(rootTagName);
+
+        // If the map returns a custom child component (e.g. <ProductCard product={item} />),
+        // derive item fields from the sample object items if direct JSX member usage was empty
+        if (isChildCustomComponent && objectItems && itemUsage.size === 0 && arr.items[0]?.value) {
+          const sampleObj = arr.items[0].value;
+          for (const key of Object.keys(sampleObj)) {
+            if (/^(id|_id|key|slug)$/i.test(key)) continue;
+            const role = /image|photo|avatar|icon|thumb|img/i.test(key)
+              ? 'image'
+              : /price|cost|amount|count|rating|stars/i.test(key)
+                ? 'number'
+                : /url|link|href/i.test(key)
+                  ? 'url'
+                  : 'text';
+            itemUsage.set(key, role);
+          }
+        }
+
         const boundProperties = [...itemUsage.keys()];
         const convertible =
           (objectItems &&
             boundProperties.length > 0 &&
             arr.items.some((item) => boundProperties.some((key) => key in item.value))) ||
-          (stringItems && usesDirectItem);
+          (stringItems && usesDirectItem) ||
+          (isChildCustomComponent && objectItems && boundProperties.length > 0);
 
         candidates.push({
           ...baseMeta,
@@ -939,18 +1135,21 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
             indexParam: mapInfo.indexParam,
             itemFields: stringItems ? [] : [...itemUsage.entries()].map(([key, role]) => ({ key, role })),
             objectItems,
-            hasComponentRef: usesItemAsComponent,
+            hasComponentRef: usesItemAsComponent && !isChildCustomComponent,
+            childComponentName: isChildCustomComponent ? rootTagName : null,
           },
           confidence: convertible
             ? confidenceFor('collection', { staticCollection: true })
             : usesItemAsComponent
               ? 0.2
               : 0.82,
-          reason: usesItemAsComponent
+          reason: usesItemAsComponent && !isChildCustomComponent
             ? 'collection-holds-component-ref'
-            : convertible
-              ? (stringItems ? 'static-primitive-array-map' : 'static-array-map')
-              : 'collection-shape-partial',
+            : isChildCustomComponent
+              ? 'collection-with-child-component'
+              : convertible
+                ? (stringItems ? 'static-primitive-array-map' : 'static-array-map')
+                : 'collection-shape-partial',
           fingerprint: fingerprintCandidate({ tag: name, kind: 'collection', size: arr.items.length }),
         });
       }
@@ -995,4 +1194,6 @@ module.exports = {
   fingerprintCandidate,
   normalizeText,
   isStaticSkipText,
+  resolveChildText,
 };
+
