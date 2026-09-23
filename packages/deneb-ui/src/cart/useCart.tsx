@@ -16,6 +16,16 @@ export interface CartItem {
   metadata?: Record<string, unknown>;
 }
 
+
+export function parseNumericPrice(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string" || !value.trim()) return 0;
+  const match = value.match(/-?\d+(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?/);
+  if (!match) return 0;
+  const parsed = parseFloat(match[0].replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function formatCurrency(amount: number, currency = 'LKR'): string {
   const formatted = (amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (currency === 'LKR' || currency === 'Rs.' || currency === 'Rs') {
