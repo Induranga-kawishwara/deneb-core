@@ -6,7 +6,7 @@ const { spawnSync } = require('node:child_process');
 const readline = require('node:readline');
 const crypto = require('node:crypto');
 
-// SHA-256 hash of default key ("lvuchami") — prevents plain text exposure in repository
+// SHA-256 hash of default key — prevents plain text exposure in repository
 const DENEB_AI_DEFAULT_KEY_HASH = '6f791210e05b535d0e48e260273b3ddb511aefb63ad2a2a35b838a80a6127588';
 
 /**
