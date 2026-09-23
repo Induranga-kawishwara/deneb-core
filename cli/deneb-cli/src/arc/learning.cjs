@@ -108,6 +108,10 @@ const BASELINE_VERIFIED_FINGERPRINTS = {
   'empty-state-array-guard': { id: 'empty-state-array-guard', state: 'verified', successfulApplications: 50, failedApplications: 0 },
   'action-label-split': { id: 'action-label-split', state: 'verified', successfulApplications: 50, failedApplications: 0 },
   'section-overflow-clip': { id: 'section-overflow-clip', state: 'verified', successfulApplications: 50, failedApplications: 0 },
+  'auto-injected-site-data-hook': { id: 'auto-injected-site-data-hook', state: 'verified', successfulApplications: 50, failedApplications: 0 },
+  'hidden-preview-marker-strip': { id: 'hidden-preview-marker-strip', state: 'verified', successfulApplications: 50, failedApplications: 0 },
+  'unknown-marker-auto-prune': { id: 'unknown-marker-auto-prune', state: 'verified', successfulApplications: 50, failedApplications: 0 },
+  'hidden-element-strict-contract': { id: 'hidden-element-strict-contract', state: 'deprecated', successfulApplications: 0, failedApplications: 50 },
 };
 
 function loadFingerprintBoost(fingerprint) {

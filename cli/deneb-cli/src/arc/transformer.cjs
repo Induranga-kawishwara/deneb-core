@@ -1537,7 +1537,7 @@ function sanitizeContradictoryMarkers(ast) {
 }
 
 function sanitizeContradictoryMarkersInSource(code, relativeFile) {
-  if (!code.includes('data-preview-static') && !code.includes('data-preview-field-path') && !code.includes('overflow-hidden')) {
+  if (!code.includes('data-preview-static') && !code.includes('data-preview-field-path') && !code.includes('data-preview-list-path') && !code.includes('data-preview-item-path') && !code.includes('overflow-hidden') && !code.includes('hidden')) {
     return { code, updated: false };
   }
   let ast;
@@ -1720,10 +1720,15 @@ function healHiddenPreviewMarkers(ast) {
           if (expr.type === 'TemplateLiteral') classText = (expr.quasis || []).map((q) => q.value.cooked || q.value.raw || '').join(' ');
         }
       }
-      const hiddenAttr = attrs.some(
-        (attr) => attr.type === 'JSXAttribute' && attr.name && (attr.name.name === 'hidden' || (attr.name.name === 'aria-hidden' && recast.print(attr).code.includes('true')))
-      );
-      if (hiddenAttr || /(^|\s)hidden(\s|$)/.test(classText)) {
+      const isHidden =
+        attrs.some((attr) => attr.type === 'JSXAttribute' && attr.name && (
+          attr.name.name === 'hidden' ||
+          (attr.name.name === 'aria-hidden' && /true/.test(recast.print(attr).code))
+        )) ||
+        /(?<![\w-])hidden(?![a-zA-Z0-9_-])/.test(classText) ||
+        attrs.some((attr) => attr.type === 'JSXAttribute' && attr.name && attr.name.name === 'style' && /(?:display\s*:\s*['"]none['"]|visibility\s*:\s*['"]hidden['"])/.test(recast.print(attr).code));
+
+      if (isHidden) {
         pathNode.node.attributes = attrs.filter(
           (attr) =>
             !(

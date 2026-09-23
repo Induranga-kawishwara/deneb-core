@@ -201,6 +201,7 @@ function runDoctor(targetDirInput = '.', options = {}) {
   // =========================================================================
   if (!isJson) console.log('\n\x1b[1m[2/7] Project Package Configuration:\x1b[0m');
   const suite2 = 'Package Configuration';
+  const sourceFiles = findSourceFiles(path.join(targetDir, 'src'));
 
   const pkgPath = path.join(targetDir, 'package.json');
   let pkg = null;
@@ -286,6 +287,20 @@ function runDoctor(targetDirInput = '.', options = {}) {
         addCheck(suite2, 'fixed', 'Platform Engine Compatibility', 'Injected Node 20 overrides for content-type: 2.1.0', { code: 'DNB-ENG-001' }) //, 'Injected Node 20 overrides for content-type: 2.1.0');
       } else {
         addCheck(suite2, 'err', 'Platform Engine Compatibility', 'Detected packages requiring Node >=22. Run "deneb doctor --fix" to inject Node 20 overrides.', { code: 'DNB-ENG-001' }) //, 'Detected packages requiring Node >=22. Run "deneb doctor --fix" to inject Node 20 overrides.');
+      }
+
+      // Pre-heal missing useSiteData hooks before tsc runs when --fix is enabled
+      if (shouldFix) {
+        for (const file of sourceFiles) {
+          if (!/\.(tsx|jsx|ts|js)$/.test(file)) continue;
+          let c = fs.readFileSync(file, 'utf-8');
+          if (c.includes('siteData')) {
+            const healed = healMissingSiteDataHooks(c, file);
+            if (healed && healed !== c) {
+              fs.writeFileSync(file, healed, 'utf8');
+            }
+          }
+        }
       }
 
       // Check TypeScript compilation preflight
@@ -480,7 +495,7 @@ function runDoctor(targetDirInput = '.', options = {}) {
   }
 
   // Scan all source files for visual editing contract compliance
-  const sourceFiles = findSourceFiles(path.join(targetDir, 'src'));
+  // (sourceFiles already loaded)
   const foundFieldPaths = new Set();
   const orphanPaths = [];
   const missingInSchema = [];
@@ -869,7 +884,7 @@ function runDoctor(targetDirInput = '.', options = {}) {
   for (const file of sourceFiles) {
     if (!/\.(tsx|jsx|ts|js)$/.test(file)) continue;
     let c = fs.readFileSync(file, 'utf-8');
-    if (c.includes('siteData') && (c.includes('useSiteData') || c.includes('@deneb-ui/ui'))) {
+    if (c.includes('siteData')) {
       const healed = healMissingSiteDataHooks(c, file);
       const norm = (s) => s.replace(/\r\n/g, '\n');
       if (healed && norm(healed) !== norm(c)) {
