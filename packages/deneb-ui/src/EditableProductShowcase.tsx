@@ -207,26 +207,40 @@ export function EditableProductShowcase({
         return { name: c?.name || `Color ${cIdx + 1}`, hex: c?.hex || '#9d9890' };
       });
 
+      const rawImage = item.image || item.imageUrl || item.photo || item.thumbnail || (Array.isArray(item.images) && item.images[0]);
       const resolvedImage =
-        item.image && typeof item.image === 'string' && item.image.trim() !== ''
-          ? item.image
-          : (item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim() !== ''
-              ? item.imageUrl
-              : (def.image || '/images/showcase-phone.jpg'));
+        typeof rawImage === 'string' && rawImage.trim() !== ''
+          ? rawImage
+          : (def.image || '/images/showcase-phone.jpg');
+
+      const rawPrice = item.price ?? item.cost ?? item.amount ?? item.productPrice;
+      const parsedPrice =
+        typeof rawPrice === 'number'
+          ? rawPrice
+          : typeof rawPrice === 'string'
+            ? parseFloat(rawPrice.replace(/[^0-9.]/g, ''))
+            : NaN;
+      const finalPrice = Number.isFinite(parsedPrice) ? parsedPrice : def.price;
+
+      const rawOrig = item.originalPrice ?? item.compareAtPrice;
+      const parsedOrig =
+        typeof rawOrig === 'number'
+          ? rawOrig
+          : typeof rawOrig === 'string'
+            ? parseFloat(rawOrig.replace(/[^0-9.]/g, ''))
+            : NaN;
+      const finalOrig = Number.isFinite(parsedOrig) ? parsedOrig : def.originalPrice;
 
       return {
         ...def,
         ...item,
         _index: idx,
         id: item.id || `product-${idx}`,
-        name: item.name || item.title || def.name,
+        name: item.name || item.title || item.productName || item.itemTitle || def.name,
         brand: item.brand || item.category || def.brand || 'Store',
         subtitle: item.subtitle || def.subtitle || '',
-        price: item.price != null ? Number(item.price) : def.price,
-        originalPrice:
-          item.originalPrice != null
-            ? Number(item.originalPrice)
-            : (item.compareAtPrice != null ? Number(item.compareAtPrice) : def.originalPrice),
+        price: finalPrice,
+        originalPrice: finalOrig,
         condition: item.condition || def.condition || 'Brand New',
         category: item.category || item.brand || def.category || 'All',
         badge: item.badge || def.badge || '',

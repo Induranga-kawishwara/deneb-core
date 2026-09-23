@@ -345,19 +345,8 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
         const currentContact = isRecord(currentContent.contact) ? currentContent.contact : {};
 
         const rawLiveProducts = Array.isArray(live.products) ? live.products : currentContent.products;
-        const nextProducts = Array.isArray(rawLiveProducts)
-          ? rawLiveProducts.map((p: any) => {
-              if (!isRecord(p)) return p;
-              const customData = isRecord(p.customData) ? p.customData : {};
-              return {
-                ...customData,
-                ...p,
-              };
-            })
-          : rawLiveProducts;
-        const nextServices = Array.isArray(live.services)
-          ? live.services
-          : currentContent.services;
+        const nextProducts = Array.isArray(rawLiveProducts) ? rawLiveProducts.map(normalizeProductItem) : rawLiveProducts;
+        const nextServices = Array.isArray(live.services) ? (live.services as unknown[]).map(normalizeServiceItem) : currentContent.services;
         const nextReviews = Array.isArray(live.reviews)
           ? live.reviews
           : null;
@@ -381,6 +370,7 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
               nextContact.phone = contact.phone;
               nextContact.contactNumber = contact.phone;
               nextCommon.contactNumber = contact.phone;
+              nextCommon.phone = contact.phone;
             }
             if (typeof contact.whatsapp === 'string' && contact.whatsapp.trim()) {
               nextContact.whatsapp = contact.whatsapp;
@@ -389,6 +379,7 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
               if (cleanWa) {
                 nextContact.whatsappNumber = cleanWa;
                 nextCommon.whatsappNumber = cleanWa;
+                nextHome.whatsappNumber = cleanWa;
 
                 // Dynamically update any hardcoded or static wa.me URLs across home and common
                 const waRegex = /(https?:\/\/(?:wa\.me|api\.whatsapp\.com\/send\?phone=))\d+/gi;
@@ -429,6 +420,7 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
             nextContact.hours = live.shop.openingHours;
             nextContact.openingHours = live.shop.openingHours;
             nextCommon.openingHours = live.shop.openingHours;
+            nextCommon.hours = live.shop.openingHours;
             nextHome.businessHours = live.shop.openingHours;
           }
 
@@ -460,6 +452,18 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
             ...(nextProducts !== undefined ? { products: nextProducts } : {}),
             ...(nextServices !== undefined ? { services: nextServices } : {}),
             ...(nextReviews !== null ? { reviews: nextReviews, testimonials: nextReviews, feedbacks: nextReviews } : {}),
+            ...(currentContent?.shop && typeof currentContent.shop === 'object' && nextProducts !== undefined
+              ? { shop: { ...currentContent.shop, products: nextProducts } }
+              : {}),
+            ...(currentContent?.catalog && typeof currentContent.catalog === 'object' && nextProducts !== undefined
+              ? { catalog: { ...currentContent.catalog, products: nextProducts } }
+              : {}),
+            ...(currentContent?.menu && typeof currentContent.menu === 'object' && nextProducts !== undefined
+              ? { menu: { ...currentContent.menu, items: nextProducts, products: nextProducts } }
+              : {}),
+            ...(currentContent?.store && typeof currentContent.store === 'object' && nextProducts !== undefined
+              ? { store: { ...currentContent.store, products: nextProducts } }
+              : {}),
             ...(currentHome || Object.keys(nextHome).length > 0
               ? {
                   home: {
@@ -834,35 +838,176 @@ export type DenebData = SiteData;
  * Hook to retrieve products cleanly from SiteData, supporting both
  * top-level content.products and nested content.home.products.
  */
+
+/**
+ * Universal Bidirectional Product Normalizer:
+ * Ensures every product object has both canonical and alias keys simultaneously populated
+ * with clean numbers and resolved image URLs, so any template component code works flawlessly
+ * regardless of whether the developer wrote .title or .name, .cost or .price, .image or .imageUrl.
+ */
+export function normalizeProductItem(p: unknown): ProductItem {
+  if (!isRecord(p)) return p as ProductItem;
+  const customData = isRecord(p.customData) ? p.customData : {};
+
+  const nameCandidate = p.name ?? p.title ?? p.productName ?? p.itemTitle ?? p.heading ?? p.label;
+  const titleCandidate = p.title ?? p.name ?? p.itemTitle ?? p.productName ?? p.heading ?? p.label;
+
+  const rawPrice =
+    p.price !== undefined
+      ? p.price
+      : p.cost !== undefined
+        ? p.cost
+        : p.amount !== undefined
+          ? p.amount
+          : p.productPrice !== undefined
+            ? p.productPrice
+            : p.currentPrice !== undefined
+              ? p.currentPrice
+              : p.rate;
+  let numPrice: number | string | undefined = rawPrice as any;
+  if (typeof rawPrice === "string" && rawPrice.trim()) {
+    const match = rawPrice.match(/-?\d+(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?/);
+    if (match) {
+      const parsed = parseFloat(match[0].replace(/,/g, ""));
+      if (!isNaN(parsed) && Number.isFinite(parsed)) {
+        numPrice = parsed;
+      }
+    }
+  }
+
+  const rawCompare =
+    p.compareAtPrice !== undefined
+      ? p.compareAtPrice
+      : p.originalPrice !== undefined
+        ? p.originalPrice
+        : p.oldPrice !== undefined
+          ? p.oldPrice
+          : p.regularPrice !== undefined
+            ? p.regularPrice
+            : p.strikePrice;
+  let numCompare: number | string | undefined = rawCompare as any;
+  if (typeof rawCompare === "string" && rawCompare.trim()) {
+    const match = rawCompare.match(/-?\d+(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?/);
+    if (match) {
+      const parsed = parseFloat(match[0].replace(/,/g, ""));
+      if (!isNaN(parsed) && Number.isFinite(parsed)) {
+        numCompare = parsed;
+      }
+    }
+  }
+
+  const imageCandidate =
+    p.imageUrl ??
+    p.image ??
+    p.photo ??
+    p.thumbnail ??
+    p.picture ??
+    p.img ??
+    p.src ??
+    p.productImage ??
+    (Array.isArray(p.gallery) ? p.gallery[0] : undefined) ??
+    (Array.isArray(p.images) ? p.images[0] : undefined);
+
+  const badgeCandidate = p.badge ?? p.tag ?? p.label ?? p.badgeText ?? p.chip;
+  const descCandidate = p.description ?? p.desc ?? p.details ?? p.shortDescription ?? p.subtitle;
+
+  return {
+    ...customData,
+    ...p,
+    name: nameCandidate as string | undefined,
+    title: titleCandidate as string | undefined,
+    productName: (titleCandidate ?? nameCandidate) as string | undefined,
+    itemTitle: (titleCandidate ?? nameCandidate) as string | undefined,
+    ...(numPrice !== undefined
+      ? {
+          price: numPrice,
+          cost: numPrice,
+          amount: numPrice,
+          productPrice: numPrice,
+        }
+      : {}),
+    ...(numCompare !== undefined
+      ? {
+          compareAtPrice: numCompare,
+          originalPrice: numCompare,
+        }
+      : {}),
+    ...(imageCandidate !== undefined
+      ? {
+          imageUrl: imageCandidate as string,
+          image: imageCandidate as string,
+          photo: imageCandidate as string,
+          thumbnail: imageCandidate as string,
+          productImage: imageCandidate as string,
+        }
+      : {}),
+    ...(badgeCandidate !== undefined
+      ? {
+          badge: badgeCandidate as string,
+          tag: badgeCandidate as string,
+        }
+      : {}),
+    ...(descCandidate !== undefined
+      ? {
+          description: descCandidate as string,
+          desc: descCandidate as string,
+          details: descCandidate as string,
+        }
+      : {}),
+  } as ProductItem;
+}
+
+/**
+ * Universal Service Normalizer
+ */
+export function normalizeServiceItem(s: unknown): ServiceItem {
+  if (!isRecord(s)) return s as ServiceItem;
+  const customData = isRecord(s.customData) ? s.customData : {};
+
+  const nameCandidate = s.name ?? s.title ?? s.serviceName ?? s.heading;
+  const titleCandidate = s.title ?? s.name ?? s.serviceName ?? s.heading;
+  const descCandidate = s.description ?? s.desc ?? s.details ?? s.shortDescription;
+  const imageCandidate = s.imageUrl ?? s.image ?? s.photo ?? s.thumbnail ?? s.picture;
+
+  return {
+    ...customData,
+    ...s,
+    name: nameCandidate as string | undefined,
+    title: titleCandidate as string | undefined,
+    ...(descCandidate !== undefined ? { description: descCandidate as string, desc: descCandidate as string, details: descCandidate as string } : {}),
+    ...(imageCandidate !== undefined ? { imageUrl: imageCandidate as string, image: imageCandidate as string, photo: imageCandidate as string } : {}),
+  } as ServiceItem;
+}
+
 export function useProducts(fallback: ProductItem[] = []): ProductItem[] {
   const siteData = useSiteData();
-  const content = isRecord(siteData?.content) ? siteData.content : null;
+  const content = isRecord(siteData?.content) ? (siteData.content as Record<string, unknown>) : null;
   if (!content) return fallback;
 
   let rawList: ProductItem[] | null = null;
-  if (Array.isArray(content.products) && content.products.length > 0) {
-    rawList = content.products as ProductItem[];
-  } else {
-    const home = isRecord(content.home) ? content.home : null;
-    if (home) {
-      if (Array.isArray(home.products) && home.products.length > 0) {
-        rawList = home.products as ProductItem[];
-      } else if (Array.isArray(home.featuredProducts) && home.featuredProducts.length > 0) {
-        rawList = home.featuredProducts as ProductItem[];
-      }
+  const candidates: unknown[] = [
+    content.products,
+    (content.shop as Record<string, unknown> | undefined)?.products,
+    (content.home as Record<string, unknown> | undefined)?.products,
+    (content.home as Record<string, unknown> | undefined)?.featuredProducts,
+    (content.catalog as Record<string, unknown> | undefined)?.products,
+    (content.menu as Record<string, unknown> | undefined)?.items,
+    (content.menu as Record<string, unknown> | undefined)?.products,
+    (content.store as Record<string, unknown> | undefined)?.products,
+    (content.shop as Record<string, unknown> | undefined)?.items,
+    (siteData.shop as Record<string, unknown> | undefined)?.products,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      rawList = candidate as ProductItem[];
+      break;
     }
   }
 
   if (!rawList) return fallback;
 
-  return rawList.map((p) => {
-    if (!isRecord(p)) return p;
-    const customData = isRecord(p.customData) ? p.customData : {};
-    return {
-      ...customData,
-      ...p,
-    } as ProductItem;
-  });
+  return rawList.map(normalizeProductItem);
 }
 
 /**
@@ -871,21 +1016,24 @@ export function useProducts(fallback: ProductItem[] = []): ProductItem[] {
  */
 export function useServices(fallback: ServiceItem[] = []): ServiceItem[] {
   const siteData = useSiteData();
-  const content = isRecord(siteData?.content) ? siteData.content : null;
+  const content = isRecord(siteData?.content) ? (siteData.content as Record<string, unknown>) : null;
   if (!content) return fallback;
 
-  if (Array.isArray(content.services) && content.services.length > 0) {
-    return content.services as ServiceItem[];
-  }
-  const home = isRecord(content.home) ? content.home : null;
-  if (home) {
-    if (Array.isArray(home.services) && home.services.length > 0) {
-      return home.services as ServiceItem[];
+  const candidates: unknown[] = [
+    content.services,
+    (content.servicesPage as Record<string, unknown> | undefined)?.services,
+    (content.home as Record<string, unknown> | undefined)?.services,
+    (content.home as Record<string, unknown> | undefined)?.featuredServices,
+    (content.company as Record<string, unknown> | undefined)?.services,
+    (content.business as Record<string, unknown> | undefined)?.services,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      return (candidate as unknown[]).map(normalizeServiceItem);
     }
-    if (Array.isArray(home.featuredServices) && home.featuredServices.length > 0) {
-      return home.featuredServices as ServiceItem[];
-    }
   }
+
   return fallback;
 }
 

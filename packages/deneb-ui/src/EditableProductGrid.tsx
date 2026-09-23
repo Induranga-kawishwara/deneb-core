@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { EditableProductCard, ProductItem, ProductCardVariant } from './EditableProductCard';
-import { useProducts, useSiteApi, useSiteData } from './SiteDataProvider';
+import { useProducts, useSiteApi, useSiteData, isRecord } from './SiteDataProvider';
 
 export interface EditableProductGridProps extends React.HTMLAttributes<HTMLElement> {
   /**
@@ -185,6 +185,26 @@ export function EditableProductGrid({
   const liveProducts = useProducts();
   const baseProducts = userProducts && userProducts.length > 0 ? userProducts : liveProducts;
 
+  const resolvedListPath = useMemo(() => {
+    if (listPath && listPath !== 'products') {
+      return listPath;
+    }
+    const content = isRecord(siteData?.content) ? (siteData.content as Record<string, unknown>) : null;
+    if (!content) return listPath || 'products';
+
+    if (Array.isArray(content.products) && content.products.length > 0) return 'products';
+    if (isRecord(content.shop) && Array.isArray((content.shop as Record<string, unknown>).products)) return 'shop.products';
+    if (isRecord(content.home) && Array.isArray((content.home as Record<string, unknown>).products)) return 'home.products';
+    if (isRecord(content.home) && Array.isArray((content.home as Record<string, unknown>).featuredProducts)) return 'home.featuredProducts';
+    if (isRecord(content.catalog) && Array.isArray((content.catalog as Record<string, unknown>).products)) return 'catalog.products';
+    if (isRecord(content.menu) && Array.isArray((content.menu as Record<string, unknown>).items)) return 'menu.items';
+    if (isRecord(content.menu) && Array.isArray((content.menu as Record<string, unknown>).products)) return 'menu.products';
+    if (isRecord(content.store) && Array.isArray((content.store as Record<string, unknown>).products)) return 'store.products';
+    if (isRecord(content.shop) && Array.isArray((content.shop as Record<string, unknown>).items)) return 'shop.items';
+
+    return listPath || 'products';
+  }, [listPath, siteData]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchingBackend, setIsSearchingBackend] = useState(false);
   const [backendProducts, setBackendProducts] = useState<ProductItem[] | null>(null);
@@ -283,12 +303,13 @@ export function EditableProductGrid({
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       result = result.filter((p) => {
-        const name = String(p.name || p.title || '').toLowerCase();
-        const desc = String(p.description || '').toLowerCase();
+        const name = String(p.name || p.title || (p as any).productName || (p as any).itemTitle || '').toLowerCase();
+        const desc = String(p.description || (p as any).desc || (p as any).details || '').toLowerCase();
         const brand = String(p.brand || '').toLowerCase();
         const cat = String(p.category || '').toLowerCase();
         const tags = Array.isArray(p.tags) ? p.tags.join(' ').toLowerCase() : '';
-        return name.includes(q) || desc.includes(q) || brand.includes(q) || cat.includes(q) || tags.includes(q);
+        const badge = String(p.badge || (p as any).tag || '').toLowerCase();
+        return name.includes(q) || desc.includes(q) || brand.includes(q) || cat.includes(q) || tags.includes(q) || badge.includes(q);
       });
     }
 
@@ -462,7 +483,7 @@ export function EditableProductGrid({
 
       {/* Grid of Products — Keeps container with data-preview-list-path mounted in all states for strict Fivora visual editing contract! */}
       <div
-        {...(listPath ? { 'data-preview-list-path': listPath } : {})}
+        {...(resolvedListPath ? { 'data-preview-list-path': resolvedListPath } : {})}
         className={
           displayedProducts.length > 0
             ? `deneb-product-grid grid ${gridColClasses} gap-6 sm:gap-8`
@@ -476,13 +497,14 @@ export function EditableProductGrid({
               (bp) =>
                 (bp.id && product.id ? String(bp.id) === String(product.id) : false) ||
                 (bp.name && product.name ? bp.name === product.name : false) ||
-                (bp.title && product.title ? bp.title === product.title : false)
+                (bp.title && product.title ? bp.title === product.title : false) ||
+                ((bp as any).productName && (product as any).productName ? (bp as any).productName === (product as any).productName : false)
             );
             const effectiveIndex =
               baseIndex !== -1 ? baseIndex : (activePage - 1) * activePageSize + idx;
 
-            const itemPath = listPath
-              ? `${listPath}[${effectiveIndex}]`
+            const itemPath = resolvedListPath
+              ? `${resolvedListPath}[${effectiveIndex}]`
               : `${sectionPath}.${cardPrefix}${effectiveIndex + 1}`;
 
             return (

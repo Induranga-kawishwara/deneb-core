@@ -116,9 +116,9 @@ export function EditableProductDetail({
       ? product.gallery
       : (product.images && product.images.length > 0)
         ? product.images
-        : [product.featuredImage || product.imageUrl || product.image || '/products/vanta-aero-x.jpg'];
+        : [product.featuredImage || product.imageUrl || product.image || (product as any).photo || (product as any).thumbnail || '/products/vanta-aero-x.jpg'];
     return (rawList as string[]).filter(Boolean);
-  }, [product.gallery, product.images, product.featuredImage, product.imageUrl, product.image]);
+  }, [product.gallery, product.images, product.featuredImage, product.imageUrl, product.image, (product as any).photo, (product as any).thumbnail]);
 
   // 2. Resolve Options (Sizes, Volumes, Weights, Counts)
   const resolved = resolveProductOptions(product);
@@ -207,8 +207,9 @@ export function EditableProductDetail({
     }
   };
 
-  const name = String(product.name || product.title || 'Product Title');
-  const price = product.price !== undefined ? String(product.price) : 'LKR 0';
+  const name = String(product.name || product.title || (product as any).productName || (product as any).itemTitle || 'Product Title');
+  const rawPriceCandidate = product.price ?? (product as any).cost ?? (product as any).amount ?? (product as any).productPrice;
+  const price = rawPriceCandidate !== undefined && rawPriceCandidate !== null ? String(rawPriceCandidate) : 'LKR 0';
   const originalPrice = product.originalPrice ?? product.compareAtPrice;
   const isAvailable = product.isAvailable !== false;
   const description = String(product.description || '');
