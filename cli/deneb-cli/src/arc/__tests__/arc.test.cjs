@@ -6,6 +6,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+process.env.DENEB_HOME = path.join(os.tmpdir(), 'deneb-test-home-' + Date.now());
+
 const { scanProject, buildDependencyGraph } = require('../scanner.cjs');
 const { analyzeFile } = require('../semantic.cjs');
 const { planTransformations } = require('../planner.cjs');
@@ -1708,8 +1710,112 @@ test('manifest buildSiteDataAndManifest creates default dual-mode palette with d
   assert.equal(bundle.siteData.theme.dark.textColor, '#f9fafb');
 });
 
+test('healEmptyStateConditionals preserves modal, null-check, and state-dependent conditional guards', () => {
+  const { parseSource, printSource } = require('../ast.cjs');
+  const { healEmptyStateConditionals } = require('../transformer.cjs');
+  const code = `
+export function Showcase() {
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [selectedDish, setSelectedDish] = useState(null);
+  return (
+    <div>
+      <AnimatePresence>
+        {lightboxIndex !== null && filteredItems[lightboxIndex] && (
+          <div className="fixed inset-0 z-50">
+            <span data-preview-field-path="home.ofLabel">Caption</span>
+          </div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {selectedDish && (
+          <div className="fixed inset-0 z-50">
+            <h3 data-preview-field-path="home.dishLabel">{selectedDish.name}</h3>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+`;
+  const ast = parseSource(code, 'src/components/Showcase.tsx');
+  const healed = healEmptyStateConditionals(ast);
+  const result = printSource(ast, code);
+  assert.equal(healed, 0, 'No modal guards should be stripped');
+  assert.match(result, /lightboxIndex !== null/);
+  assert.match(result, /selectedDish &&/);
+});
 
+test('M1: auditFivoraContract flags uncovered visible text as a contract violation', () => {
+  const { auditFivoraContract } = require('../index.cjs');
+  const profile = { routes: [{ id: 'home', file: 'src/app/page.tsx' }] };
+  const siteData = { content: { home: { heroTitle: 'Welcome' } } };
+  const manifest = {
+    pages: [{ id: 'home', route: '/' }],
+    editorSchema: {
+      sections: [
+        {
+          id: 'home',
+          path: 'home',
+          type: 'object',
+          fields: [{ key: 'heroTitle', type: 'text' }],
+        },
+      ],
+    },
+  };
+  const inventory = {
+    sources: [
+      {
+        rel: 'src/app/page.tsx',
+        code: 'export default function Page() { return <div><h1><span data-preview-field-path="home.heroTitle">Welcome</span></h1><p>Uncovered paragraph copy here</p></div>; }',
+      },
+    ],
+    pageKeysByFile: { 'src/app/page.tsx': ['home'] },
+  };
 
+  const audit = auditFivoraContract({ profile, siteData, manifest, inventory });
+  assert.equal(audit.passed, false, 'Audit must fail when uncovered visible text exists');
+  assert.ok(audit.uncoveredVisibleText.length > 0, 'Uncovered visible text must be recorded');
+  assert.match(audit.uncoveredVisibleText[0].text, /Uncovered paragraph copy here/);
+});
 
+test('M2: ensureStyleAttrs is idempotent and does not duplicate style attributes', () => {
+  const { parseSource, printSource, ensureStyleAttrs } = require('../ast.cjs');
+  const code = '<span data-preview-field-path="home.title">Hello</span>';
+  const ast = parseSource(code, 'test.tsx');
+  const node = ast.program.body[0].expression;
 
+  ensureStyleAttrs(node, 'home.title', 'text');
+  const firstPass = printSource(ast, code);
+  assert.match(firstPass, /data-preview-style-target="home\.title"/);
+  assert.match(firstPass, /data-preview-style-type="text"/);
+
+  // Second pass: must not duplicate attributes
+  ensureStyleAttrs(node, 'home.title', 'text');
+  const secondPass = printSource(ast, code);
+  assert.equal(secondPass, firstPass, 'Second call must be strictly idempotent');
+});
+
+test('M3: collectFontIdsFromSiteData resolves planned fonts and theme accurately', () => {
+  const { collectFontIdsFromSiteData, applyFontTheme } = require('../font-plan.cjs');
+  const siteData = {
+    theme: {
+      headingFont: 'Playfair Display',
+      bodyFont: 'Plus Jakarta Sans',
+    },
+    styles: {
+      'home.accent': { fontFamily: 'Space Grotesk' },
+    },
+  };
+
+  const fontIds = collectFontIdsFromSiteData(siteData);
+  assert.ok(Array.isArray(fontIds));
+  assert.ok(fontIds.includes('playfair-display'));
+  assert.ok(fontIds.includes('plus-jakarta-sans'));
+  assert.ok(fontIds.includes('space-grotesk'));
+
+  const siteDataEmpty = {};
+  applyFontTheme(siteDataEmpty, ['inter', 'playfair-display']);
+  assert.equal(siteDataEmpty.theme.headingFont, 'Playfair Display');
+  assert.equal(siteDataEmpty.theme.bodyFont, 'Inter');
+});
 
