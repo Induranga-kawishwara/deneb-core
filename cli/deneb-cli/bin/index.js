@@ -6,7 +6,7 @@ const { spawnSync } = require('node:child_process');
 const readline = require('node:readline');
 const crypto = require('node:crypto');
 
-// SHA-256 hash of default key ("lvuchami") — prevents plain text exposure in repository
+// SHA-256 hash of default key — prevents plain text exposure in repository
 const DENEB_AI_DEFAULT_KEY_HASH = '6f791210e05b535d0e48e260273b3ddb511aefb63ad2a2a35b838a80a6127588';
 
 /**
@@ -112,19 +112,47 @@ function isForbiddenFile(filename) {
   );
 }
 
-function stripAnsi(str) {
-  return str.replace(/\x1b\[[0-9;]*m/g, '');
+function getVisualWidth(str) {
+  if (!str) return 0;
+  const stripped = String(str).replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+  let width = 0;
+  for (const char of stripped) {
+    const code = char.codePointAt(0);
+    if (
+      (code >= 0x1100 && code <= 0x115F) ||
+      (code >= 0x2E80 && code <= 0xA4CF) ||
+      (code >= 0xAC00 && code <= 0xD7A3) ||
+      (code >= 0xF900 && code <= 0xFAFF) ||
+      (code >= 0xFE10 && code <= 0xFE19) ||
+      (code >= 0xFE30 && code <= 0xFE6F) ||
+      (code >= 0xFF00 && code <= 0xFF60) ||
+      (code >= 0xFFE0 && code <= 0xFFE6) ||
+      (code >= 0x1F000 && code <= 0x1FAFF) ||
+      (code >= 0x2600 && code <= 0x27BF)
+    ) {
+      width += 2;
+    } else if (code > 0xFFFF) {
+      width += 2;
+    } else {
+      width += 1;
+    }
+  }
+  return width;
 }
 
-function createBox(lines, width = 55) {
+function createBox(lines, preferredWidth = 58) {
   const cyan = '\x1b[36m';
   const reset = '\x1b[0m';
-  const top = `  ${cyan}╔${'═'.repeat(width)}╗${reset}`;
-  const bottom = `  ${cyan}╚${'═'.repeat(width)}╝${reset}`;
+  const visualLengths = lines.map((l) => getVisualWidth(l));
+  const maxLineVisual = Math.max(...visualLengths, 0);
+  const boxWidth = Math.max(preferredWidth, maxLineVisual + 4);
 
-  const rows = lines.map((line) => {
-    const rawLen = stripAnsi(line).length;
-    const padTotal = Math.max(0, width - rawLen);
+  const top = `  ${cyan}╔${'═'.repeat(boxWidth)}╗${reset}`;
+  const bottom = `  ${cyan}╚${'═'.repeat(boxWidth)}╝${reset}`;
+
+  const rows = lines.map((line, idx) => {
+    const rawLen = visualLengths[idx];
+    const padTotal = Math.max(0, boxWidth - rawLen);
     const padLeft = Math.floor(padTotal / 2);
     const padRight = padTotal - padLeft;
     return `  ${cyan}║${reset}${' '.repeat(padLeft)}${line}${' '.repeat(padRight)}${cyan}║${reset}`;
@@ -572,7 +600,7 @@ function getDefaultSiteData(projectName, pages) {
   };
 }
 
-function getComponentRegistry(importPkg) {
+function getComponentRegistry(importPkg = '@deneb-ui/ui') {
   return {
     'button': {
       file: 'Button.tsx',
@@ -1054,6 +1082,15 @@ async function initProject(targetInput, options = {}) {
     }
   }
 
+  let importPkg = '@deneb-ui/ui';
+  if (pkg.dependencies?.['@deneb-ui/ui'] || pkg.devDependencies?.['@deneb-ui/ui']) {
+    importPkg = '@deneb-ui/ui';
+  } else if (pkg.dependencies?.['@deneb/ui'] || pkg.devDependencies?.['@deneb/ui']) {
+    importPkg = '@deneb/ui';
+  } else if (pkg.dependencies?.['@fivora/editable-components'] || pkg.devDependencies?.['@fivora/editable-components']) {
+    importPkg = '@fivora/editable-components';
+  }
+
   // 4.6. Ensure Root Layout instruments SiteDataProvider
   const appLayoutCandidates = [
     path.join(targetDir, 'src', 'app', 'layout.tsx'),
@@ -1068,7 +1105,7 @@ async function initProject(targetInput, options = {}) {
       const hasProvider = /SiteDataProvider|DenebDataProvider|<Providers\b/.test(layoutContent);
       if (!hasProvider) {
         const { instrumentLayoutSource } = require('../src/arc/transformer.cjs');
-        const instrumented = instrumentLayoutSource(layoutContent, '@/data/site-data.json', '@deneb-ui/ui');
+        const instrumented = instrumentLayoutSource(layoutContent, '@/data/site-data.json', importPkg);
         if (instrumented.updated && instrumented.code !== layoutContent) {
           fs.writeFileSync(targetLayoutFile, instrumented.code, 'utf8');
           console.log(`\x1b[32m✔ Instrumented\x1b[0m ${path.relative(targetDir, targetLayoutFile)} with <SiteDataProvider>`);
@@ -1201,11 +1238,16 @@ async function initProject(targetInput, options = {}) {
     }
   }
 
-  if (!skipInstall) {
+  if (!skipInstall && !process.env.DENEB_SKIP_FONTS) {
     try {
       const { runFontsInstall } = require('../src/tools/deneb-fonts.cjs');
+      const plannedFontArgs = [];
+      const fontList = conversionRes && Array.isArray(conversionRes.fontIds) ? conversionRes.fontIds : [];
+      for (const id of fontList) {
+        plannedFontArgs.push('--font', id);
+      }
       console.log(`\n\x1b[36mAa Downloading and configuring DENEB Google Fonts...\x1b[0m`);
-      runFontsInstall(targetDir, []);
+      runFontsInstall(targetDir, plannedFontArgs);
     } catch (err) {
       console.log(`\n\x1b[33m! Fonts were not installed automatically: ${err.message}. Run \x1b[1mdeneb fonts install .\x1b[0m\x1b[0m`);
     }

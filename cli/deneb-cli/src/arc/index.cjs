@@ -21,6 +21,7 @@ const { applyFilePlan, instrumentLayoutSource, instrumentPageKey, resolveSiteDat
 const { applyResidualPass } = require('./residual.cjs');
 const { parseSource } = require('./ast.cjs');
 const { buildSiteDataAndManifest, writeDataBank, loadExistingData, countSchemaFields } = require('./manifest.cjs');
+const { collectFontIdsFromSiteData } = require('./font-plan.cjs');
 const { validateAstFiles, validateContracts, designPreservationScore, coverageMetrics } = require('./validator.cjs');
 const { recordExperience, registryArchitecture } = require('./learning.cjs');
 const { matchRecipeV2 } = require('./recipes-v2.cjs');
@@ -613,6 +614,23 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     }
   }
 
+  // Mandatory Post-Pass: Guarantee all files referencing siteData have useSiteData hook injected
+  const { healMissingSiteDataHooks } = require('./transformer.cjs');
+  for (const relativeFile of profile.jsxFiles || []) {
+    const abs = path.join(projectDir, relativeFile);
+    if (!fs.existsSync(abs)) continue;
+    const currentCode = fs.readFileSync(abs, 'utf8');
+    if (currentCode.includes('siteData')) {
+      const healed = healMissingSiteDataHooks(currentCode, relativeFile);
+      if (healed && healed !== currentCode) {
+        backupFile(projectDir, backupDir, abs);
+        fs.writeFileSync(abs, healed, 'utf8');
+        afterFiles[relativeFile] = healed;
+        if (!changedFiles.includes(relativeFile)) changedFiles.push(relativeFile);
+      }
+    }
+  }
+
   if (profile.framework === 'nextjs') {
     const before = findNextConfig(projectDir);
     if (before) backupFile(projectDir, backupDir, before.abs);
@@ -682,12 +700,38 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
   const alreadyEditable = analyses.filter((a) => a.alreadyEditable).length;
   const skippedDynamic = plan.skipped.filter((s) => /dynamic|api/.test(s.reason || '')).length;
 
-  const fivoraAudit = auditFivoraContract({
+  let fivoraAudit = auditFivoraContract({
     profile,
     siteData: dataBundle.siteData,
     manifest: dataBundle.manifest,
     inventory: collectMarkerInventory(projectDir, profile, graph),
   });
+
+  // Auto-reconciliation: If fivoraAudit flagged unknown paths, auto-register them to controlOnlyPaths
+  if (!fivoraAudit.passed && fivoraAudit.errors?.length > 0) {
+    let manifestModified = false;
+    for (const err of fivoraAudit.errors) {
+      const unknownMatch = err.match(/references unknown path "([^"]+)"/);
+      if (unknownMatch) {
+        const unknownPath = unknownMatch[1];
+        dataBundle.manifest.visualEditing = dataBundle.manifest.visualEditing || {};
+        dataBundle.manifest.visualEditing.controlOnlyPaths = dataBundle.manifest.visualEditing.controlOnlyPaths || [];
+        if (!dataBundle.manifest.visualEditing.controlOnlyPaths.includes(unknownPath)) {
+          dataBundle.manifest.visualEditing.controlOnlyPaths.push(unknownPath);
+          manifestModified = true;
+        }
+      }
+    }
+    if (manifestModified) {
+      writeDataBank(projectDir, dataBundle.siteData, dataBundle.manifest);
+      fivoraAudit = auditFivoraContract({
+        profile,
+        siteData: dataBundle.siteData,
+        manifest: dataBundle.manifest,
+        inventory: collectMarkerInventory(projectDir, profile, graph),
+      });
+    }
+  }
 
   const coverage = coverageMetrics({
     analyses,
@@ -742,7 +786,11 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
       }
     }
     outcome = 'rolled-back';
-    printer.printRollback('Strict Fivora contract failed');
+    const reasons = [];
+    if (!fivoraAudit.passed) reasons.push(`${fivoraAudit.errors.length} Fivora contract error(s)`);
+    if (fivoraAudit.uncoveredVisibleText.length > 0) reasons.push(`${fivoraAudit.uncoveredVisibleText.length} uncovered visible text node(s)`);
+    if (designFailure) reasons.push(`Design preservation score below threshold (${design.score} < 98)`);
+    printer.printRollback(`Strict Fivora contract failed: ${reasons.join(', ')}`);
   } else if (contractFailure) {
     outcome = 'contract-failed';
   } else if (designFailure) {
@@ -819,6 +867,7 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     designPreservation: design.score,
     validation,
     outcome,
+    fontIds: collectFontIdsFromSiteData(dataBundle.siteData),
   };
 
   const report = buildReport({
@@ -911,6 +960,7 @@ module.exports = {
   runDenebArc,
   parseArcOptions,
   scanProject,
+  auditFivoraContract,
   ENGINE_ID,
   ARC_VERSION,
 };

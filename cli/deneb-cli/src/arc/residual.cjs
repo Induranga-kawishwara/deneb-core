@@ -427,8 +427,16 @@ function applyResidualPass({ code, file, ownerScope, usedPaths, componentName, r
     return { code, changed: false, fields: [], applied: 0 };
   }
 
+  let finalCode = printSource(ast, code);
+  if (finalCode.includes('siteData')) {
+    try {
+      const { healMissingSiteDataHooks } = require('./transformer.cjs');
+      finalCode = healMissingSiteDataHooks(finalCode, file);
+    } catch {}
+  }
+
   return {
-    code: printSource(ast, code),
+    code: finalCode,
     changed: true,
     fields,
     applied,

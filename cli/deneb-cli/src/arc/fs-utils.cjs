@@ -119,6 +119,9 @@ function rel(projectDir, filePath) {
 }
 
 function homeDenebDir() {
+  if (process.env.DENEB_HOME) {
+    return path.resolve(process.env.DENEB_HOME);
+  }
   return path.join(os.homedir(), '.deneb');
 }
 

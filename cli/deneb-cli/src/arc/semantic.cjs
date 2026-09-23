@@ -286,6 +286,34 @@ function hasStaticMarker(node) {
   return hasJsxAttribute(node, 'data-preview-static');
 }
 
+function isElementOrParentHidden(pathNode) {
+  let current = pathNode;
+  while (current) {
+    const node = current.node || current.value || current;
+    if (node && (node.type === 'JSXElement' || node.type === 'JSXOpeningElement')) {
+      const attrs = (node.type === 'JSXElement' ? node.openingElement?.attributes : node.attributes) || [];
+      if (attrs.some((a) => a.type === 'JSXAttribute' && a.name && (
+        a.name.name === 'hidden' ||
+        (a.name.name === 'aria-hidden' && /true/.test(recast.print(a).code))
+      ))) {
+        return true;
+      }
+      const classAttr = attrs.find((a) => a.type === 'JSXAttribute' && a.name && (a.name.name === 'className' || a.name.name === 'class'));
+      if (classAttr) {
+        const rawClass = recast.print(classAttr).code;
+        if (/(?<![\w-])hidden(?![a-zA-Z0-9_-])/.test(rawClass)) return true;
+      }
+      const styleAttr = attrs.find((a) => a.type === 'JSXAttribute' && a.name && a.name.name === 'style');
+      if (styleAttr) {
+        const rawStyle = recast.print(styleAttr).code;
+        if (/(?:display\s*:\s*['"]none['"]|visibility\s*:\s*['"]hidden['"])/.test(rawStyle)) return true;
+      }
+    }
+    current = current.parentPath || current.parent;
+  }
+  return false;
+}
+
 function parentNames(pathNode) {
   const names = [];
   let current = pathNode.parent;
@@ -516,6 +544,21 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
           confidence: 1,
           skip: true,
           reason: 'already-has-preview-binding',
+          file: relativeFile,
+          ownerScope,
+        });
+        this.traverse(pathNode);
+        return;
+      }
+
+      if (isElementOrParentHidden(pathNode)) {
+        candidates.push({
+          loc,
+          tag: name,
+          kind: 'decoration',
+          confidence: 0.1,
+          skip: true,
+          reason: 'hidden-element-strict-contract',
           file: relativeFile,
           ownerScope,
         });
