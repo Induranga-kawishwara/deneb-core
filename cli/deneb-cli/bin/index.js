@@ -572,7 +572,7 @@ function getDefaultSiteData(projectName, pages) {
   };
 }
 
-function getComponentRegistry(importPkg) {
+function getComponentRegistry(importPkg = '@deneb-ui/ui') {
   return {
     'button': {
       file: 'Button.tsx',
@@ -1054,6 +1054,15 @@ async function initProject(targetInput, options = {}) {
     }
   }
 
+  let importPkg = '@deneb-ui/ui';
+  if (pkg.dependencies?.['@deneb-ui/ui'] || pkg.devDependencies?.['@deneb-ui/ui']) {
+    importPkg = '@deneb-ui/ui';
+  } else if (pkg.dependencies?.['@deneb/ui'] || pkg.devDependencies?.['@deneb/ui']) {
+    importPkg = '@deneb/ui';
+  } else if (pkg.dependencies?.['@fivora/editable-components'] || pkg.devDependencies?.['@fivora/editable-components']) {
+    importPkg = '@fivora/editable-components';
+  }
+
   // 4.6. Ensure Root Layout instruments SiteDataProvider
   const appLayoutCandidates = [
     path.join(targetDir, 'src', 'app', 'layout.tsx'),
@@ -1068,7 +1077,7 @@ async function initProject(targetInput, options = {}) {
       const hasProvider = /SiteDataProvider|DenebDataProvider|<Providers\b/.test(layoutContent);
       if (!hasProvider) {
         const { instrumentLayoutSource } = require('../src/arc/transformer.cjs');
-        const instrumented = instrumentLayoutSource(layoutContent, '@/data/site-data.json', '@deneb-ui/ui');
+        const instrumented = instrumentLayoutSource(layoutContent, '@/data/site-data.json', importPkg);
         if (instrumented.updated && instrumented.code !== layoutContent) {
           fs.writeFileSync(targetLayoutFile, instrumented.code, 'utf8');
           console.log(`\x1b[32m✔ Instrumented\x1b[0m ${path.relative(targetDir, targetLayoutFile)} with <SiteDataProvider>`);
