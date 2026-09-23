@@ -15,6 +15,7 @@ const path = require('path');
 const { ARC_NAME, ARC_VERSION, SCHEMA_VERSION, ENGINE_ID } = require('./version.cjs');
 const { walkFiles, isJsxFile, rel, copyFilePreserve, writeJson, readJsonSafe, findFirstExisting } = require('./fs-utils.cjs');
 const { scanProject, buildDependencyGraph, inferOwnerScope, resolvePageFileOnDisk } = require('./scanner.cjs');
+const { buildProjectIR } = require('./ir-builder.cjs');
 const { analyzeFile, collectDesignSnapshot } = require('./semantic.cjs');
 const { planTransformations } = require('./planner.cjs');
 const { applyFilePlan, instrumentLayoutSource, instrumentPageKey, resolveSiteDataSpecifier, resolveSiteDataRuntimeSpecifier, rewriteRecursiveSiteDataContext, ensureJsonModule, sanitizeContradictoryMarkersInSource } = require('./transformer.cjs');
@@ -47,6 +48,8 @@ const { classifyComponents } = require('./component-registry.cjs');
 const { checkAiReady, adaptComponent, generateDocsPage, loadEnv } = require('./ai-agent.cjs');
 const { checkGithubReady, createComponentPR } = require('./pr-agent.cjs');
 const { runAiEvaluatorPipeline } = require('./ai-evaluator.cjs');
+const { explainFile } = require('./explain.cjs');
+const { generateArcDiff } = require('./diff.cjs');
 
 function parseArcOptions(raw = {}) {
   return {
@@ -60,6 +63,8 @@ function parseArcOptions(raw = {}) {
     aiEnabled: Boolean(raw.aiEnabled),
     aiDryRun: Boolean(raw.aiDryRun),
     strict: Boolean(raw.strict),
+    verifyRuntime: Boolean(raw.verifyRuntime || raw['verify-runtime']),
+    previewUrl: raw.previewUrl || raw['preview-url'] || null,
   };
 }
 
@@ -220,7 +225,7 @@ function auditFivoraContract({ profile, siteData, manifest, inventory }) {
   };
 }
 
-function analyzeProjectFiles(profile, graph) {
+function analyzeProjectFiles(profile, graph, ir) {
   const analyses = [];
   for (const relativeFile of profile.jsxFiles) {
     const abs = path.join(profile.root, relativeFile);
@@ -245,6 +250,7 @@ function analyzeProjectFiles(profile, graph) {
       graph,
       ownerScope,
       componentMeta,
+      ir,
     });
     analyses.push({
       ...result,
@@ -283,7 +289,8 @@ async function runDenebArcAsync(projectDir, projectName, options = {}) {
   mergeDetectedPages(profile, opts.detectedPages);
   printer.printProfile(profile);
   const graph = buildDependencyGraph(profile);
-  const analyses = analyzeProjectFiles(profile, graph);
+  const ir = buildProjectIR(profile);
+  const analyses = analyzeProjectFiles(profile, graph, ir);
 
   const candidateCount = analyses.reduce(
     (n, a) => n + (a.candidates || []).filter((c) => c.kind !== 'decoration' && c.kind !== 'already-editable' && !c.skip).length,
@@ -376,7 +383,7 @@ async function runDenebArcAsync(projectDir, projectName, options = {}) {
     }
   }
 
-  const result = runArcTransformations(projectDir, projectName, opts, profile, graph, analyses, runId, startedAt);
+  const result = runArcTransformations(projectDir, projectName, opts, profile, graph, analyses, runId, startedAt, ir);
 
   if (!opts.dryRun && result && result.outcome === 'success') {
     printer.printAiEvaluatorStart();
@@ -417,7 +424,8 @@ function runDenebArcSync(projectDir, projectName, options = {}) {
 
   printer.printProfile(profile);
   const graph = buildDependencyGraph(profile);
-  const analyses = analyzeProjectFiles(profile, graph);
+  const ir = buildProjectIR(profile);
+  const analyses = analyzeProjectFiles(profile, graph, ir);
 
   const candidateCount = analyses.reduce(
     (n, a) => n + (a.candidates || []).filter((c) => c.kind !== 'decoration' && c.kind !== 'already-editable' && !c.skip).length,
@@ -429,7 +437,7 @@ function runDenebArcSync(projectDir, projectName, options = {}) {
   );
   printer.printScan(profile, graph, candidateCount, actionCount);
 
-  return runArcTransformations(projectDir, projectName, opts, profile, graph, analyses, runId, startedAt);
+  return runArcTransformations(projectDir, projectName, opts, profile, graph, analyses, runId, startedAt, ir);
 }
 
 function runDenebArc(projectDir, projectName, options = {}) {
@@ -440,7 +448,7 @@ function runDenebArc(projectDir, projectName, options = {}) {
   return runDenebArcSync(projectDir, projectName, options);
 }
 
-function runArcTransformations(projectDir, projectName, opts, profile, graph, analyses, runId, startedAt) {
+function runArcTransformations(projectDir, projectName, opts, profile, graph, analyses, runId, startedAt, ir) {
   const sourceAbs = profile.jsxFiles.map((f) => path.join(projectDir, f));
   const recipeMatch = matchRecipeV2(projectDir, profile, sourceAbs, opts.recipeName);
   if (recipeMatch.recipe) {
@@ -451,6 +459,7 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     profile,
     analyses,
     recipe: recipeMatch.recipe,
+    ir,
   });
   printer.printPlan(plan);
 
@@ -586,6 +595,7 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
       usedPaths,
       componentName: analysis?.componentMeta?.name,
       role: analysis?.componentMeta?.role,
+      ir,
     });
     if (!residual.changed) continue;
     try {
@@ -745,6 +755,18 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     uncoveredVisibleText: fivoraAudit.uncoveredVisibleText,
   });
 
+  const { validateRuntimeEditabilitySync } = require('./runtime-validator.cjs');
+  let runtimeVerification = null;
+  try {
+    runtimeVerification = validateRuntimeEditabilitySync({
+      projectDir,
+      siteData: dataBundle.siteData,
+      manifest: dataBundle.manifest,
+    });
+  } catch (err) {
+    runtimeVerification = { passed: false, error: err.message, runtimeEditabilityScore: 0 };
+  }
+
   const validation = {
     syntaxPassed,
     fivoraContractPassed: fivoraAudit.passed,
@@ -759,6 +781,7 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     astFailures: astResults.filter((r) => !r.passed),
     transformFailures,
     designPreservation: design.score,
+    runtimeVerification,
   };
 
   const criticalFailure = !syntaxPassed || (contracts.actionCollisions > 0 && appliedCount === 0);
@@ -892,6 +915,63 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
   writeJson(path.join(journalDir, 'validation.json'), validation);
   writeJson(path.join(projectDir, '.deneb', 'report.json'), report);
 
+  function classifyDiagnosticSeverity(item) {
+    if (item.blocking || /syntax|ast-invalid|fatal/i.test(item.reason || '')) {
+      return 'BLOCKING';
+    }
+    if (/contract|collision|unresolved-binding|failed/i.test(item.reason || '') || item.type === 'error') {
+      return 'ERROR';
+    }
+    if (/dynamic|uncovered|compound|complex|skip/i.test(item.reason || '') && !/icon|decorative|hidden|picture-source/i.test(item.reason || '')) {
+      return 'WARNING';
+    }
+    return 'INFO';
+  }
+
+  const unresolvedList = (plan.skipped || []).map((s) => ({
+    file: s.file,
+    loc: s.loc,
+    type: s.kind || 'unknown',
+    reason: s.reason || 'skipped',
+    confidence: s.confidence,
+    severity: classifyDiagnosticSeverity(s),
+  }));
+
+  const diagnosticsBySeverity = {
+    info: unresolvedList.filter((u) => u.severity === 'INFO').length,
+    warning: unresolvedList.filter((u) => u.severity === 'WARNING').length,
+    error: unresolvedList.filter((u) => u.severity === 'ERROR').length,
+    blocking: unresolvedList.filter((u) => u.severity === 'BLOCKING').length,
+  };
+
+  const conversionReport = {
+    runId,
+    timestamp: startedAt,
+    projectName: projectName || profile.packageName,
+    outcome,
+    scorecard: {
+      contractValidity: validation.fivoraContractPassed ? '100%' : 'Failed',
+      editabilityCoverage: `${coverage.visualCoverage != null ? coverage.visualCoverage : coverage.editableCoverage}%`,
+      visualBound: coverage.visualCovered != null ? `${coverage.visualCovered}/${coverage.visualRequired}` : null,
+      designPreservation: `${design.score}%`,
+      runtimeEditability: runtimeVerification ? `${runtimeVerification.runtimeEditabilityScore}%` : '100%',
+    },
+    runtimeVerification,
+    diagnosticsBySeverity,
+    unresolvedCount: unresolvedList.length,
+    unresolved: unresolvedList,
+    categories: {
+      text: { planned: plan.files.reduce((n, f) => n + f.transformations.filter((t) => /text|heading|label/.test(t.fieldType || '')).length, 0) },
+      images: { planned: plan.files.reduce((n, f) => n + f.transformations.filter((t) => t.fieldType === 'image').length, 0) },
+      links: { planned: plan.files.reduce((n, f) => n + f.transformations.filter((t) => t.fieldType === 'url').length, 0) },
+      collections: { planned: plan.files.reduce((n, f) => n + f.transformations.filter((t) => t.operation === 'collection-conversion').length, 0) },
+      backgrounds: { planned: plan.files.reduce((n, f) => n + f.transformations.filter((t) => t.operation === 'extract-tailwind-bg').length, 0) },
+      componentProps: { planned: plan.files.reduce((n, f) => n + f.transformations.filter((t) => t.operation === 'extract-prop' || t.operation === 'prop-flow-callsite').length, 0) },
+    },
+  };
+  writeJson(path.join(projectDir, 'deneb-conversion-report.json'), conversionReport);
+  writeJson(path.join(journalDir, 'conversion-report.json'), conversionReport);
+
   if (outcome === 'success') {
     printer.printSuccess();
     printer.printDeveloperNextSteps();
@@ -956,8 +1036,40 @@ function buildReport(args) {
   };
 }
 
+function runTransactionalPipeline(targetDirInput = '.', options = {}) {
+  const opts = { ...options, strict: options.strict ?? true };
+  const projectDir = path.resolve(targetDirInput);
+  try {
+    const result = runArc(targetDirInput, opts);
+    return {
+      success: result.outcome === 'success',
+      rolledBack: result.outcome === 'rolled-back',
+      outcome: result.outcome,
+      result,
+    };
+  } catch (err) {
+    const runsDir = path.join(projectDir, '.deneb', 'backups');
+    if (fs.existsSync(runsDir)) {
+      const backups = fs.readdirSync(runsDir).sort();
+      const latest = backups[backups.length - 1];
+      if (latest) {
+        restoreBackup(projectDir, path.join(runsDir, latest));
+      }
+    }
+    return {
+      success: false,
+      rolledBack: true,
+      outcome: 'rolled-back',
+      error: err.message,
+    };
+  }
+}
+
 module.exports = {
   runDenebArc,
+  runTransactionalPipeline,
+  explainFile,
+  generateArcDiff,
   parseArcOptions,
   scanProject,
   auditFivoraContract,
