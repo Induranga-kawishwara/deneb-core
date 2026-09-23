@@ -13,17 +13,49 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { matchRecipeForProject, loadAllRecipes } = require('./recipe-engine.cjs');
-const { healMissingSiteDataHooks, healBroadContainerMarkers, healSectionOverflowHidden } = require('../arc/transformer.cjs');
+const { healMissingSiteDataHooks, healBroadContainerMarkers, healSectionOverflowHidden, healUnguardedModalConditionalsInSource } = require('../arc/transformer.cjs');
 
-function createBox(lines, width = 60) {
-  const horizontal = '═'.repeat(width - 2);
+function getVisualWidth(str) {
+  if (!str) return 0;
+  const stripped = String(str).replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+  let width = 0;
+  for (const char of stripped) {
+    const code = char.codePointAt(0);
+    if (
+      (code >= 0x1100 && code <= 0x115F) ||
+      (code >= 0x2E80 && code <= 0xA4CF) ||
+      (code >= 0xAC00 && code <= 0xD7A3) ||
+      (code >= 0xF900 && code <= 0xFAFF) ||
+      (code >= 0xFE10 && code <= 0xFE19) ||
+      (code >= 0xFE30 && code <= 0xFE6F) ||
+      (code >= 0xFF00 && code <= 0xFF60) ||
+      (code >= 0xFFE0 && code <= 0xFFE6) ||
+      (code >= 0x1F000 && code <= 0x1FAFF) ||
+      (code >= 0x2600 && code <= 0x27BF)
+    ) {
+      width += 2;
+    } else if (code > 0xFFFF) {
+      width += 2;
+    } else {
+      width += 1;
+    }
+  }
+  return width;
+}
+
+function createBox(lines, preferredWidth = 66) {
+  const visualLengths = lines.map((l) => getVisualWidth(l));
+  const maxLineVisual = Math.max(...visualLengths, 0);
+  const boxWidth = Math.max(preferredWidth, maxLineVisual + 6);
+  const innerWidth = boxWidth - 4;
+
+  const horizontal = '═'.repeat(boxWidth - 2);
   const top = `  ╔${horizontal}╗`;
   const bottom = `  ╚${horizontal}╝`;
 
-  const content = lines.map((line) => {
-    // Strip ANSI colors for length calculation
-    const stripped = line.replace(/\x1b\[[0-9;]*m/g, '');
-    const padding = Math.max(0, width - 4 - stripped.length);
+  const content = lines.map((line, idx) => {
+    const vLen = visualLengths[idx];
+    const padding = Math.max(0, innerWidth - vLen);
     const leftPad = Math.floor(padding / 2);
     const rightPad = padding - leftPad;
     return `  ║ ${' '.repeat(leftPad)}${line}${' '.repeat(rightPad)} ║`;
@@ -289,16 +321,28 @@ function runDoctor(targetDirInput = '.', options = {}) {
         addCheck(suite2, 'err', 'Platform Engine Compatibility', 'Detected packages requiring Node >=22. Run "deneb doctor --fix" to inject Node 20 overrides.', { code: 'DNB-ENG-001' }) //, 'Detected packages requiring Node >=22. Run "deneb doctor --fix" to inject Node 20 overrides.');
       }
 
-      // Pre-heal missing useSiteData hooks before tsc runs when --fix is enabled
+      // Pre-heal missing useSiteData hooks and unguarded modals before tsc runs when --fix is enabled
       if (shouldFix) {
         for (const file of sourceFiles) {
           if (!/\.(tsx|jsx|ts|js)$/.test(file)) continue;
           let c = fs.readFileSync(file, 'utf-8');
+          let modified = false;
           if (c.includes('siteData')) {
             const healed = healMissingSiteDataHooks(c, file);
             if (healed && healed !== c) {
-              fs.writeFileSync(file, healed, 'utf8');
+              c = healed;
+              modified = true;
             }
+          }
+          if (c.includes('AnimatePresence') || c.includes('fixed inset-0')) {
+            const modalHealed = healUnguardedModalConditionalsInSource(c, file);
+            if (modalHealed && modalHealed.updated) {
+              c = modalHealed.code;
+              modified = true;
+            }
+          }
+          if (modified) {
+            fs.writeFileSync(file, c, 'utf8');
           }
         }
       }
