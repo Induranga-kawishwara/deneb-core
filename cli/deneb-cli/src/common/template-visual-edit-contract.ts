@@ -2177,8 +2177,11 @@ function auditSensitiveAttributes(
 }
 
 function isHiddenHtmlElement(token: string, tag: string) {
+  // Strip quoted attribute values so CSS classes like "overflow-hidden" are not falsely flagged as HTML attributes
+  const stripped = token.replace(/="[^"]*"|='[^']*'/g, '=""');
+
   if (
-    /(?:^|\s)hidden(?:\s|=|\/?>)/i.test(token) ||
+    /(?<![\w-])hidden(?:[\s=]|\/?>)/i.test(stripped) ||
     /\baria-hidden\s*=\s*(?:"true"|'true')/i.test(token)
   ) {
     return true;
