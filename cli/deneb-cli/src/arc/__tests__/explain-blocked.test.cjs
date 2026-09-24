@@ -11,15 +11,68 @@ const {
 } = require('../explain-blocked.cjs');
 const { resolveWorkspaceStorefrontsDir } = require('../corpus-verifier.cjs');
 
+function createMockCompliantProject() {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-compliant-'));
+  const appDir = path.join(tempDir, 'src', 'app');
+  const dataDir = path.join(tempDir, 'src', 'data');
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(path.join(tempDir, 'package.json'), JSON.stringify({ name: 'sample', dependencies: { next: '15.0.0' } }));
+  fs.writeFileSync(path.join(tempDir, 'fivora-template.json'), JSON.stringify({
+    framework: 'nextjs-static-export',
+    version: 2,
+    arcVersion: '2.1.0',
+    schemaVersion: 2,
+    siteDataFile: 'src/data/site-data.json',
+    pages: [{ id: 'home', label: 'Home', route: '/', required: true }],
+    editorSchema: {
+      version: 1,
+      sections: [
+        { id: 'home', path: 'home', type: 'object', label: 'Home', fields: [{ key: 'heroTitle', type: 'text' }] }
+      ]
+    },
+    visualEditing: {
+      contractVersion: 1,
+      mode: 'strict',
+      controlOnlyPaths: []
+    }
+  }, null, 2));
+  fs.writeFileSync(path.join(dataDir, 'site-data.json'), JSON.stringify({
+    content: {
+      home: { heroTitle: 'Welcome' }
+    }
+  }, null, 2));
+  fs.writeFileSync(path.join(appDir, 'layout.tsx'), 'export default function RootLayout({ children }: any) { return <html><body>{children}</body></html>; }');
+  fs.writeFileSync(path.join(appDir, 'page.tsx'), 'export default function HomePage() { return <main data-preview-page-id="home"><h1 data-preview-field-path="home.heroTitle">Welcome</h1></main>; }');
+
+  return {
+    dir: tempDir,
+    cleanup: () => fs.rmSync(tempDir, { recursive: true, force: true }),
+  };
+}
+
 test('Explain Blocked: identifies clean status for compliant storefront (coffee)', () => {
   const baseDir = resolveWorkspaceStorefrontsDir();
   const coffeeDir = path.join(baseDir, 'coffee');
+  const hasRealCoffee = fs.existsSync(coffeeDir) && fs.existsSync(path.join(coffeeDir, 'fivora-template.json'));
 
-  const report = analyzeBlockedProject(coffeeDir);
-  assert.equal(report.blocked, false);
-  assert.equal(report.totalBlockingIssues, 0);
-  assert.equal(report.findings.length, 0);
-  assert.equal(report.summary.contractPassed, true);
+  let compliantDir = coffeeDir;
+  let compliantCleanup = null;
+  if (!hasRealCoffee) {
+    const fixture = createMockCompliantProject();
+    compliantDir = fixture.dir;
+    compliantCleanup = fixture.cleanup;
+  }
+
+  try {
+    const report = analyzeBlockedProject(compliantDir);
+    assert.equal(report.blocked, false);
+    assert.equal(report.totalBlockingIssues, 0);
+    assert.equal(report.findings.length, 0);
+    assert.equal(report.summary.contractPassed, true);
+  } finally {
+    if (compliantCleanup) compliantCleanup();
+  }
 });
 
 test('Explain Blocked: pinpoints exact unmapped field paths and locations for blocked storefront', () => {
