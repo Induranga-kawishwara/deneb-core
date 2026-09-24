@@ -449,7 +449,29 @@ function applyResidualPass({ code, file, ownerScope, usedPaths, componentName, r
   };
 }
 
+const RESIDUAL_REASONS = {
+  STATIC_INTENTIONAL: 'STATIC_INTENTIONAL',
+  STATIC_DECORATIVE: 'STATIC_DECORATIVE',
+  PLATFORM_CONTROLLED: 'PLATFORM_CONTROLLED',
+  RUNTIME_DATA: 'RUNTIME_DATA',
+  UNSUPPORTED_SAFE: 'UNSUPPORTED_SAFE',
+  CONVERSION_FAILED: 'CONVERSION_FAILED',
+};
+
+function normalizeResidualReason(rawReason) {
+  if (!rawReason) return RESIDUAL_REASONS.STATIC_DECORATIVE;
+  const lower = String(rawReason).toLowerCase();
+  if (lower.includes('fail') || lower.includes('error')) return RESIDUAL_REASONS.CONVERSION_FAILED;
+  if (lower.includes('platform') || lower.includes('control')) return RESIDUAL_REASONS.PLATFORM_CONTROLLED;
+  if (lower.includes('runtime') || lower.includes('session') || lower.includes('cart')) return RESIDUAL_REASONS.RUNTIME_DATA;
+  if (lower.includes('intentional') || lower.includes('brand')) return RESIDUAL_REASONS.STATIC_INTENTIONAL;
+  if (lower.includes('unsupported') || lower.includes('complex')) return RESIDUAL_REASONS.UNSUPPORTED_SAFE;
+  return RESIDUAL_REASONS.STATIC_DECORATIVE;
+}
+
 module.exports = {
   applyResidualPass,
   isMeaningfulVisibleText,
+  RESIDUAL_REASONS,
+  normalizeResidualReason,
 };

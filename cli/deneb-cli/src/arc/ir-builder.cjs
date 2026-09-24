@@ -16,7 +16,7 @@ const { resolveImportSpecifier } = require('./scanner.cjs');
 const { unrollCollectionSource, collectVariableAliases } = require('./data-flow.cjs');
 
 /**
- * Deneb ARC v2 — Project-Wide Intermediate Representation (IR) Builder
+ * Deneb ARC v3 — Project-Wide Intermediate Representation (IR) Builder
  *
  * Scans the entire project upfront to construct an application-level graph:
  * 1. Component Graph: Component declarations, export names, props shapes, interfaces, and member usages.
@@ -25,6 +25,152 @@ const { unrollCollectionSource, collectVariableAliases } = require('./data-flow.
  * 4. Asset Imports: Next.js static asset imports mapped to clean public URL paths.
  * 5. CSS Background Images: Discovers Tailwind arbitrary bg-[url(...)] and inline styles.
  */
+
+function createDenebComponent({
+  id,
+  name,
+  file,
+  kind = 'function',
+  isDefault = false,
+  propsSignature = { kind: 'none', names: [], paramName: null, typeAnnotationName: null },
+  memberAccesses = {},
+  usages = [],
+  clientBoundary = 'server',
+  routes = [],
+}) {
+  return {
+    id: id || `${file}:${name}`,
+    name,
+    file,
+    kind,
+    isDefault: Boolean(isDefault),
+    propsSignature,
+    memberAccesses,
+    usages,
+    clientBoundary,
+    routes,
+  };
+}
+
+function createDataSource({
+  name,
+  file,
+  kind = 'inline-array',
+  items = [],
+  fieldKeys = [],
+  editable = true,
+  sourceFile,
+}) {
+  return {
+    name,
+    file,
+    kind,
+    items,
+    fieldKeys,
+    editable: editable !== false,
+    sourceFile: sourceFile || file,
+  };
+}
+
+function createCollectionDefinition({
+  file,
+  loc,
+  rootLoc,
+  arrayName,
+  itemParam = null,
+  indexParam = null,
+  rootTagName,
+  isChildCustomComponent = false,
+  childComponent = null,
+  passedProps = {},
+  hasSpreadItem = false,
+  pipelineChain = [],
+  dataSource = null,
+}) {
+  return {
+    file,
+    loc,
+    rootLoc,
+    arrayName,
+    itemParam,
+    indexParam,
+    rootTagName,
+    isChildCustomComponent: Boolean(isChildCustomComponent),
+    childComponent,
+    passedProps,
+    hasSpreadItem: Boolean(hasSpreadItem),
+    pipelineChain,
+    dataSource,
+  };
+}
+
+function validateProjectIR(ir) {
+  const errors = [];
+  const warnings = [];
+
+  if (!ir) {
+    return {
+      valid: false,
+      errors: ['Project IR is null or undefined'],
+      warnings: [],
+      stats: { componentCount: 0, dataSourceCount: 0, collectionCount: 0, assetCount: 0, backgroundCount: 0, usageCount: 0 },
+    };
+  }
+
+  const componentCount = ir.components instanceof Map ? ir.components.size : (ir.components ? Object.keys(ir.components).length : 0);
+  const dataSourceCount = ir.dataSources instanceof Map ? ir.dataSources.size : (ir.dataSources ? Object.keys(ir.dataSources).length : 0);
+  const collectionCount = Array.isArray(ir.collections) ? ir.collections.length : 0;
+  const assetCount = ir.assetImports instanceof Map ? ir.assetImports.size : 0;
+  const backgroundCount = Array.isArray(ir.backgroundImages) ? ir.backgroundImages.length : 0;
+  const usageCount = Array.isArray(ir.componentUsages) ? ir.componentUsages.length : 0;
+
+  if (ir.components instanceof Map) {
+    for (const [name, comp] of ir.components.entries()) {
+      if (!comp.name || comp.name !== name) {
+        errors.push(`Component '${name}' has mismatched or missing name property`);
+      }
+      if (!comp.file) {
+        errors.push(`Component '${name}' is missing source file reference`);
+      }
+    }
+  }
+
+  if (ir.dataSources instanceof Map) {
+    for (const [name, src] of ir.dataSources.entries()) {
+      if (!src.name || src.name !== name) {
+        errors.push(`DataSource '${name}' has mismatched or missing name property`);
+      }
+      if (!src.file) {
+        errors.push(`DataSource '${name}' is missing source file reference`);
+      }
+    }
+  }
+
+  if (Array.isArray(ir.collections)) {
+    for (const [idx, col] of ir.collections.entries()) {
+      if (!col.arrayName) {
+        errors.push(`Collection at index ${idx} is missing arrayName`);
+      }
+      if (!col.file) {
+        errors.push(`Collection '${col.arrayName || idx}' is missing file reference`);
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    stats: {
+      componentCount,
+      dataSourceCount,
+      collectionCount,
+      assetCount,
+      backgroundCount,
+      usageCount,
+    },
+  };
+}
 
 function unwrapTypeCasts(node) {
   let curr = node;
@@ -264,23 +410,25 @@ function buildProjectIR(profile) {
               try {
                 const raw = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
                 if (Array.isArray(raw) && raw.length > 0) {
-                  dataSources.set(localName, {
+                  dataSources.set(localName, createDataSource({
                     name: localName,
                     file: rel(projectDir, dataFile),
                     kind: 'imported-json',
                     items: raw,
                     fieldKeys: typeof raw[0] === 'object' && raw[0] !== null ? Object.keys(raw[0]) : [],
-                  });
+                    editable: true,
+                  }));
                 } else if (raw && typeof raw === 'object') {
                   for (const [key, val] of Object.entries(raw)) {
                     if (Array.isArray(val) && val.length > 0) {
-                      dataSources.set(key, {
+                      dataSources.set(key, createDataSource({
                         name: key,
                         file: rel(projectDir, dataFile),
                         kind: 'imported-json',
                         items: val,
                         fieldKeys: typeof val[0] === 'object' && val[0] !== null ? Object.keys(val[0]) : [],
-                      });
+                        editable: true,
+                      }));
                     }
                   }
                 }
@@ -310,13 +458,14 @@ function buildProjectIR(profile) {
             }
           }
           if (items.length > 0) {
-            dataSources.set(node.id.name, {
+            dataSources.set(node.id.name, createDataSource({
               name: node.id.name,
               file: relativeFile,
               kind: 'inline-array',
               items,
               fieldKeys: typeof items[0] === 'object' ? Object.keys(items[0]) : [],
-            });
+              editable: true,
+            }));
           }
         }
         this.traverse(pathNode);
@@ -389,14 +538,14 @@ function buildProjectIR(profile) {
         if (accessed.size > 0) memberAccesses.set(propsSig.paramName, [...accessed]);
       }
 
-      components.set(compName, {
+      components.set(compName, createDenebComponent({
         name: compName,
         file,
         kind,
         isDefault,
         propsSignature: propsSig,
         memberAccesses: Object.fromEntries(memberAccesses.entries()),
-      });
+      }));
     }
   }
 
@@ -500,7 +649,7 @@ function buildProjectIR(profile) {
                 }
               }
 
-              collections.push({
+              collections.push(createCollectionDefinition({
                 file: relativeFile,
                 loc: locKey(node),
                 rootLoc: locKey(rootElement),
@@ -514,7 +663,7 @@ function buildProjectIR(profile) {
                 hasSpreadItem,
                 pipelineChain: unrolled?.chain || [],
                 dataSource: dataSources.get(arrayName) || null,
-              });
+              }));
             }
           }
         }
@@ -549,7 +698,7 @@ function buildProjectIR(profile) {
     return base.charAt(0).toUpperCase() + base.slice(1);
   }
 
-  return {
+  const irInstance = {
     components,
     dataSources,
     collections,
@@ -571,11 +720,20 @@ function buildProjectIR(profile) {
     getComponentUsages(name) {
       return componentUsages.filter((u) => u.componentName === name);
     },
+    validate() {
+      return validateProjectIR(this);
+    },
   };
+
+  return irInstance;
 }
 
 module.exports = {
   buildProjectIR,
   resolvePublicAssetUrl,
   objectLiteralToPlain,
+  createDenebComponent,
+  createDataSource,
+  createCollectionDefinition,
+  validateProjectIR,
 };
