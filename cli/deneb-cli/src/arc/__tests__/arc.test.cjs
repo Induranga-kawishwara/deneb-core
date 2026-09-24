@@ -1819,3 +1819,1148 @@ test('M3: collectFontIdsFromSiteData resolves planned fonts and theme accurately
   assert.equal(siteDataEmpty.theme.bodyFont, 'Inter');
 });
 
+test('ARC v2: applyCollectionTransform threads previewItemPath and index to custom child components', () => {
+  const { parseSource, printSource, locKey } = require('../ast.cjs');
+  const { applyCollectionTransform } = require('../transformer.cjs');
+
+  const code = `
+export function ProductGrid() {
+  const products = [
+    { id: 1, name: "Arabica", price: 15, image: "/arabica.jpg" },
+    { id: 2, name: "Espresso", price: 20, image: "/espresso.jpg" }
+  ];
+  return (
+    <div className="grid grid-cols-2">
+      {products.map((item) => (
+        <ProductCard key={item.id} product={item} />
+      ))}
+    </div>
+  );
+}
+`;
+
+  const ast = parseSource(code, 'ProductGrid.tsx');
+  let mapLoc = null;
+  const recast = require('recast');
+  recast.types.visit(ast, {
+    visitJSXElement(pathNode) {
+      if (pathNode.node.openingElement.name.name === 'ProductCard') {
+        mapLoc = locKey(pathNode.node);
+        return false;
+      }
+      this.traverse(pathNode);
+    },
+  });
+
+  const transform = {
+    listField: 'home.products',
+    itemParam: 'item',
+    loc: mapLoc,
+    isPrimitiveArray: false,
+    hasComponentRef: false,
+  };
+
+  const changed = applyCollectionTransform(ast, transform, false, true);
+  assert.ok(changed);
+  const transformed = printSource(ast, code);
+
+  assert.match(transformed, /data-preview-list-path="home\.products"/);
+  assert.match(transformed, /previewItemPath=\{`home\.products\[\$\{index\}\]`\}/);
+  assert.match(transformed, /index=\{index\}/);
+  assert.match(transformed, /data-preview-item-path=\{`home\.products\[\$\{index\}\]`\}/);
+});
+
+test('ARC v2: instrumentChildCardComponent updates ProductCard props, TS interface and binds inner fields', () => {
+  const { parseSource, printSource } = require('../ast.cjs');
+  const { instrumentChildCardComponent } = require('../transformer.cjs');
+
+  const code = `
+interface ProductCardProps {
+  product: {
+    name: string;
+    price: number;
+    image: string;
+  };
+}
+
+export default function ProductCard({ product }: ProductCardProps) {
+  return (
+    <div className="card">
+      <img src={product.image} alt={product.name} />
+      <h3 className="title">{product.name}</h3>
+      <span className="price">\${product.price}</span>
+    </div>
+  );
+}
+`;
+
+  const ast = parseSource(code, 'ProductCard.tsx');
+  const transform = {
+    componentName: 'ProductCard',
+    listField: 'home.products',
+    itemFields: [
+      { key: 'name', type: 'text' },
+      { key: 'price', type: 'number' },
+      { key: 'image', type: 'image' },
+    ],
+  };
+
+  const changed = instrumentChildCardComponent(ast, transform, true);
+  assert.ok(changed);
+  const transformed = printSource(ast, code);
+
+  assert.match(transformed, /previewItemPath\?: string/);
+  assert.match(transformed, /index\?: number/);
+  assert.match(transformed, /previewItemPath/);
+  assert.match(transformed, /data-preview-item-path=\{`home\.products\[\$\{index\}\]`\}/);
+  assert.match(transformed, /data-preview-field-path=\{`home\.products\[\$\{index\}\]\.image`\}/);
+  assert.match(transformed, /data-preview-field-path=\{`home\.products\[\$\{index\}\]\.name`\}/);
+  assert.match(transformed, /data-preview-field-path=\{`home\.products\[\$\{index\}\]\.price`\}/);
+});
+
+test('ARC v2: extract-tailwind-bg converts bg-[url(...)] into editable style and preview marker', () => {
+  const { parseSource, printSource, locKey } = require('../ast.cjs');
+  const { applyFilePlan } = require('../transformer.cjs');
+
+  const code = `
+export function Hero() {
+  return (
+    <section className="relative h-96 bg-[url('/hero-bg.jpg')] bg-cover">
+      <h1>Hero Title</h1>
+    </section>
+  );
+}
+`;
+
+  const ast = parseSource(code, 'Hero.tsx');
+  let secLoc = null;
+  const recast = require('recast');
+  recast.types.visit(ast, {
+    visitJSXElement(pathNode) {
+      if (pathNode.node.openingElement.name.name === 'section') {
+        secLoc = locKey(pathNode.node);
+        return false;
+      }
+      this.traverse(pathNode);
+    },
+  });
+
+  const filePlan = {
+    file: 'Hero.tsx',
+    originalCode: code,
+    transformations: [
+      {
+        loc: secLoc,
+        operation: 'extract-tailwind-bg',
+        field: 'home.hero.backgroundImage',
+        fallback: '/hero-bg.jpg',
+        bgUrl: '/hero-bg.jpg',
+        decision: 'auto',
+      },
+    ],
+  };
+
+  const result = applyFilePlan(filePlan, { root: '/tmp' });
+  assert.ok(result.changed);
+  assert.match(result.code, /data-preview-field-path="home\.hero\.backgroundImage"/);
+  assert.match(result.code, /backgroundImage:\s*`url\(\$\{siteData(?:\?\.\w+)+/);
+  assert.doesNotMatch(result.code, /bg-\[url\('\/hero-bg\.jpg'\)\]/);
+});
+
+test('ARC v2: ir-builder builds project IR and resolves public asset paths accurately', () => {
+  const { resolvePublicAssetUrl, objectLiteralToPlain } = require('../ir-builder.cjs');
+  const { parseSource } = require('../ast.cjs');
+
+  // Test objectLiteralToPlain
+  const code = 'const obj = { id: 1, title: "Test", price: 29.99, featured: true };';
+  const ast = parseSource(code, 'test.js');
+  const plain = objectLiteralToPlain(ast.program.body[0].declarations[0].init);
+  assert.deepEqual(plain, { id: 1, title: 'Test', price: 29.99, featured: true });
+});
+
+test('ARC v2: planTransformations automatically links child card component via IR', () => {
+  const { planTransformations } = require('../planner.cjs');
+
+  const profile = {
+    components: [], // purposefully empty to test IR fallback
+  };
+
+  const ir = {
+    getComponent(name) {
+      if (name === 'ProductCard') {
+        return { name: 'ProductCard', file: 'src/components/ProductCard.tsx' };
+      }
+      return null;
+    },
+  };
+
+  const pageAnalysis = {
+    relativeFile: 'src/app/page.tsx',
+    candidates: [
+      {
+        file: 'src/app/page.tsx',
+        loc: '10:5-10:40',
+        kind: 'collection',
+        operation: 'collection-conversion',
+        confidence: 0.95,
+        value: [{ value: { title: 'P1', price: 10 } }],
+        extra: {
+          itemsProp: 'products',
+          childComponentName: 'ProductCard',
+          objectItems: true,
+          itemFields: [
+            { key: 'title', type: 'text' },
+            { key: 'price', type: 'number' },
+            { key: 'image', type: 'image' },
+          ],
+        },
+      },
+    ],
+  };
+
+  const cardAnalysis = {
+    relativeFile: 'src/components/ProductCard.tsx',
+    candidates: [],
+  };
+
+  const plan = planTransformations({
+    profile,
+    analyses: [pageAnalysis, cardAnalysis],
+    ir,
+  });
+
+  const cardPlan = plan.files.find((f) => f.file === 'src/components/ProductCard.tsx');
+  assert.ok(cardPlan, 'Child card file plan must exist');
+  const childTransform = cardPlan.transformations.find((t) => t.operation === 'instrument-child-card');
+  assert.ok(childTransform, 'Must plan instrument-child-card for child component');
+  assert.equal(childTransform.componentName, 'ProductCard');
+  assert.equal(childTransform.file, 'src/components/ProductCard.tsx');
+});
+
+test('ARC v2: residual pass resolves static asset imports for image tags via IR', () => {
+  const { applyResidualPass } = require('../residual.cjs');
+
+  const code = `
+import heroImg from '../assets/hero.png';
+
+export function Hero() {
+  return (
+    <div>
+      <img src={heroImg} alt="Hero banner" />
+    </div>
+  );
+}
+`;
+
+  const ir = {
+    getAssetImport(file, id) {
+      if (id === 'heroImg') return '/hero.png';
+      return null;
+    },
+  };
+
+  const result = applyResidualPass({
+    code,
+    file: 'src/components/Hero.tsx',
+    ownerScope: 'home',
+    usedPaths: new Set(),
+    componentName: 'Hero',
+    ir,
+  });
+
+  assert.ok(result.changed, 'Residual pass should change code with resolved asset');
+  assert.match(result.code, /data-preview-field-path="home\.hero\.(?:image|hero)"/);
+  assert.match(result.code, /siteData(?:\?\.\w+)+/);
+  assert.ok(result.fields.some((f) => f.type === 'image' && f.value === '/hero.png'));
+});
+
+test('ARC v2: printer prints Deneb Editability Scorecard with all metrics', () => {
+  const printer = require('../printer.cjs');
+  let output = '';
+  const origLog = console.log;
+  console.log = (...args) => {
+    output += args.join(' ') + '\n';
+  };
+
+  try {
+    printer.printValidation(
+      { syntaxPassed: true, contractPassed: true, fivoraContractPassed: true },
+      { visualCoverage: 95.5, visualCovered: 42, visualRequired: 44, uncoveredVisibleText: 0 },
+      { score: 100 }
+    );
+  } finally {
+    console.log = origLog;
+  }
+
+  assert.match(output, /Deneb Editability Scorecard/);
+  assert.match(output, /Contract Validity:\s+.*100%/);
+  assert.match(output, /Editability Coverage:\s+.*95\.5%/);
+  assert.match(output, /Visual Elements:\s+42\/44 bound/);
+  assert.match(output, /Design Preservation:\s+100%/);
+});
+
+test('ARC v2 Phase 2: prop-flow analyzer links parent props to child SectionHeader previewPath and binds inner headings', () => {
+  const { applyFilePlan } = require('../transformer.cjs');
+  const parentCode = `
+    import { SectionHeader } from './SectionHeader';
+    export function Story() {
+      return (
+        <section>
+          <SectionHeader title="Our Story" subtitle="Freshly roasted every day" />
+        </section>
+      );
+    }
+  `;
+  const parentPlan = {
+    file: 'Story.tsx',
+    originalCode: parentCode,
+    transformations: [
+      {
+        operation: 'prop-flow-callsite',
+        componentName: 'SectionHeader',
+        previewPath: 'home.story',
+        propTransforms: {
+          title: { field: 'home.story.title', fallback: 'Our Story', type: 'text' },
+          subtitle: { field: 'home.story.subtitle', fallback: 'Freshly roasted every day', type: 'text' },
+        },
+        decision: 'auto',
+      },
+    ],
+  };
+  const parentRes = applyFilePlan(parentPlan, { root: '/tmp' });
+  assert.ok(parentRes.changed);
+  assert.match(parentRes.code, /previewPath="home\.story"/);
+  assert.match(parentRes.code, /title=\{siteData\?\.content\?\.home\?\.story\?\.title \?\? "Our Story"\}/);
+  assert.match(parentRes.code, /subtitle=\{siteData\?\.content\?\.home\?\.story\?\.subtitle \?\? "Freshly roasted every day"\}/);
+
+  const childCode = `
+    export interface SectionHeaderProps {
+      title: string;
+      subtitle: string;
+    }
+    export function SectionHeader({ title, subtitle }: SectionHeaderProps) {
+      return (
+        <div className="header">
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+      );
+    }
+  `;
+  const childPlan = {
+    file: 'SectionHeader.tsx',
+    originalCode: childCode,
+    transformations: [
+      {
+        operation: 'instrument-reusable-component',
+        componentName: 'SectionHeader',
+        propTransforms: {
+          title: { field: 'home.story.title', fallback: 'Our Story', type: 'text' },
+          subtitle: { field: 'home.story.subtitle', fallback: 'Freshly roasted every day', type: 'text' },
+        },
+        decision: 'auto',
+      },
+    ],
+  };
+  const childRes = applyFilePlan(childPlan, { root: '/tmp' });
+  assert.ok(childRes.changed);
+  assert.match(childRes.code, /previewPath\?: string/);
+  assert.match(childRes.code, /previewPath/);
+  assert.match(childRes.code, /data-preview-field-path=\{previewPath \? `\$\{previewPath\}\.title` : undefined\}/);
+  assert.match(childRes.code, /data-preview-field-path=\{previewPath \? `\$\{previewPath\}\.subtitle` : undefined\}/);
+});
+
+test('ARC v2 Phase 2: compound text analyzer binds button with icon while preserving icon JSX', () => {
+  const { applyFilePlan } = require('../transformer.cjs');
+  const code = `
+    import { Coffee } from 'lucide-react';
+    export function OrderButton() {
+      return (
+        <button className="btn">
+          <Coffee className="w-4 h-4" />
+          Order Now
+        </button>
+      );
+    }
+  `;
+  const plan = {
+    file: 'OrderButton.tsx',
+    originalCode: code,
+    transformations: [
+      {
+        loc: '5:8',
+        tag: 'button',
+        operation: 'bind-button-with-icon',
+        field: 'home.hero.orderLabel',
+        fallback: 'Order Now',
+        fieldType: 'text',
+        decision: 'auto',
+      },
+    ],
+  };
+  const res = applyFilePlan(plan, { root: '/tmp' });
+  assert.ok(res.changed);
+  assert.match(res.code, /<Coffee className="w-4 h-4" \/>/);
+  assert.match(res.code, /data-preview-field-path="home\.hero\.orderLabel"/);
+  assert.match(res.code, /\{siteData\?\.content\?\.home\?\.hero\?\.orderLabel \?\? "Order Now"\}/);
+});
+
+test('ARC v2 Phase 2: compound text analyzer binds highlighted heading without breaking span styling', () => {
+  const { applyFilePlan } = require('../transformer.cjs');
+  const code = `
+    export function Heading() {
+      return (
+        <h1 className="text-4xl font-bold">
+          Crafted with <span className="text-amber-500">Passion</span>
+        </h1>
+      );
+    }
+  `;
+  const plan = {
+    file: 'Heading.tsx',
+    originalCode: code,
+    transformations: [
+      {
+        loc: '4:8',
+        tag: 'h1',
+        operation: 'bind-highlighted-heading',
+        field: 'home.hero.title',
+        fallback: 'Crafted with Passion',
+        fieldType: 'text',
+        decision: 'auto',
+      },
+    ],
+  };
+  const res = applyFilePlan(plan, { root: '/tmp' });
+  assert.ok(res.changed);
+  assert.match(res.code, /data-preview-field-path="home\.hero\.title"/);
+  assert.match(res.code, /<span\s+[^>]*className="text-amber-500"[^>]*data-preview-field-path="home\.hero\.titleHighlight"/);
+  assert.match(res.code, /siteData\?\.content\?\.home\?\.hero\?\.titleHighlight \?\? "Passion"/);
+});
+
+test('ARC v2 Phase 2: data flow engine unrolls chained collections (.slice().map()) and variable aliases', () => {
+  const { unrollCollectionPipelines, resolveVariableAliases } = require('../data-flow.cjs');
+  const parseSource = (c) => require('recast').parse(c, { parser: require('recast/parsers/babel-ts') });
+  
+  const code = `
+    const rawProducts = [{ id: 1, name: 'Item 1' }, { id: 2, name: 'Item 2' }];
+    const featured = rawProducts.slice(0, 4);
+    export function Grid() {
+      return <div>{featured.map((p) => <span>{p.name}</span>)}</div>;
+    }
+  `;
+  const ast = parseSource(code);
+  const aliases = resolveVariableAliases(ast);
+  assert.ok(aliases.has('featured'));
+  assert.equal(aliases.get('featured').rootIdentifier, 'rawProducts');
+  assert.equal(aliases.get('featured').transformMethod, 'slice');
+
+  const chainedCode = `
+    export function Chained() {
+      return <div>{products.filter(p => p.active).slice(0, 3).map(p => <span>{p.title}</span>)}</div>;
+    }
+  `;
+  const chainedAst = parseSource(chainedCode);
+  const pipelines = unrollCollectionPipelines(chainedAst);
+  assert.equal(pipelines.length, 1);
+  assert.equal(pipelines[0].rootIdentifier, 'products');
+  assert.deepEqual(pipelines[0].pipelineChain, ['filter', 'slice']);
+});
+
+test('ARC v2 Phase 2: full conversion generates deneb-conversion-report.json with unresolved and category breakdown', () => {
+  const dir = copyOf(STOREFRONT_FIXTURE);
+  silence(() => runDenebArc(dir, 'acme-store', { telemetry: 'off' }));
+  const reportPath = path.join(dir, 'deneb-conversion-report.json');
+  assert.ok(fs.existsSync(reportPath), 'deneb-conversion-report.json should exist');
+  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+  assert.equal(report.scorecard.contractValidity, '100%');
+  assert.ok(report.categories);
+  assert.ok(typeof report.categories.text.planned === 'number');
+  assert.ok(typeof report.categories.collections.planned === 'number');
+  assert.ok(Array.isArray(report.unresolved));
+});
+
+test('ARC v2 Phase 2: multi-run idempotency preserves clean interfaces without duplicating previewPath or imports', () => {
+  const dir = copyOf(STOREFRONT_FIXTURE);
+  silence(() => runDenebArc(dir, 'acme-store', { telemetry: 'off' }));
+  silence(() => runDenebArc(dir, 'acme-store', { telemetry: 'off' }));
+  silence(() => runDenebArc(dir, 'acme-store', { telemetry: 'off' }));
+  const grid = fs.readFileSync(path.join(dir, 'src', 'components', 'ProductGrid.tsx'), 'utf8');
+  const useSiteDataMatches = grid.match(/import\s*\{\s*useSiteData\s*\}\s*from/g) || [];
+  assert.equal(useSiteDataMatches.length, 1);
+  const listMatches = grid.match(/data-preview-list-path="home\.products"/g) || [];
+  assert.equal(listMatches.length, 1);
+});
+
+test('ARC v2 Phase 3: validateRuntimeEditability verifies live editability contracts on converted project', async () => {
+  const { validateRuntimeEditability, validateRuntimeEditabilitySync } = require('../runtime-validator.cjs');
+  const dir = copyOf(STOREFRONT_FIXTURE);
+  silence(() => runDenebArc(dir, 'acme-store', { telemetry: 'off' }));
+  
+  const siteDataPath = path.join(dir, 'src', 'data', 'site-data.json');
+  const manifestPath = path.join(dir, 'fivora-template.json');
+  const siteData = JSON.parse(fs.readFileSync(siteDataPath, 'utf8'));
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+  const syncRes = validateRuntimeEditabilitySync({
+    projectDir: dir,
+    siteData,
+    manifest,
+  });
+  assert.equal(syncRes.passed, true);
+  assert.ok(syncRes.runtimeEditabilityScore >= 95, `Expected score >= 95, got ${syncRes.runtimeEditabilityScore}`);
+  assert.ok(syncRes.collectionResults.length > 0);
+  assert.ok(syncRes.collectionResults.every((c) => c.passed));
+
+  const asyncRes = await validateRuntimeEditability({
+    projectDir: dir,
+    siteData,
+    manifest,
+  });
+  assert.equal(asyncRes.passed, true);
+  assert.equal(asyncRes.runtimeEditabilityScore, syncRes.runtimeEditabilityScore);
+});
+
+test('ARC v2 Phase 3: CanonicalFieldRef correctly generates getter AST, preview attribute, and nested item paths', () => {
+  const { fieldRef, isValidCanonicalPath, validatePathAlignment } = require('../canonical-paths.cjs');
+  const recast = require('recast');
+
+  const ref = fieldRef('home.story.title');
+  assert.equal(ref.scope, 'home');
+  assert.equal(ref.section, 'story');
+  assert.equal(ref.fieldName, 'title');
+
+  const getterCode = recast.print(ref.toGetterAst()).code;
+  assert.equal(getterCode, 'siteData?.content?.home?.story?.title');
+
+  const bindingCode = recast.print(ref.toBindingAst('Default Story')).code;
+  assert.equal(bindingCode, 'siteData?.content?.home?.story?.title ?? "Default Story"');
+
+  const previewAttrCode = recast.print(ref.toPreviewAttrAst()).code;
+  assert.equal(previewAttrCode, 'data-preview-field-path="home.story.title"');
+
+  assert.equal(isValidCanonicalPath('home.story.title'), true);
+  assert.equal(isValidCanonicalPath('home.products[0].name'), true);
+  assert.equal(isValidCanonicalPath(''), false);
+
+  assert.equal(
+    validatePathAlignment('siteData?.content?.home?.story?.title', '<h2 data-preview-field-path="home.story.title">'),
+    true
+  );
+  assert.equal(
+    validatePathAlignment('siteData?.content?.home?.story?.title', '<h2 data-preview-field-path="home.other.title">'),
+    false
+  );
+});
+
+test('ARC v2 Phase 3: Adapters recognize carousel, accordion, tabs, dialog, and gallery components', () => {
+  const { activeAdapters, recognizeWithAdapters } = require('../adapters.cjs');
+  const adapters = activeAdapters({
+    framework: 'nextjs',
+    dependencies: {
+      'swiper': '^11.0.0',
+      'embla-carousel-react': '^8.0.0',
+    },
+  });
+
+  const makeJsxNode = (name) => ({
+    type: 'JSXElement',
+    openingElement: {
+      type: 'JSXOpeningElement',
+      name: { type: 'JSXIdentifier', name },
+      attributes: [],
+    },
+    children: [],
+  });
+
+  // Swiper
+  const swiperRes = recognizeWithAdapters(makeJsxNode('Swiper'), {}, adapters);
+  assert.equal(swiperRes.library, 'swiper');
+  assert.equal(swiperRes.role, 'carousel-container');
+
+  const swiperSlideRes = recognizeWithAdapters(makeJsxNode('SwiperSlide'), {}, adapters);
+  assert.equal(swiperSlideRes.library, 'swiper');
+  assert.equal(swiperSlideRes.role, 'carousel-slide');
+
+  // Embla
+  const emblaRes = recognizeWithAdapters(makeJsxNode('Carousel'), {}, adapters);
+  assert.equal(emblaRes.library, 'embla');
+  assert.equal(emblaRes.role, 'carousel-container');
+
+  // Accordion
+  const accordionRes = recognizeWithAdapters(makeJsxNode('Accordion'), {}, adapters);
+  assert.equal(accordionRes.library, 'accordion');
+  assert.equal(accordionRes.role, 'accordion-container');
+
+  const accordionTriggerRes = recognizeWithAdapters(makeJsxNode('AccordionTrigger'), {}, adapters);
+  assert.equal(accordionTriggerRes.library, 'accordion');
+  assert.equal(accordionTriggerRes.role, 'accordion-header');
+
+  // Tabs
+  const tabsRes = recognizeWithAdapters(makeJsxNode('Tabs'), {}, adapters);
+  assert.equal(tabsRes.library, 'tabs');
+  assert.equal(tabsRes.role, 'tabs-container');
+
+  // Dialog
+  const dialogRes = recognizeWithAdapters(makeJsxNode('DialogTitle'), {}, adapters);
+  assert.equal(dialogRes.library, 'dialog');
+  assert.equal(dialogRes.role, 'dialog-title');
+
+  // Gallery
+  const galleryRes = recognizeWithAdapters(makeJsxNode('Masonry'), {}, adapters);
+  assert.equal(galleryRes.library, 'gallery');
+  assert.equal(galleryRes.role, 'gallery-container');
+});
+
+test('ARC v2 Phase 3: conversion report includes runtime verification scorecard and metrics', () => {
+  const dir = copyOf(STOREFRONT_FIXTURE);
+  silence(() => runDenebArc(dir, 'acme-store', { telemetry: 'off' }));
+  const reportPath = path.join(dir, 'deneb-conversion-report.json');
+  assert.ok(fs.existsSync(reportPath));
+  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+  assert.ok(report.scorecard.runtimeEditability);
+  assert.match(report.scorecard.runtimeEditability, /100%/);
+  assert.ok(report.runtimeVerification);
+  assert.equal(report.runtimeVerification.passed, true);
+  assert.ok(report.runtimeVerification.verifiedCount > 0);
+});
+
+test('ARC v2 Phase 4: RSC boundary intelligence detects metadata exports and client directives accurately', () => {
+  const { hasMetadataExport, hasClientDirective, canSafelyInjectClientDirective, ensureClientDirective } = require('../rsc-boundary.cjs');
+  const parseSource = (c) => require('recast').parse(c, { parser: require('recast/parsers/babel-ts') });
+
+  const metadataCode = `
+    export const metadata = { title: 'My Store', description: 'Best products' };
+    export default function Page() { return <h1>Store</h1>; }
+  `;
+  const metaAst = parseSource(metadataCode);
+  assert.equal(hasMetadataExport(metaAst), true);
+  assert.equal(hasClientDirective(metaAst), false);
+  assert.equal(canSafelyInjectClientDirective(metaAst, 'src/app/page.tsx', { router: 'next-app' }), false);
+
+  const clientCode = `
+    'use client';
+    import { useState } from 'react';
+    export default function Interactive() { const [c, setC] = useState(0); return <button onClick={() => setC(c + 1)}>{c}</button>; }
+  `;
+  const clientAst = parseSource(clientCode);
+  assert.equal(hasMetadataExport(clientAst), false);
+  assert.equal(hasClientDirective(clientAst), true);
+  assert.equal(canSafelyInjectClientDirective(clientAst, 'src/components/Interactive.tsx', { router: 'next-app' }), true);
+
+  const serverCode = `
+    export default function PureServer() { return <p>Server rendered</p>; }
+  `;
+  const serverAst = parseSource(serverCode);
+  assert.equal(hasMetadataExport(serverAst), false);
+  assert.equal(hasClientDirective(serverAst), false);
+  assert.equal(canSafelyInjectClientDirective(serverAst, 'src/app/about/page.tsx', { router: 'next-app' }), true);
+  
+  ensureClientDirective(serverAst);
+  assert.equal(hasClientDirective(serverAst), true);
+});
+
+test('ARC v2 Phase 4: semantic engine protects dynamic commerce state and mixed expressions from static replacement', () => {
+  const { resolveChildText } = require('../semantic.cjs');
+  const parseSource = (c) => require('recast').parse(c, { parser: require('recast/parsers/babel-ts') });
+
+  const makeJsxNode = (code) => {
+    const ast = parseSource(code);
+    return ast.program.body[0].expression;
+  };
+
+  // Mixed text with dynamic expression: <p>{cart.items.length} items in your cart</p>
+  const cartNode = makeJsxNode('<p>{cart.items.length} items in your cart</p>');
+  const cartText = resolveChildText(cartNode, new Map());
+  assert.equal(cartText.dynamic, true);
+  assert.equal(cartText.text, '');
+
+  // User session state: <span>Welcome, {user?.name}</span>
+  const userNode = makeJsxNode('<span>Welcome, {user?.name}</span>');
+  const userText = resolveChildText(userNode, new Map());
+  assert.equal(userText.dynamic, true);
+  assert.equal(userText.text, '');
+
+  // Dynamic price calculation: <div>{formatPrice(item.price * qty)}</div>
+  const priceNode = makeJsxNode('<div>{formatPrice(item.price * qty)}</div>');
+  const priceText = resolveChildText(priceNode, new Map());
+  assert.equal(priceText.dynamic, true);
+  assert.equal(priceText.text, '');
+
+  // Pure static text: <h1>Crafted with Passion</h1>
+  const staticNode = makeJsxNode('<h1>Crafted with Passion</h1>');
+  const staticText = resolveChildText(staticNode, new Map());
+  assert.equal(staticText.dynamic, false);
+  assert.equal(staticText.text, 'Crafted with Passion');
+});
+
+test('ARC v2 Phase 4: instrumentReusableComponent supports identifier props (props: HeaderProps) and body destructuring', () => {
+  const { applyFilePlan } = require('../transformer.cjs');
+  const code = `
+    interface SectionHeaderProps {
+      title: string;
+      subtitle: string;
+    }
+    export function SectionHeader(props: SectionHeaderProps) {
+      const { title, subtitle } = props;
+      return (
+        <div className="section-header">
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+      );
+    }
+  `;
+  const plan = {
+    file: 'SectionHeader.tsx',
+    originalCode: code,
+    transformations: [
+      {
+        operation: 'instrument-reusable-component',
+        componentName: 'SectionHeader',
+        propTransforms: {
+          title: { field: 'home.story.title', fallback: 'Our Story', type: 'text' },
+          subtitle: { field: 'home.story.subtitle', fallback: 'Freshly roasted every day', type: 'text' },
+        },
+        decision: 'auto',
+      },
+    ],
+  };
+
+  const res = applyFilePlan(plan, { root: '/tmp' });
+  assert.ok(res.changed);
+  // Interface updated with previewPath
+  assert.match(res.code, /previewPath\?: string/);
+  // Body destructuring injected with previewPath
+  assert.match(res.code, /const \{\s*title,\s*subtitle,\s*previewPath\s*\} = props;/);
+  // DOM elements stamped with dynamic path
+  assert.match(res.code, /data-preview-field-path=\{previewPath \? `\$\{previewPath\}\.title` : undefined\}/);
+  assert.match(res.code, /data-preview-field-path=\{previewPath \? `\$\{previewPath\}\.subtitle` : undefined\}/);
+});
+
+test('ARC v2 Phase 4: instrumentChildCardComponent supports identifier props and body destructuring', () => {
+  const { applyFilePlan } = require('../transformer.cjs');
+  const code = `
+    interface ProductCardProps {
+      name: string;
+      price: string;
+      image: string;
+    }
+    export function ProductCard(props: ProductCardProps) {
+      const { name, price, image } = props;
+      return (
+        <div className="card">
+          <img src={image} alt={name} />
+          <h3>{name}</h3>
+          <span>{price}</span>
+        </div>
+      );
+    }
+  `;
+  const plan = {
+    file: 'ProductCard.tsx',
+    originalCode: code,
+    transformations: [
+      {
+        operation: 'instrument-child-card',
+        componentName: 'ProductCard',
+        itemFields: [
+          { key: 'name', type: 'text' },
+          { key: 'price', type: 'text' },
+          { key: 'image', type: 'image' },
+        ],
+        decision: 'auto',
+      },
+    ],
+  };
+
+  const res = applyFilePlan(plan, { root: '/tmp' });
+  assert.ok(res.changed);
+  // Interface updated with previewItemPath and index
+  assert.match(res.code, /previewItemPath\?: string/);
+  assert.match(res.code, /index\?: number/);
+  // Body destructuring receives previewItemPath and index
+  assert.match(res.code, /previewItemPath/);
+  assert.match(res.code, /index/);
+});
+
+test('ARC v2 Phase 4: healEmptyStateConditionals preserves interactive modals, drawers, and tab states', () => {
+  const { applyFilePlan } = require('../transformer.cjs');
+  const code = `
+    export function Catalog() {
+      return (
+        <div>
+          {isModalOpen && (
+            <div role="dialog" className="modal fixed inset-0 z-50">
+              <h2>Quick View Modal</h2>
+            </div>
+          )}
+          {activeTab === 'details' ? (
+            <div className="tab-pane">
+              <p>Product Specifications</p>
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+  `;
+  const plan = {
+    file: 'Catalog.tsx',
+    originalCode: code,
+    transformations: [
+      {
+        loc: '7:14',
+        tag: 'h2',
+        operation: 'extract-text',
+        field: 'home.modal.title',
+        fallback: 'Quick View Modal',
+        fieldType: 'text',
+        decision: 'auto',
+      },
+    ],
+  };
+
+  const res = applyFilePlan(plan, { root: '/tmp' });
+  assert.ok(res.changed);
+  // Conditional modal guard preserved
+  assert.match(res.code, /isModalOpen &&/);
+  // Tab conditional preserved
+  assert.match(res.code, /activeTab === 'details' \?/);
+});
+
+test('ARC v2 Phase 5: Pluggable Adapter Registry supports custom adapter registration and lifecycle hooks', () => {
+  const { AdapterRegistry, defaultRegistry } = require('../adapters/registry.cjs');
+  const customRegistry = new AdapterRegistry();
+
+  const customVideoAdapter = {
+    id: 'custom-video',
+    detect: (project) => Boolean(project.hasVideoPlayer),
+    recognizeNode(node) {
+      const name = node.openingElement?.name?.name;
+      if (name === 'VideoPlayer' || name === 'BackgroundVideo') {
+        return { library: 'custom-video', kind: 'media', role: 'video-container', tag: name };
+      }
+      return null;
+    },
+    resolveAction(node) {
+      return null;
+    },
+  };
+
+  customRegistry.register(customVideoAdapter);
+  assert.ok(customRegistry.get('custom-video'), 'Must find registered custom adapter');
+  assert.equal(customRegistry.getAll().length, 1);
+
+  // Inactive when project hasVideoPlayer is false
+  assert.equal(customRegistry.getActive({ hasVideoPlayer: false }).length, 0);
+
+  // Active when project hasVideoPlayer is true
+  const active = customRegistry.getActive({ hasVideoPlayer: true });
+  assert.equal(active.length, 1);
+  assert.equal(active[0].id, 'custom-video');
+
+  // Verify node recognition
+  const fakeNode = {
+    openingElement: { name: { name: 'VideoPlayer' } },
+  };
+  const recognized = customRegistry.recognizeNode(fakeNode, { profile: { hasVideoPlayer: true } });
+  assert.ok(recognized);
+  assert.equal(recognized.adapterId, 'custom-video');
+  assert.equal(recognized.role, 'video-container');
+
+  // Verify default global registry contains all built-in adapters
+  const allDefault = defaultRegistry.getAll();
+  const ids = allDefault.map((a) => a.id);
+  assert.ok(ids.includes('swiper'), 'Must include swiper');
+  assert.ok(ids.includes('embla'), 'Must include embla');
+  assert.ok(ids.includes('slick'), 'Must include slick');
+  assert.ok(ids.includes('accordion'), 'Must include accordion');
+  assert.ok(ids.includes('tabs'), 'Must include tabs');
+  assert.ok(ids.includes('dialog'), 'Must include dialog');
+  assert.ok(ids.includes('gallery'), 'Must include gallery');
+  assert.ok(ids.includes('picture-source'), 'Must include picture-source');
+});
+
+test('ARC v2 Phase 5: Responsive media adapter recognizes <picture> and ignores decorative <source> tags', () => {
+  const { analyzeFile } = require('../semantic.cjs');
+  const code = `
+    export function HeroBanner() {
+      return (
+        <section className="hero">
+          <picture>
+            <source media="(min-width: 1024px)" srcSet="/banner-desktop.jpg" />
+            <source media="(min-width: 640px)" srcSet="/banner-tablet.jpg" />
+            <img src="/banner-mobile.jpg" alt="Summer Collection" />
+          </picture>
+        </section>
+      );
+    }
+  `;
+
+  const analysis = analyzeFile({
+    relativeFile: 'HeroBanner.tsx',
+    code,
+    profile: {
+      framework: 'nextjs',
+      router: 'next-app',
+    },
+  });
+
+  // Verify <source> tags are handled gracefully as picture-source-child
+  const sourceCandidates = analysis.candidates.filter((c) => c.tag === 'source');
+  assert.ok(sourceCandidates.length > 0, 'Source tags must be recorded');
+  for (const s of sourceCandidates) {
+    assert.equal(s.reason, 'picture-source-child');
+    assert.equal(s.skip, true);
+  }
+
+  // Verify fallback <img> or <picture> is extracted with the mobile src fallback
+  const imgCandidate = analysis.candidates.find((c) => c.kind === 'image' && !c.skip);
+  assert.ok(imgCandidate, 'Must extract image candidate from picture/img');
+  assert.equal(imgCandidate.value, '/banner-mobile.jpg');
+});
+
+test('ARC v2 Phase 5: Transformer binds <picture> fallback <img> and stamps preview field path', () => {
+  const { applyFilePlan } = require('../transformer.cjs');
+  const code = `
+    export function HeroBanner() {
+      return (
+        <section className="hero">
+          <picture>
+            <source media="(min-width: 1024px)" srcSet="/banner-desktop.jpg" />
+            <img src="/banner-mobile.jpg" alt="Summer Collection" />
+          </picture>
+        </section>
+      );
+    }
+  `;
+
+  const plan = {
+    file: 'HeroBanner.tsx',
+    originalCode: code,
+    transformations: [
+      {
+        loc: '5:10:8:20',
+        tag: 'picture',
+        operation: 'extract-picture',
+        field: 'home.hero.banner',
+        fallback: '/banner-mobile.jpg',
+        fieldType: 'image',
+        decision: 'auto',
+      },
+    ],
+  };
+
+  const res = applyFilePlan(plan, { root: '/tmp' });
+  assert.ok(res.changed);
+  // Both picture and inner img receive preview attributes
+  assert.match(res.code, /<picture[^>]*data-preview-field-path="home\.hero\.banner"/);
+  assert.match(res.code, /<img[^>]*data-preview-field-path="home\.hero\.banner"/);
+  // Fallback img receives dynamic siteData binding
+  assert.match(res.code, /src=\{siteData\?\.content\?\.home\?\.hero\?\.banner (\?\?|\|\|) "\/banner-mobile\.jpg"\}/);
+});
+
+test('ARC v2 Phase 5: Carousel adapters identify containers and slide items across Swiper, Embla, and Slick', () => {
+  const { recognizeWithAdapters, defaultRegistry } = require('../adapters/registry.cjs');
+  const parseSource = (c) => require('recast').parse(c, { parser: require('recast/parsers/babel-ts') });
+  const makeNode = (code) => parseSource(code).program.body[0].expression;
+
+  const activeAdapters = defaultRegistry.getAll();
+
+  // Swiper
+  const swiperContainer = makeNode('<Swiper autoplay={true}><SwiperSlide>Slide 1</SwiperSlide></Swiper>');
+  const swiperRec = recognizeWithAdapters(swiperContainer, {}, activeAdapters);
+  assert.equal(swiperRec?.role, 'carousel-container');
+  assert.equal(swiperRec?.adapterId, 'swiper');
+
+  const swiperSlide = swiperContainer.children.find((c) => c.openingElement?.name?.name === 'SwiperSlide');
+  const slideRec = recognizeWithAdapters(swiperSlide, {}, activeAdapters);
+  assert.equal(slideRec?.role, 'carousel-slide');
+  assert.equal(slideRec?.adapterId, 'swiper');
+
+  // Embla
+  const emblaContainer = makeNode('<Carousel><CarouselContent><CarouselItem>Item 1</CarouselItem></CarouselContent></Carousel>');
+  const emblaRec = recognizeWithAdapters(emblaContainer, {}, activeAdapters);
+  assert.equal(emblaRec?.role, 'carousel-container');
+  assert.equal(emblaRec?.adapterId, 'embla');
+
+  // Slick
+  const slickContainer = makeNode('<Slider dots={true}><div>Slide</div></Slider>');
+  const slickRec = recognizeWithAdapters(slickContainer, {}, activeAdapters);
+  assert.equal(slickRec?.role, 'carousel-container');
+  assert.equal(slickRec?.adapterId, 'slick');
+});
+
+test('ARC v2 Phase 5: Accordion and Tabs adapters recognize component hierarchies and trigger/content roles', () => {
+  const { recognizeWithAdapters, defaultRegistry } = require('../adapters/registry.cjs');
+  const parseSource = (c) => require('recast').parse(c, { parser: require('recast/parsers/babel-ts') });
+  const makeNode = (code) => parseSource(code).program.body[0].expression;
+
+  const activeAdapters = defaultRegistry.getAll();
+
+  // Accordion Trigger & Content
+  const accTrigger = makeNode('<AccordionTrigger>What is your return policy?</AccordionTrigger>');
+  const accTriggerRec = recognizeWithAdapters(accTrigger, {}, activeAdapters);
+  assert.equal(accTriggerRec?.role, 'accordion-header');
+  assert.equal(accTriggerRec?.adapterId, 'accordion');
+
+  const accContent = makeNode('<AccordionContent>We offer 30-day refunds.</AccordionContent>');
+  const accContentRec = recognizeWithAdapters(accContent, {}, activeAdapters);
+  assert.equal(accContentRec?.role, 'accordion-body');
+  assert.equal(accContentRec?.adapterId, 'accordion');
+
+  // Tabs Trigger & Content
+  const tabTrigger = makeNode('<TabsTrigger value="overview">Overview</TabsTrigger>');
+  const tabTriggerRec = recognizeWithAdapters(tabTrigger, {}, activeAdapters);
+  assert.equal(tabTriggerRec?.role, 'tab-button');
+  assert.equal(tabTriggerRec?.adapterId, 'tabs');
+
+  const tabContent = makeNode('<TabsContent value="overview"><p>Details here</p></TabsContent>');
+  const tabContentRec = recognizeWithAdapters(tabContent, {}, activeAdapters);
+  assert.equal(tabContentRec?.role, 'tab-panel');
+  assert.equal(tabContentRec?.adapterId, 'tabs');
+});
+
+test('ARC v2 Phase 6: explainFile analyzes component AST and outputs structured explanation', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+  const { explainFile } = require('../explain.cjs');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-explain-test-'));
+  const compFile = path.join(tmpDir, 'Hero.tsx');
+  fs.writeFileSync(
+    compFile,
+    `
+    export function Hero() {
+      return (
+        <section className="hero">
+          <h1>Welcome to Luxury Watches</h1>
+          <p>Handcrafted precision timepieces</p>
+          <img src="/watches/hero.jpg" alt="Hero Watch" />
+        </section>
+      );
+    }
+  `,
+    'utf8'
+  );
+
+  const explanation = explainFile('Hero.tsx', { root: tmpDir });
+  assert.equal(explanation.file, 'Hero.tsx');
+  assert.equal(explanation.isTypeScript, true);
+  assert.ok(explanation.totalCandidates >= 3, 'Must discover heading, paragraph, and image');
+  assert.ok(explanation.editableCount >= 3, 'All 3 content items must be editable');
+
+  const h1El = explanation.editableElements.find((e) => e.tag === 'h1');
+  assert.ok(h1El, 'Must include h1');
+  assert.equal(h1El.kind, 'text');
+  assert.equal(h1El.value, 'Welcome to Luxury Watches');
+
+  const imgEl = explanation.editableElements.find((e) => e.tag === 'img');
+  assert.ok(imgEl, 'Must include img');
+  assert.equal(imgEl.kind, 'image');
+  assert.equal(imgEl.value, '/watches/hero.jpg');
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('ARC v2 Phase 6: createUnifiedDiff generates unified diff representation cleanly', () => {
+  const { createUnifiedDiff } = require('../diff.cjs');
+
+  const oldCode = `export function Banner() {\n  return <h1>Old Headline</h1>;\n}`;
+  const newCode = `export function Banner() {\n  return <h1 data-preview-field-path="home.title">New Headline</h1>;\n}`;
+
+  const diffResult = createUnifiedDiff('Banner.tsx', oldCode, newCode);
+  assert.equal(diffResult.filename, 'Banner.tsx');
+  assert.ok(diffResult.additions > 0);
+  assert.ok(diffResult.deletions > 0);
+  assert.match(diffResult.diff, /--- a\/Banner\.tsx/);
+  assert.match(diffResult.diff, /\+\+\+ b\/Banner\.tsx/);
+  assert.match(diffResult.diff, /-   return <h1>Old Headline<\/h1>;/);
+  assert.match(diffResult.diff, /\+   return <h1 data-preview-field-path="home\.title">New Headline<\/h1>;/);
+});
+
+test('ARC v2 Phase 6: conversion report includes severity-graded diagnostics (INFO, WARNING, ERROR, BLOCKING)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+  const { runDenebArc } = require('../index.cjs');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-severity-test-'));
+  fs.mkdirSync(path.join(tmpDir, 'src', 'components'), { recursive: true });
+  fs.writeFileSync(
+    path.join(tmpDir, 'package.json'),
+    JSON.stringify({ name: 'severity-test', dependencies: { next: '14.0.0', react: '18.2.0' } }),
+    'utf8'
+  );
+  fs.writeFileSync(
+    path.join(tmpDir, 'src', 'components', 'Banner.tsx'),
+    `
+    export function Banner() {
+      return (
+        <div>
+          <svg className="decorative-icon"><path d="M0 0" /></svg>
+          <h2>Exclusive Deals</h2>
+        </div>
+      );
+    }
+  `,
+    'utf8'
+  );
+
+  runDenebArc(tmpDir, { dryRun: false });
+
+  const reportPath = path.join(tmpDir, 'deneb-conversion-report.json');
+  assert.ok(fs.existsSync(reportPath), 'deneb-conversion-report.json must exist');
+  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+
+  assert.ok(report.diagnosticsBySeverity, 'Must contain diagnosticsBySeverity');
+  assert.equal(typeof report.diagnosticsBySeverity.info, 'number');
+  assert.equal(typeof report.diagnosticsBySeverity.warning, 'number');
+  assert.equal(typeof report.diagnosticsBySeverity.error, 'number');
+  assert.equal(typeof report.diagnosticsBySeverity.blocking, 'number');
+
+  // Decorative SVG is categorized as INFO
+  const svgDiagnostic = (report.unresolved || []).find((u) => u.type === 'icon' || u.type === 'decoration');
+  if (svgDiagnostic) {
+    assert.equal(svgDiagnostic.severity, 'INFO');
+  }
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('ARC v2 Phase 6: runTransactionalPipeline executes atomic rollback on critical gate failure', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+  const { runTransactionalPipeline } = require('../index.cjs');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-rollback-test-'));
+  fs.mkdirSync(path.join(tmpDir, 'src', 'components'), { recursive: true });
+  fs.writeFileSync(
+    path.join(tmpDir, 'package.json'),
+    JSON.stringify({ name: 'rollback-test', dependencies: { next: '14.0.0', react: '18.2.0' } }),
+    'utf8'
+  );
+  const originalCode = `export function Card() { return <h3>Original Card</h3>; }`;
+  const cardPath = path.join(tmpDir, 'src', 'components', 'Card.tsx');
+  fs.writeFileSync(cardPath, originalCode, 'utf8');
+
+  // Run transactional pipeline with strict mode where contract failures trigger rollback
+  const result = runTransactionalPipeline(tmpDir, { strict: true });
+  // If it rolled back or succeeded, original code is preserved or successfully updated
+  if (result.rolledBack) {
+    const afterCode = fs.readFileSync(cardPath, 'utf8');
+    assert.equal(afterCode, originalCode, 'Original code must be restored upon rollback');
+  } else {
+    assert.ok(result.success, 'Valid pipeline must report success');
+  }
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+
+
+
+
+

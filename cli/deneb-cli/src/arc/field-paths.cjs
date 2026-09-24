@@ -44,16 +44,20 @@ function inferSection(context) {
     ['hero', /hero|banner|jumbotron/],
     ['navigation', /nav|menu|links/],
     ['feedback', /feedback|google-review/],
-    ['testimonials', /testimonial/],
+    ['testimonials', /testimonial|review/],
+    ['featuredProducts', /featured|product-grid|catalog|goods|store/],
+    ['services', /service|offering/],
+    ['gallery', /gallery|portfolio|showcase/],
+    ['team', /team|member|staff|author/],
+    ['stats', /stat|counter|metric/],
     ['map', /map\b|location-map|google-map/],
     ['faq', /faq|accordion/],
     ['form', /form|booking|inquiry|registration/],
     ['contact', /contact|whatsapp|mailto/],
-    ['featuredProducts', /featured|product-grid|collection/],
     ['newsletter', /newsletter|subscribe/],
     ['pricing', /pricing|plan/],
     ['features', /feature/],
-    ['about', /about|story|brand/],
+    ['about', /about|story|brand|history/],
   ];
   for (const [name, re] of rules) {
     if (re.test(haystack)) return name;
@@ -163,16 +167,24 @@ function listActionCtaItemFieldNames() {
   return ['buttonLabel', 'buttonUrl'];
 }
 
-function classifyFieldType(kind, value) {
-  if (kind === 'image') return 'image';
-  if (kind === 'url') return 'url';
-  if (kind === 'email' || (typeof value === 'string' && /^mailto:/i.test(value))) return 'email';
-  if (kind === 'phone' || (typeof value === 'string' && /^(tel:|\+)/i.test(value))) return 'tel';
-  if (kind === 'color') return 'text';
-  if (kind === 'rating' || kind === 'number' || typeof value === 'number') return 'number';
-  if (typeof value === 'boolean') return 'boolean';
-  if (kind === 'textarea' || (typeof value === 'string' && value.length > 80)) return 'textarea';
-  if (typeof value === 'string' && /\$|lkr|usd|rs\.?\s*\d/i.test(value)) return 'text';
+function classifyFieldType(kind, value, fieldName = '') {
+  const name = String(fieldName || '').toLowerCase();
+  if (kind === 'image' || /image|thumbnail|avatar|picture|cover|photo/i.test(name)) return 'image';
+  if (kind === 'url' || /url|href|link|path$/i.test(name)) return 'url';
+  if (kind === 'email' || /email/i.test(name) || (typeof value === 'string' && /^mailto:/i.test(value))) return 'email';
+  if (kind === 'phone' || /phone|tel|whatsapp/i.test(name) || (typeof value === 'string' && /^(tel:|\+)/i.test(value))) return 'tel';
+  if (kind === 'color' || /color/i.test(name)) return 'text';
+  if (
+    kind === 'rating' ||
+    kind === 'number' ||
+    typeof value === 'number' ||
+    /price|amount|rating|count|score|stars|qty|quantity|discount|fee|cost/i.test(name)
+  ) {
+    if (typeof value === 'string' && /\$|lkr|usd|rs\.?\s*\d/i.test(value)) return 'text';
+    return typeof value === 'number' ? 'number' : 'text';
+  }
+  if (typeof value === 'boolean' || /enabled|visible|show|active/i.test(name)) return 'boolean';
+  if (kind === 'textarea' || (typeof value === 'string' && (value.length > 70 || value.includes('\n')))) return 'textarea';
   return 'text';
 }
 

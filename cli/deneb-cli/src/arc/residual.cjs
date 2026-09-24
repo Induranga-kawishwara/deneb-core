@@ -192,7 +192,7 @@ function wrapFirstLiteralAsStatic(node, reason) {
   return wrapped;
 }
 
-function applyResidualPass({ code, file, ownerScope, usedPaths, componentName, role }) {
+function applyResidualPass({ code, file, ownerScope, usedPaths, componentName, role, ir }) {
   if (!code || !code.includes('<')) {
     return { code, changed: false, fields: [], applied: 0 };
   }
@@ -231,7 +231,14 @@ function applyResidualPass({ code, file, ownerScope, usedPaths, componentName, r
       }
 
       const text = collectJsxText(node);
-      const src = attrLiteral(node, 'src');
+      const srcAttr = findJsxAttribute(node, 'src');
+      let src = attrLiteral(node, 'src');
+      if (!src && srcAttr && srcAttr.value && srcAttr.value.type === 'JSXExpressionContainer') {
+        const expr = srcAttr.value.expression;
+        if (expr && expr.type === 'Identifier') {
+          src = ir && typeof ir.getAssetImport === 'function' ? ir.getAssetImport(file, expr.name) : null;
+        }
+      }
       const placeholder = attrLiteral(node, 'placeholder');
       const alt = attrLiteral(node, 'alt');
 
@@ -264,7 +271,6 @@ function applyResidualPass({ code, file, ownerScope, usedPaths, componentName, r
           used,
         });
         node.openingElement.attributes.push(jsxPreviewAttr(field));
-        const srcAttr = findJsxAttribute(node, 'src');
         if (srcAttr) {
           srcAttr.value = b.jsxExpressionContainer(siteDataBinding(field.split('.'), src, 'image'));
         }

@@ -23,7 +23,7 @@ function decideThreshold(confidence, candidate) {
   return 'skip';
 }
 
-function planTransformations({ profile, analyses, recipe }) {
+function planTransformations({ profile, analyses, recipe, ir }) {
   const usedPaths = new Set();
   const filePlans = [];
   const skipped = [];
@@ -169,6 +169,53 @@ function planTransformations({ profile, analyses, recipe }) {
         });
         transform.propName = propName;
         transform.fieldType = classifyFieldType('text', candidate.value);
+      } else if (candidate.operation === 'bind-button-with-icon') {
+        transform.field = buildFieldPath({
+          scope,
+          section,
+          field: inferFieldName('label', candidate.tag, candidate.value, { ...extra, cta: true }),
+          used: usedPaths,
+        });
+        transform.fieldType = 'text';
+      } else if (candidate.operation === 'bind-highlighted-heading') {
+        transform.field = buildFieldPath({
+          scope,
+          section,
+          field: inferFieldName('title', candidate.tag, candidate.value, extra),
+          used: usedPaths,
+        });
+        transform.fieldType = 'text';
+        transform.fragments = extra.fragments || [];
+      } else if (candidate.operation === 'prop-flow-callsite') {
+        const propTransforms = {};
+        const prefix = section ? `${scope}.${section}` : scope;
+        for (const [propName, propVal] of Object.entries(extra.literalProps || {})) {
+          const field = buildFieldPath({
+            scope,
+            section,
+            field: inferFieldName(propName, candidate.tag, propVal, extra),
+            used: usedPaths,
+          });
+          propTransforms[propName] = {
+            field,
+            fallback: propVal,
+            type: classifyFieldType('text', propVal, propName),
+          };
+        }
+        transform.propTransforms = propTransforms;
+        transform.targetComponent = extra.componentName;
+        transform.targetFile = extra.componentFile;
+        transform.previewPath = prefix;
+      } else if (candidate.operation === 'extract-tailwind-bg') {
+        transform.field = buildFieldPath({
+          scope,
+          section,
+          field: inferFieldName('backgroundImage', candidate.tag, candidate.value, extra),
+          used: usedPaths,
+        });
+        transform.fieldType = 'image';
+        transform.rawClass = extra.rawClass;
+        transform.bgUrl = extra.bgUrl;
       } else if (candidate.operation === 'collection-conversion') {
         // A collection is named after the developer's own array variable so the
         // merchant sees "products", not "items2".
@@ -188,8 +235,11 @@ function planTransformations({ profile, analyses, recipe }) {
                     ? 'textarea'
                     : 'text',
         }));
-        transform.items = candidate.value.map((item) => item.value);
+        transform.items = Array.isArray(candidate.value)
+          ? candidate.value.map((item) => (item && typeof item === 'object' && 'value' in item ? item.value : item))
+          : [];
         transform.itemParam = extra.itemParam;
+        transform.childComponentName = extra.childComponentName || null;
         if (!transform.itemFields.length && extra.objectItems && candidate.value?.length > 0) {
           const sample = candidate.value[0]?.value || {};
           transform.itemFields = Object.keys(sample)
@@ -235,6 +285,60 @@ function planTransformations({ profile, analyses, recipe }) {
       originalCode: analysis.code,
       designSnapshot: analysis.designSnapshot,
     });
+  }
+
+  // Connect collection loops to child component definitions
+  for (const fp of filePlans) {
+    for (const t of fp.transformations) {
+      if (t.operation === 'collection-conversion' && t.childComponentName) {
+        const compMeta = (profile.components || []).find((c) => c.name === t.childComponentName);
+        const compFile = compMeta?.file || (ir && typeof ir.getComponent === 'function' && ir.getComponent(t.childComponentName)?.file);
+        if (compFile) {
+          const targetPlan = filePlans.find((p) => p.file === compFile);
+          if (targetPlan) {
+            const already = targetPlan.transformations.some(
+              (x) => x.operation === 'instrument-child-card' && x.componentName === t.childComponentName
+            );
+            if (!already) {
+              targetPlan.transformations.push({
+                operation: 'instrument-child-card',
+                componentName: t.childComponentName,
+                listField: t.listField,
+                itemFields: t.itemFields,
+                file: compFile,
+                decision: 'auto',
+                confidence: 0.95,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Connect reusable component callsites to component definitions
+  for (const fp of filePlans) {
+    for (const t of fp.transformations) {
+      if (t.operation === 'prop-flow-callsite' && t.targetComponent && t.targetFile) {
+        const targetPlan = filePlans.find((p) => p.file === t.targetFile);
+        if (targetPlan) {
+          const already = targetPlan.transformations.some(
+            (x) => x.operation === 'instrument-reusable-component' && x.componentName === t.targetComponent
+          );
+          if (!already) {
+            targetPlan.transformations.push({
+              operation: 'instrument-reusable-component',
+              componentName: t.targetComponent,
+              previewPath: t.previewPath,
+              propTransforms: t.propTransforms,
+              file: t.targetFile,
+              decision: 'auto',
+              confidence: 0.95,
+            });
+          }
+        }
+      }
+    }
   }
 
   appendStyleBindTransforms(filePlans);

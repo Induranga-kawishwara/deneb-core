@@ -1502,12 +1502,13 @@ if (command === 'validate' && (commandArgs[0] === 'and' || commandArgs[0] === '&
   commandArgs = commandArgs.slice(2);
 }
 
-if (command === 'init') {
+if (command === 'init' || command === 'arc') {
   let targetInput = '.';
   let recipeName = null;
   let dryRun = false;
   let explain = false;
   let legacy = false;
+  let strict = false;
   let telemetry = 'off';
   let aiEnabled = false;
   let aiDryRun = false;
@@ -1523,6 +1524,8 @@ if (command === 'init') {
       explain = true;
     } else if (arg === '--legacy') {
       legacy = true;
+    } else if (arg === '--strict') {
+      strict = true;
     } else if (arg === '--ai') {
       aiEnabled = true;
     } else if (arg === '--ai-dry-run') {
@@ -1536,10 +1539,44 @@ if (command === 'init') {
       targetInput = arg;
     }
   }
-  initProject(targetInput, { recipeName, dryRun, explain, legacy, telemetry, aiEnabled, aiDryRun }).catch((err) => {
+  initProject(targetInput, { recipeName, dryRun, explain, legacy, strict, telemetry, aiEnabled, aiDryRun }).catch((err) => {
     console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
     process.exit(1);
   });
+} else if (command === 'explain') {
+  const fileInput = commandArgs.find((a) => !a.startsWith('-'));
+  if (!fileInput) {
+    console.error('\x1b[31mError:\x1b[0m Please specify a component file to explain (e.g. deneb explain src/components/Hero.tsx)');
+    process.exit(1);
+  }
+  const isJson = commandArgs.includes('--json');
+  try {
+    const { explainFile, printExplanation } = require('../src/arc/explain.cjs');
+    const explanation = explainFile(fileInput, { root: '.' });
+    if (isJson) {
+      console.log(JSON.stringify(explanation, null, 2));
+    } else {
+      printExplanation(explanation);
+    }
+  } catch (err) {
+    console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
+    process.exit(1);
+  }
+} else if (command === 'diff') {
+  let targetInput = commandArgs.find((a) => !a.startsWith('-')) || '.';
+  const isJson = commandArgs.includes('--json');
+  try {
+    const { generateArcDiff, printDiff } = require('../src/arc/diff.cjs');
+    const diffs = generateArcDiff(targetInput);
+    if (isJson) {
+      console.log(JSON.stringify(diffs, null, 2));
+    } else {
+      printDiff(diffs);
+    }
+  } catch (err) {
+    console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
+    process.exit(1);
+  }
 } else if (command === 'create') {
   createTemplate(commandArgs[0]);
 } else if (command === 'add') {
