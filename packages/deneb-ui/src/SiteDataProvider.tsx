@@ -320,6 +320,16 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
       initialSiteData?.project?.slug ||
       initialSiteData?.project?.id;
 
+    if (
+      !candidateSlug ||
+      candidateSlug === 'template-validation' ||
+      (typeof window !== 'undefined' &&
+        (window.location.pathname.includes('/template-preview/') ||
+          window.location.pathname.includes('/preview/')))
+    ) {
+      return;
+    }
+
     const endpoint =
       liveCatalogEndpoint ||
       initialSiteData?.api?.catalogUrl ||

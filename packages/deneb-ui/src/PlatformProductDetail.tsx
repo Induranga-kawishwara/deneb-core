@@ -86,16 +86,32 @@ function resolveCatalogUrl(
   override: string | null | undefined,
 ): string | null {
   if (override === null) return null;
-  if (typeof override === 'string') return override.trim() || null;
-
-  const configured = siteData.api?.catalogUrl;
-  if (typeof configured === 'string' && configured.trim()) {
-    return configured.trim();
-  }
 
   const slug = normalizeId(
     siteData.siteInstance?.slug || siteData.project?.slug || siteData.project?.id,
   );
+  const isPreviewMode =
+    typeof window !== 'undefined' &&
+    (window.location.pathname.includes('/template-preview/') ||
+      window.location.pathname.includes('/preview/'));
+
+  if (isPreviewMode || slug === 'template-validation') {
+    return null;
+  }
+
+  if (typeof override === 'string') {
+    const trimmed = override.trim();
+    if (trimmed.includes('/template-validation/')) return null;
+    return trimmed || null;
+  }
+
+  const configured = siteData.api?.catalogUrl;
+  if (typeof configured === 'string' && configured.trim()) {
+    const trimmed = configured.trim();
+    if (trimmed.includes('/template-validation/')) return null;
+    return trimmed;
+  }
+
   if (!slug) return null;
 
   const baseUrl = siteData.api?.baseUrl;

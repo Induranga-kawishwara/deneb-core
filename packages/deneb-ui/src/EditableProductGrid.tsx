@@ -236,7 +236,20 @@ export function EditableProductGrid({
       siteApi?.catalogUrl ||
       (siteData?.siteInstance?.slug ? `/site-catalog/${siteData.siteInstance.slug}` : null);
 
-    if (!catalogUrl) return;
+    const slug = siteData?.siteInstance?.slug;
+    const isPreviewMode =
+      typeof window !== 'undefined' &&
+      (window.location.pathname.includes('/template-preview/') ||
+        window.location.pathname.includes('/preview/'));
+
+    if (
+      !catalogUrl ||
+      isPreviewMode ||
+      slug === 'template-validation' ||
+      catalogUrl.includes('/template-validation/')
+    ) {
+      return;
+    }
 
     let active = true;
     const timer = setTimeout(async () => {
