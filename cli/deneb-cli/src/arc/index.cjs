@@ -50,6 +50,30 @@ const { checkGithubReady, createComponentPR } = require('./pr-agent.cjs');
 const { runAiEvaluatorPipeline } = require('./ai-evaluator.cjs');
 const { explainFile } = require('./explain.cjs');
 const { generateArcDiff } = require('./diff.cjs');
+const {
+  createRunWorkspace,
+  copyProjectToWorkspace,
+  commitWorkspaceToProject,
+  cleanupWorkspace,
+  saveRunArtifacts,
+  formatFailureExplanation,
+} = require('./workspace.cjs');
+const { calculateVisualPreservation, extractDesignSnapshot, STANDARD_VIEWPORTS } = require('./visual-regression.cjs');
+const { verifyInteractionsSync, INTERACTION_PATTERNS } = require('./interaction-verifier.cjs');
+const { KNOWN_STOREFRONTS, auditStorefrontTemplate, verifyStorefrontCorpus } = require('./corpus-verifier.cjs');
+const {
+  MUTATION_TYPES,
+  applyMutation,
+  generateFuzzCorpus,
+  testMutationResilience,
+  runFuzzHarness,
+} = require('./fuzz-engine.cjs');
+const {
+  analyzeBlockedProject,
+  formatBlockedExplanationTerminal,
+  printBlockedExplanation,
+} = require('./explain-blocked.cjs');
+
 
 function parseArcOptions(raw = {}) {
   return {
@@ -62,9 +86,10 @@ function parseArcOptions(raw = {}) {
     json: Boolean(raw.json),
     aiEnabled: Boolean(raw.aiEnabled),
     aiDryRun: Boolean(raw.aiDryRun),
-    strict: Boolean(raw.strict),
+    strict: raw.strict !== false,
     verifyRuntime: Boolean(raw.verifyRuntime || raw['verify-runtime']),
     previewUrl: raw.previewUrl || raw['preview-url'] || null,
+    isolatedWorkspace: raw.isolatedWorkspace !== false,
   };
 }
 
@@ -1036,9 +1061,114 @@ function buildReport(args) {
   };
 }
 
+function runArc(dir, opts = {}) {
+  const projectName = opts.projectName || path.basename(path.resolve(dir));
+  return runDenebArcSync(dir, projectName, opts);
+}
+
 function runTransactionalPipeline(targetDirInput = '.', options = {}) {
-  const opts = { ...options, strict: options.strict ?? true };
+  const opts = { ...options, strict: options.strict !== false };
   const projectDir = path.resolve(targetDirInput);
+  const runId = createRunId();
+
+  if (opts.dryRun || opts.explain) {
+    const result = runArc(targetDirInput, opts);
+    return {
+      success: result.outcome === 'success' || result.outcome === 'dry-run',
+      rolledBack: false,
+      outcome: result.outcome,
+      result,
+    };
+  }
+
+  // ARC v3: Transactional Isolated Workspace Execution
+  let runDirs = null;
+  try {
+    runDirs = createRunWorkspace(projectDir, runId);
+    copyProjectToWorkspace(projectDir, runDirs.workspaceDir, runDirs.snapshotDir);
+  } catch {
+    runDirs = null;
+  }
+
+  if (runDirs) {
+    try {
+      const result = runArc(runDirs.workspaceDir, { ...opts, runId });
+      const contractOk = result.validation?.fivoraContractPassed !== false && (result.validation?.uncoveredVisibleText || 0) === 0;
+      const syntaxOk = result.validation?.syntaxPassed !== false;
+      const isSuccess = result.outcome === 'success' && (!opts.strict || (contractOk && syntaxOk));
+
+      if (isSuccess) {
+        // Collect all files to commit from workspace to project
+        const changedFiles = [...(result.filesChanged || [])];
+        const auxiliary = [
+          'fivora-template.json',
+          'deneb-conversion-report.json',
+          path.join('src', 'data', 'site-data.json'),
+          path.join('data', 'site-data.json'),
+          path.join('src', 'lib', 'siteDataContext.tsx'),
+          path.join('src', 'lib', 'siteDataContext.ts'),
+          path.join('lib', 'siteDataContext.tsx'),
+          path.join('lib', 'siteDataContext.ts'),
+        ];
+        for (const aux of auxiliary) {
+          if (fs.existsSync(path.join(runDirs.workspaceDir, aux))) {
+            changedFiles.push(aux);
+          }
+        }
+
+        commitWorkspaceToProject(runDirs.workspaceDir, projectDir, changedFiles);
+        saveRunArtifacts(runDirs, {
+          report: result,
+          runtimeResults: result.runtimeVerification,
+        });
+        cleanupWorkspace(runDirs.workspaceDir);
+
+        return {
+          success: true,
+          rolledBack: false,
+          outcome: 'success',
+          result,
+        };
+      } else {
+        const reasons = [];
+        if (result.validation?.fivoraContractPassed === false) reasons.push('Fivora strict contract validation failed');
+        if (result.validation?.uncoveredVisibleText > 0) reasons.push(`${result.validation.uncoveredVisibleText} uncovered visible text node(s)`);
+        if (result.validation?.syntaxPassed === false) reasons.push('AST syntax validation failed');
+        if (result.validation?.designPreservation < 98 && result.validation?.designPreservation > 0) reasons.push(`Design preservation (${result.validation.designPreservation}%) below threshold`);
+
+        saveRunArtifacts(runDirs, {
+          report: result,
+          runtimeResults: result.runtimeVerification,
+          failureReasons: reasons,
+        });
+        cleanupWorkspace(runDirs.workspaceDir);
+
+        const explanation = formatFailureExplanation(result.validation, reasons);
+        console.log('\n' + explanation);
+
+        return {
+          success: false,
+          rolledBack: true,
+          outcome: 'rolled-back',
+          result,
+          reasons,
+        };
+      }
+    } catch (err) {
+      if (runDirs) {
+        saveRunArtifacts(runDirs, { failureReasons: [err.message] });
+        cleanupWorkspace(runDirs.workspaceDir);
+      }
+      return {
+        success: false,
+        rolledBack: true,
+        outcome: 'rolled-back',
+        error: err.message,
+      };
+    }
+  }
+
+  // Fallback: direct in-project execution with backup restoration
   try {
     const result = runArc(targetDirInput, opts);
     return {
@@ -1073,6 +1203,22 @@ module.exports = {
   parseArcOptions,
   scanProject,
   auditFivoraContract,
+  calculateVisualPreservation,
+  extractDesignSnapshot,
+  STANDARD_VIEWPORTS,
+  verifyInteractionsSync,
+  INTERACTION_PATTERNS,
+  KNOWN_STOREFRONTS,
+  auditStorefrontTemplate,
+  verifyStorefrontCorpus,
+  MUTATION_TYPES,
+  applyMutation,
+  generateFuzzCorpus,
+  testMutationResilience,
+  runFuzzHarness,
+  analyzeBlockedProject,
+  formatBlockedExplanationTerminal,
+  printBlockedExplanation,
   ENGINE_ID,
   ARC_VERSION,
 };

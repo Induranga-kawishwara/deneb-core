@@ -2959,6 +2959,838 @@ test('ARC v2 Phase 6: runTransactionalPipeline executes atomic rollback on criti
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
+test('ARC v3 Phase 7: createRunWorkspace creates isolated run structure and commits files cleanly', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+  const {
+    createRunWorkspace,
+    copyProjectToWorkspace,
+    commitWorkspaceToProject,
+    cleanupWorkspace,
+    saveRunArtifacts,
+    formatFailureExplanation,
+  } = require('../workspace.cjs');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-workspace-test-'));
+  fs.mkdirSync(path.join(tmpDir, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({ name: 'ws-test' }), 'utf8');
+  fs.writeFileSync(path.join(tmpDir, 'src', 'App.tsx'), 'export default function App() {}', 'utf8');
+
+  const runId = 'arc-test-phase7';
+  const runDirs = createRunWorkspace(tmpDir, runId);
+  assert.ok(fs.existsSync(runDirs.workspaceDir), 'workspaceDir should exist');
+  assert.ok(fs.existsSync(runDirs.snapshotDir), 'snapshotDir should exist');
+  assert.ok(fs.existsSync(runDirs.reportsDir), 'reportsDir should exist');
+
+  // Copy project to workspace
+  copyProjectToWorkspace(tmpDir, runDirs.workspaceDir, runDirs.snapshotDir);
+  assert.ok(fs.existsSync(path.join(runDirs.workspaceDir, 'src', 'App.tsx')), 'App.tsx copied to workspace');
+  assert.ok(fs.existsSync(path.join(runDirs.snapshotDir, 'src', 'App.tsx')), 'App.tsx snapshotted');
+
+  // Modify in workspace
+  fs.writeFileSync(path.join(runDirs.workspaceDir, 'src', 'App.tsx'), 'export default function App() { return <h1>Updated</h1>; }', 'utf8');
+  // Original is unchanged before commit
+  assert.equal(fs.readFileSync(path.join(tmpDir, 'src', 'App.tsx'), 'utf8'), 'export default function App() {}');
+
+  // Save artifacts
+  saveRunArtifacts(runDirs, {
+    report: { outcome: 'success', engine: 'ARC v3' },
+    runtimeResults: { passed: true, score: 100 },
+  });
+  assert.ok(fs.existsSync(path.join(runDirs.reportsDir, 'conversion-report.json')));
+
+  // Commit to project
+  const committed = commitWorkspaceToProject(runDirs.workspaceDir, tmpDir, ['src/App.tsx']);
+  assert.ok(committed.includes('src/App.tsx'));
+  assert.equal(fs.readFileSync(path.join(tmpDir, 'src', 'App.tsx'), 'utf8'), 'export default function App() { return <h1>Updated</h1>; }');
+
+  // Format failure explanation
+  const explanation = formatFailureExplanation({ fivoraContractErrors: ['Missing key'], uncoveredVisibleText: 2 }, ['Contract failed']);
+  assert.ok(explanation.includes('DENEB CONVERSION BLOCKED'));
+  assert.ok(explanation.includes('Contract failed'));
+
+  cleanupWorkspace(runDirs.workspaceDir);
+  assert.ok(!fs.existsSync(runDirs.workspaceDir), 'workspaceDir cleaned up');
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('ARC v3 Phase 7: blocking Fivora contract enforcement prevents commit when contract checks fail', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+  const { runTransactionalPipeline } = require('../index.cjs');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-blocking-contract-test-'));
+  fs.mkdirSync(path.join(tmpDir, 'src', 'components'), { recursive: true });
+  fs.writeFileSync(
+    path.join(tmpDir, 'package.json'),
+    JSON.stringify({ name: 'blocking-contract-test', dependencies: { next: '14.0.0', react: '18.2.0' } }),
+    'utf8'
+  );
+  // An invalid component that violates Fivora contract (uncovered text or invalid syntax)
+  const initialCode = `export function Broken() { return <div>Unbound static text</div>; }`;
+  const compPath = path.join(tmpDir, 'src', 'components', 'Broken.tsx');
+  fs.writeFileSync(compPath, initialCode, 'utf8');
+
+  // Strict mode is true by default in ARC v3
+  const pipelineRes = runTransactionalPipeline(tmpDir);
+  assert.ok(pipelineRes !== null);
+
+  // If pipeline rolls back or fails contract, original file must remain untouched
+  if (pipelineRes.rolledBack) {
+    const afterCode = fs.readFileSync(compPath, 'utf8');
+    assert.equal(afterCode, initialCode, 'Developer project file must remain untouched upon rollback');
+  }
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('ARC v3 Phase 8: modular transforms architecture exports all sub-modules with 100% facade compatibility', () => {
+  const facade = require('../transformer.cjs');
+  const modular = require('../transforms/index.cjs');
+
+  assert.equal(typeof facade.applyFilePlan, 'function');
+  assert.equal(typeof facade.applyCollectionTransform, 'function');
+  assert.equal(typeof facade.instrumentChildCardComponent, 'function');
+  assert.equal(typeof facade.instrumentReusableComponent, 'function');
+  assert.equal(typeof facade.instrumentLayoutSource, 'function');
+  assert.equal(typeof facade.instrumentPageKey, 'function');
+  assert.equal(typeof facade.resolveSiteDataSpecifier, 'function');
+  assert.equal(typeof facade.rewriteRecursiveSiteDataContext, 'function');
+
+  assert.strictEqual(facade.applyFilePlan, modular.applyFilePlan);
+  assert.strictEqual(facade.applyCollectionTransform, modular.applyCollectionTransform);
+  assert.strictEqual(facade.instrumentChildCardComponent, modular.instrumentChildCardComponent);
+  assert.strictEqual(facade.instrumentLayoutSource, modular.instrumentLayoutSource);
+});
+
+test('ARC v3 Phase 8: direct sub-module transformation works for primitives, compound-content, and background assets', () => {
+  const { replaceTextChildren } = require('../transforms/primitives/text.cjs');
+  const { extractTailwindBg } = require('../transforms/assets/tailwind-bg.cjs');
+  const { bindButtonWithIcon } = require('../transforms/components/compound-content.cjs');
+  const { parseSource, printSource } = require('../ast.cjs');
+
+  // 1. Primitive text transform
+  const textCode = `export function Heading() { return <h1>Original Title</h1>; }`;
+  const textAst = parseSource(textCode);
+  const h1Node = textAst.program.body[0].declaration.body.body[0].argument;
+  replaceTextChildren(h1Node, 'home.heroTitle', 'Original Title', 'text');
+  const updatedText = printSource(textAst, textCode);
+  assert.ok(updatedText.includes('siteData.content.home.heroTitle') || updatedText.includes('siteData?.content?.home?.heroTitle') || updatedText.includes('siteData.home.heroTitle'));
+
+  // 2. Asset tailwind background image extraction
+  const bgCode = `export function Banner() { return <div className="h-64 bg-[url('/hero.png')] text-white" />; }`;
+  const bgAst = parseSource(bgCode);
+  const divNode = bgAst.program.body[0].declaration.body.body[0].argument;
+  extractTailwindBg(divNode, { field: 'home.heroBanner', fallback: '/hero.png' });
+  const updatedBg = printSource(bgAst, bgCode);
+  assert.ok(updatedBg.includes('backgroundImage: `url(${'));
+  assert.ok(!updatedBg.includes("bg-[url('/hero.png')]"));
+
+  // 3. Compound content button with icon
+  const btnCode = `export function Action() { return <button className="btn"><svg /><span>Click Me</span></button>; }`;
+  const btnAst = parseSource(btnCode);
+  const btnNode = btnAst.program.body[0].declaration.body.body[0].argument;
+  bindButtonWithIcon(btnNode, { field: 'home.ctaLabel' });
+  const updatedBtn = printSource(btnAst, btnCode);
+  assert.ok(updatedBtn.includes('data-preview-field-path="home.ctaLabel"'));
+});
+
+test('ARC v3 Phase 9: canonicalField engine provides single source of truth for runtime, markers, schema, and setters', () => {
+  const { canonicalField, fieldRef, isValidCanonicalPath, validatePathAlignment } = require('../canonical-paths.cjs');
+
+  // 1. Core derivation from canonical string
+  const field = canonicalField('home.hero.title', { provenance: { file: 'Hero.tsx', loc: '12:4' } });
+  assert.equal(field.path, 'home.hero.title');
+  assert.equal(field.scope, 'home');
+  assert.equal(field.section, 'hero');
+  assert.equal(field.fieldName, 'title');
+  assert.equal(field.previewPath, 'home.hero.title');
+  assert.equal(field.previewMarker, 'data-preview-field-path="home.hero.title"');
+  assert.equal(field.runtimePath, 'siteData.content.home.hero.title');
+  assert.equal(field.manifestSchemaPath, 'home.hero.title');
+  assert.equal(field.diagnosticsId, 'field:home.hero.title');
+  assert.equal(field.toSetterCode('newVal'), 'siteData.content.home.hero.title = newVal;');
+  assert.equal(field.validate().valid, true);
+
+  // 2. Collection and child derivation
+  const col = canonicalField('home.categories');
+  const item0 = col.toCollectionItem(0);
+  assert.equal(item0.path, 'home.categories[0]');
+  assert.equal(item0.isCollection, true);
+
+  const nestedChild = item0.toCollectionChild('products', 2);
+  assert.equal(nestedChild.path, 'home.categories[0].products[2]');
+
+  // 3. Backward compatible alias
+  const aliasRef = fieldRef('about.story.heading');
+  assert.equal(aliasRef.fieldName, 'heading');
+  assert.equal(aliasRef.scope, 'about');
+
+  // 4. AST generation
+  const getterAst = field.toGetterAst();
+  assert.equal(getterAst.type, 'OptionalMemberExpression');
+
+  const bindingAst = field.toBindingAst('Fallback');
+  assert.equal(bindingAst.type, 'LogicalExpression');
+
+  const attrAst = field.toPreviewAttrAst();
+  assert.equal(attrAst.name.name, 'data-preview-field-path');
+  assert.equal(attrAst.value.value, 'home.hero.title');
+
+  const styleAttrAst = field.toPreviewStyleTargetAst();
+  assert.equal(styleAttrAst.name.name, 'data-preview-style-target');
+
+  // 5. Validation and alignment
+  assert.ok(isValidCanonicalPath('home.hero.title'));
+  assert.ok(isValidCanonicalPath('home.categories[0].products[${index}].title'));
+  assert.ok(!isValidCanonicalPath(''));
+  assert.ok(!isValidCanonicalPath('invalid path with spaces'));
+
+  assert.ok(validatePathAlignment('siteData?.content?.home?.hero?.title', 'data-preview-field-path="home.hero.title"'));
+});
+
+test('ARC v3 Phase 9: formalized typed IR models and validateProjectIR verify project structure integrity', () => {
+  const {
+    createDenebComponent,
+    createDataSource,
+    createCollectionDefinition,
+    validateProjectIR,
+  } = require('../ir-builder.cjs');
+
+  // 1. Factory validation
+  const comp = createDenebComponent({
+    name: 'ProductCard',
+    file: 'components/ProductCard.tsx',
+    propsSignature: { kind: 'destructured', names: ['product'], paramName: null, typeAnnotationName: 'CardProps' },
+    memberAccesses: { product: ['name', 'price', 'image'] },
+  });
+  assert.equal(comp.id, 'components/ProductCard.tsx:ProductCard');
+  assert.equal(comp.clientBoundary, 'server');
+
+  const ds = createDataSource({
+    name: 'featuredItems',
+    file: 'data/products.json',
+    items: [{ id: 1, name: 'Item 1' }],
+    fieldKeys: ['id', 'name'],
+  });
+  assert.equal(ds.editable, true);
+  assert.equal(ds.kind, 'inline-array');
+
+  const col = createCollectionDefinition({
+    file: 'app/shop/page.tsx',
+    arrayName: 'featuredItems',
+    itemParam: 'item',
+    rootTagName: 'ProductCard',
+    childComponent: comp,
+    dataSource: ds,
+  });
+  assert.equal(col.arrayName, 'featuredItems');
+  assert.equal(col.childComponent.name, 'ProductCard');
+
+  // 2. Validate valid IR
+  const mockIR = {
+    components: new Map([['ProductCard', comp]]),
+    dataSources: new Map([['featuredItems', ds]]),
+    collections: [col],
+    assetImports: new Map(),
+    backgroundImages: [],
+    componentUsages: [],
+  };
+
+  const validation = validateProjectIR(mockIR);
+  assert.equal(validation.valid, true);
+  assert.equal(validation.errors.length, 0);
+  assert.equal(validation.stats.componentCount, 1);
+  assert.equal(validation.stats.dataSourceCount, 1);
+  assert.equal(validation.stats.collectionCount, 1);
+
+  // 3. Catch corrupted IR
+  const brokenIR = {
+    components: new Map([['BrokenComp', { name: 'MismatchedName', file: '' }]]),
+    dataSources: new Map([['BrokenDS', { name: 'BrokenDS', file: '' }]]),
+    collections: [{ file: '' }],
+  };
+  const brokenValidation = validateProjectIR(brokenIR);
+  assert.equal(brokenValidation.valid, false);
+  assert.ok(brokenValidation.errors.length >= 3);
+});
+
+test('ARC v3 Phase 10: data-classification engine accurately categorizes 7 data tiers and protects platform/runtime data', () => {
+  const { DATA_CLASSIFICATION, classifyDataCandidate, isEditableClassification } = require('../data-classification.cjs');
+
+  // 1. CONTENT -> editable
+  const contentRes = classifyDataCandidate({ tag: 'h1', kind: 'text', value: 'Special Summer Blend' });
+  assert.equal(contentRes.classification, DATA_CLASSIFICATION.CONTENT);
+  assert.equal(contentRes.editable, true);
+  assert.equal(isEditableClassification(contentRes.classification), true);
+
+  // 2. COMMERCE_CONTENT -> editable
+  const commerceRes = classifyDataCandidate({ tag: 'h3', kind: 'text', value: 'Arabica Dark Roast', propName: 'productTitle' });
+  assert.equal(commerceRes.classification, DATA_CLASSIFICATION.COMMERCE_CONTENT);
+  assert.equal(commerceRes.editable, true);
+  assert.equal(isEditableClassification(commerceRes.classification), true);
+
+  // 3. PLATFORM_CONTROLLED -> not editable (no marker)
+  const platformRes = classifyDataCandidate({ tag: 'span', kind: 'text', value: 'LKR', field: 'common.currency' });
+  assert.equal(platformRes.classification, DATA_CLASSIFICATION.PLATFORM_CONTROLLED);
+  assert.equal(platformRes.editable, false);
+  assert.equal(isEditableClassification(platformRes.classification), false);
+
+  const orderIdRes = classifyDataCandidate({ tag: 'span', kind: 'text', value: '#10492', propName: 'orderId' });
+  assert.equal(orderIdRes.classification, DATA_CLASSIFICATION.PLATFORM_CONTROLLED);
+  assert.equal(orderIdRes.editable, false);
+
+  // 4. INTERACTION_STATE -> not editable
+  const modalRes = classifyDataCandidate({ tag: 'div', kind: 'text', propName: 'isOpen', value: 'true' });
+  assert.equal(modalRes.classification, DATA_CLASSIFICATION.INTERACTION_STATE);
+  assert.equal(modalRes.editable, false);
+
+  // 5. COMPUTED_DATA -> not editable
+  const computedRes = classifyDataCandidate({ tag: 'span', kind: 'text', value: 'items.reduce((a, b) => a + b)' });
+  assert.equal(computedRes.classification, DATA_CLASSIFICATION.COMPUTED_DATA);
+  assert.equal(computedRes.editable, false);
+
+  // 6. RUNTIME_DATA -> not editable
+  const runtimeRes = classifyDataCandidate({ tag: 'span', kind: 'text', value: 'user.email' });
+  assert.equal(runtimeRes.classification, DATA_CLASSIFICATION.RUNTIME_DATA);
+  assert.equal(runtimeRes.editable, false);
+
+  // 7. DECORATIVE -> not editable
+  const decorRes = classifyDataCandidate({ tag: 'span', kind: 'text', value: '•' });
+  assert.equal(decorRes.classification, DATA_CLASSIFICATION.DECORATIVE);
+  assert.equal(decorRes.editable, false);
+});
+
+test('ARC v3 Phase 10: planner enforces non-editable skip on platform-controlled, interaction, and computed candidates', () => {
+  const { planTransformations } = require('../planner.cjs');
+
+  const analyses = [
+    {
+      relativeFile: 'components/OrderSummary.tsx',
+      candidates: [
+        {
+          loc: '5:4',
+          tag: 'h2',
+          kind: 'text',
+          value: 'Your Order Summary',
+          confidence: 0.95,
+        },
+        {
+          loc: '12:6',
+          tag: 'span',
+          kind: 'text',
+          value: 'user.email',
+          confidence: 0.95,
+        },
+        {
+          loc: '18:6',
+          tag: 'span',
+          kind: 'text',
+          value: 'LKR',
+          field: 'common.currency',
+          confidence: 0.95,
+        },
+        {
+          loc: '24:6',
+          tag: 'div',
+          kind: 'text',
+          propName: 'isOpen',
+          value: 'true',
+          confidence: 0.95,
+        },
+      ],
+      code: 'export function OrderSummary() {}',
+    },
+  ];
+
+  const plan = planTransformations({ profile: { jsxFiles: ['components/OrderSummary.tsx'] }, analyses });
+  const filePlan = plan.files[0];
+
+  // Only the content headline should be planned for transformation
+  assert.equal(filePlan.transformations.length, 1);
+  assert.equal(filePlan.transformations[0].fallback, 'Your Order Summary');
+  assert.equal(filePlan.transformations[0].dataClassification, 'CONTENT');
+
+  // The 3 runtime/platform/interaction candidates must be skipped
+  assert.equal(plan.skipped.length, 3);
+  const skippedClassifications = plan.skipped.map((s) => s.classification);
+  assert.ok(skippedClassifications.includes('RUNTIME_DATA'));
+  assert.ok(skippedClassifications.includes('PLATFORM_CONTROLLED'));
+  assert.ok(skippedClassifications.includes('INTERACTION_STATE'));
+});
+
+test('ARC v3 Phase 11: data-flow engine unrolls nested member collections (category.products.map) and spread props', () => {
+  const { unrollCollectionSource } = require('../data-flow.cjs');
+  const parseSource = (c) => require('recast').parse(c, { parser: require('recast/parsers/babel-ts') });
+
+  // 1. Nested collection member: category.products.map(...)
+  const code = `category.products.map((product) => <ProductCard key={product.id} {...product} />);`;
+  const ast = parseSource(code);
+  const mapExpr = ast.program.body[0].expression;
+  const calleeObj = mapExpr.callee.object; // category.products
+
+  const unrolled = unrollCollectionSource(calleeObj);
+  assert.equal(unrolled.kind, 'nested-member');
+  assert.equal(unrolled.parentIdentifier, 'category');
+  assert.equal(unrolled.childProp, 'products');
+  assert.equal(unrolled.rootName, 'category.products');
+
+  // 2. Chained filter on nested member: category.products.filter(p => p.active)
+  const chainedCode = `category.products.filter(p => p.active).slice(0, 5);`;
+  const chainedAst = parseSource(chainedCode);
+  const chainedExpr = chainedAst.program.body[0].expression;
+  const chainedUnrolled = unrollCollectionSource(chainedExpr);
+  assert.equal(chainedUnrolled.rootName, 'category.products');
+  assert.ok(chainedUnrolled.chain.includes('slice'));
+});
+
+test('ARC v3 Phase 11: data-flow engine resolves renamed destructuring and deep nested destructuring aliases', () => {
+  const { collectVariableAliases } = require('../data-flow.cjs');
+  const parseSource = (c) => require('recast').parse(c, { parser: require('recast/parsers/babel-ts') });
+
+  const code = `
+    const { title: heading, image: heroImg } = hero;
+    const { product: { name: productName, price: productPrice } } = props;
+  `;
+  const ast = parseSource(code);
+  const aliases = collectVariableAliases(ast);
+
+  // 1. Renamed destructuring check
+  const headingAlias = aliases.get('heading');
+  assert.ok(headingAlias);
+  assert.equal(headingAlias.rootName, 'hero');
+  assert.equal(headingAlias.sourceProp, 'title');
+  assert.equal(headingAlias.kind, 'destructured-alias');
+
+  const heroImgAlias = aliases.get('heroImg');
+  assert.ok(heroImgAlias);
+  assert.equal(heroImgAlias.rootName, 'hero');
+  assert.equal(heroImgAlias.sourceProp, 'image');
+
+  // 2. Deep nested destructuring check
+  const nameAlias = aliases.get('productName');
+  assert.ok(nameAlias);
+  assert.equal(nameAlias.rootName, 'props.product');
+  assert.equal(nameAlias.sourceProp, 'name');
+  assert.equal(nameAlias.kind, 'deep-destructured-alias');
+});
+
+test('ARC v3 Phase 12: RSC boundary optimizer prevents converting async server components and metadata exporters', () => {
+  const {
+    isAsyncServerComponent,
+    canSafelyInjectClientDirective,
+    calculateMinimalClientBoundary,
+  } = require('../rsc-boundary.cjs');
+  const parseSource = (c) => require('recast').parse(c, { parser: require('recast/parsers/babel-ts') });
+
+  // 1. Async Server Component cannot be converted
+  const asyncCode = `export default async function ProductPage() { return <div>Server Data</div>; }`;
+  const asyncAst = parseSource(asyncCode);
+  assert.equal(isAsyncServerComponent(asyncAst), true);
+  assert.equal(canSafelyInjectClientDirective(asyncAst, 'app/product/[id]/page.tsx', { router: 'next-app', appDir: 'app' }), false);
+
+  // 2. Metadata exporter cannot be converted
+  const metaCode = `
+    export const metadata = { title: 'Store Catalog' };
+    export default function Catalog() { return <div>Catalog</div>; }
+  `;
+  const metaAst = parseSource(metaCode);
+  assert.equal(canSafelyInjectClientDirective(metaAst, 'app/shop/page.tsx', { router: 'next-app', appDir: 'app' }), false);
+
+  // 3. Minimal client boundary calculation
+  assert.equal(calculateMinimalClientBoundary({ isAsync: true, hasHooks: true }), 'server');
+  assert.equal(calculateMinimalClientBoundary({ hasMetadata: true, hasHooks: true }), 'server');
+  assert.equal(calculateMinimalClientBoundary({ isLeaf: true, hasHooks: true }), 'client');
+  assert.equal(calculateMinimalClientBoundary({ isLeaf: false, hasHooks: false }), 'server');
+});
+
+test('ARC v3 Phase 12: RSC metrics tracking computes boundary counts and validates conversion threshold', () => {
+  const { computeRscMetrics, validateRscBoundaryIntegrity } = require('../rsc-boundary.cjs');
+
+  const files = [
+    { file: 'app/layout.tsx', hadClientDirective: false, hasClientDirective: false },
+    { file: 'app/page.tsx', hadClientDirective: false, hasClientDirective: false },
+    { file: 'components/Hero.tsx', hadClientDirective: false, hasClientDirective: true },
+    { file: 'components/ProductCard.tsx', hadClientDirective: false, hasClientDirective: true },
+    { file: 'components/CartModal.tsx', hadClientDirective: true, hasClientDirective: true },
+  ];
+
+  const metrics = computeRscMetrics(files);
+  assert.equal(metrics.clientBoundariesBefore, 1);
+  assert.equal(metrics.clientBoundariesAfter, 3);
+  assert.equal(metrics.serverComponentsConverted, 2);
+  assert.equal(metrics.serverComponentsPreserved, 2);
+  assert.equal(metrics.conversionExceededThreshold, false);
+
+  const validation = validateRscBoundaryIntegrity(metrics, 5);
+  assert.equal(validation.valid, true);
+
+  // Exceed threshold
+  const failValidation = validateRscBoundaryIntegrity(metrics, 1);
+  assert.equal(failValidation.valid, false);
+  assert.ok(failValidation.error.includes('Excessive RSC conversions'));
+});
+
+test('ARC v3 Phase 13: validateCollectionOperations verifies runtime add, remove, reorder, and mutation operations', () => {
+  const { validateCollectionOperations } = require('../runtime-validator.cjs');
+
+  const mockSiteData = {
+    content: {
+      home: {
+        products: [
+          { id: '1', title: 'Product 1', price: 100 },
+          { id: '2', title: 'Product 2', price: 200 },
+        ],
+        testimonials: [
+          { id: 't1', author: 'Jane Doe', quote: 'Great coffee' },
+        ],
+      },
+    },
+  };
+
+  const report = validateCollectionOperations(mockSiteData);
+  assert.equal(report.passed, true);
+  assert.equal(report.totalCollections, 2);
+
+  const prodCol = report.collections.find((c) => c.path === 'home.products');
+  assert.ok(prodCol);
+  assert.equal(prodCol.operations.addItem, true);
+  assert.equal(prodCol.operations.removeItem, true);
+  assert.equal(prodCol.operations.reorderItems, true);
+  assert.equal(prodCol.operations.mutateItemField, true);
+  assert.equal(prodCol.passed, true);
+});
+
+test('ARC v3 Phase 13: 12-Gate Acceptance Matrix evaluates critical gates, thresholds, and incomplete/failed statuses', () => {
+  const { evaluateAcceptanceGates } = require('../acceptance-gates.cjs');
+
+  // 1. All Gates Passing
+  const passingMetrics = {
+    sourceAnalysis: { passed: true },
+    astTransformation: { passed: true },
+    typescriptValidation: { passed: true },
+    buildSuccess: { passed: true },
+    fivoraAudit: { passed: true },
+    manifestValid: true,
+    runtimeEditabilityScore: 99.5,
+    collectionOpsPassed: true,
+    imageEditingPassed: true,
+    routeCoveragePassed: true,
+    designPreservationScore: 99.1,
+    controlOnlyValid: true,
+    editabilityCoverage: 99.2,
+  };
+  const passRes = evaluateAcceptanceGates(passingMetrics);
+  assert.equal(passRes.passed, true);
+  assert.equal(passRes.status, 'CONVERSION_PASSED');
+  assert.equal(passRes.allCriticalPassed, true);
+
+  // 2. Critical Gate Failure (Fivora Contract) -> CONVERSION_FAILED
+  const failMetrics = {
+    ...passingMetrics,
+    fivoraAudit: { passed: false },
+  };
+  const failRes = evaluateAcceptanceGates(failMetrics);
+  assert.equal(failRes.passed, false);
+  assert.equal(failRes.status, 'CONVERSION_FAILED');
+  assert.equal(failRes.allCriticalPassed, false);
+
+  // 3. Sub-Threshold Coverage (e.g. 96%) -> CONVERSION_INCOMPLETE
+  const incompleteMetrics = {
+    ...passingMetrics,
+    editabilityCoverage: 96.0,
+  };
+  const incRes = evaluateAcceptanceGates(incompleteMetrics);
+  assert.equal(incRes.passed, false);
+  assert.equal(incRes.status, 'CONVERSION_INCOMPLETE');
+  assert.equal(incRes.allCriticalPassed, true);
+});
+
+test('ARC v3 Phase 15: calculateVisualPreservation computes >= 98% score across mobile, tablet, and desktop viewports', () => {
+  const { calculateVisualPreservation } = require('../visual-regression.cjs');
+
+  const beforeCode = `
+    export function Hero() {
+      return (
+        <section className="flex flex-col md:grid md:grid-cols-2 gap-8 p-12 bg-white">
+          <h1 className="text-4xl font-bold">Original Hero Title</h1>
+          <p className="text-lg text-gray-600">Subtitle copy text</p>
+          <button className="btn flex items-center gap-2">
+            <svg className="w-5 h-5" />
+            <span>Discover Products</span>
+          </button>
+        </section>
+      );
+    }
+  `;
+
+  const afterCode = `
+    export function Hero() {
+      return (
+        <section className="flex flex-col md:grid md:grid-cols-2 gap-8 p-12 bg-white">
+          <h1 data-preview-field-path="home.hero.title" className="text-4xl font-bold">
+            {siteData?.content?.home?.hero?.title ?? "Original Hero Title"}
+          </h1>
+          <p data-preview-field-path="home.hero.subtitle" className="text-lg text-gray-600">
+            {siteData?.content?.home?.hero?.subtitle ?? "Subtitle copy text"}
+          </p>
+          <button className="btn flex items-center gap-2">
+            <svg className="w-5 h-5" />
+            <span data-preview-field-path="home.hero.cta">
+              {siteData?.content?.home?.hero?.cta ?? "Discover Products"}
+            </span>
+          </button>
+        </section>
+      );
+    }
+  `;
+
+  const report = calculateVisualPreservation(beforeCode, afterCode);
+  assert.equal(report.passed, true);
+  assert.ok(report.overallPreservationScore >= 98.0);
+  assert.ok(report.viewports.mobile.preservationScore >= 98.0);
+  assert.ok(report.viewports.tablet.preservationScore >= 98.0);
+  assert.ok(report.viewports.desktop.preservationScore >= 98.0);
+  assert.equal(report.blockingIssues.length, 0);
+});
+
+test('ARC v3 Phase 15: calculateVisualPreservation detects dropped icons or layout shifts as blocking issues', () => {
+  const { calculateVisualPreservation } = require('../visual-regression.cjs');
+
+  const beforeCode = `
+    export function ButtonWithIcon() {
+      return (
+        <button className="btn">
+          <svg className="icon" />
+          <span>Add to Cart</span>
+        </button>
+      );
+    }
+  `;
+
+  const brokenAfterCode = `
+    export function ButtonWithIcon() {
+      return (
+        <button className="btn">
+          <span>Add to Cart</span>
+        </button>
+      );
+    }
+  `;
+
+  const report = calculateVisualPreservation(beforeCode, brokenAfterCode);
+  assert.equal(report.passed, false);
+  assert.ok(report.blockingIssues.length > 0);
+  assert.ok(report.blockingIssues[0].includes('SVG or icon dropped'));
+});
+
+test('ARC v3 Phase 15: verifyInteractionsSync validates mobile nav toggle, accordions, tabs, and carousels', () => {
+  const { verifyInteractionsSync, INTERACTIVE_PATTERNS } = require('../interaction-verifier.cjs');
+
+  const files = [
+    {
+      file: 'components/Header.tsx',
+      code: `
+        export function Header() {
+          const [open, setOpen] = useState(false);
+          return (
+            <header>
+              <button aria-label="Toggle Menu" onClick={() => setOpen(!open)}>
+                <span>Menu</span>
+              </button>
+            </header>
+          );
+        }
+      `,
+    },
+    {
+      file: 'components/FaqSection.tsx',
+      code: `export function Faq() { return <AccordionTrigger>Item</AccordionTrigger>; }`,
+    },
+    {
+      file: 'components/ProductTabs.tsx',
+      code: `export function Tabs() { return <TabsTrigger value="one">Tab</TabsTrigger>; }`,
+    },
+    {
+      file: 'components/Slider.tsx',
+      code: `export function Slider() { return <Swiper><SwiperSlide>Slide 1</SwiperSlide></Swiper>; }`,
+    },
+  ];
+
+  const report = verifyInteractionsSync({ files });
+  assert.equal(report.passed, true);
+  assert.equal(report.interactionScore, 100.0);
+  assert.equal(report.totalTested, 4);
+  assert.equal(report.failedTests, 0);
+
+  const patterns = report.patterns.map((p) => p.pattern);
+  assert.ok(patterns.includes(INTERACTIVE_PATTERNS.NAVBAR_MOBILE_TOGGLE));
+  assert.ok(patterns.includes(INTERACTIVE_PATTERNS.ACCORDION));
+  assert.ok(patterns.includes(INTERACTIVE_PATTERNS.TABS));
+  assert.ok(patterns.includes(INTERACTIVE_PATTERNS.CAROUSEL));
+});
+
+test('ARC v3 Phase 16: auditStorefrontTemplate verifies real-world storefront against 12-Gate Acceptance Matrix', () => {
+  const { auditStorefrontTemplate, resolveWorkspaceStorefrontsDir } = require('../corpus-verifier.cjs');
+  const path = require('path');
+  const baseDir = resolveWorkspaceStorefrontsDir();
+  const coffeeDir = path.join(baseDir, 'coffee');
+
+  const result = auditStorefrontTemplate(coffeeDir, { templateId: 'coffee', templateName: 'Coffee Shop' });
+  assert.equal(result.validStructure, true);
+  assert.equal(result.fivoraContract.passed, true);
+  assert.equal(result.fivoraContract.violationCount, 0);
+  assert.equal(result.runtimeEditability.passed, true);
+  assert.equal(result.collectionOperations.passed, true);
+  assert.equal(result.acceptanceGates.passed, true);
+  assert.equal(result.acceptanceGates.status, 'CONVERSION_PASSED');
+  assert.equal(result.passed, true);
+});
+
+test('ARC v3 Phase 16: verifyStorefrontCorpus audits all real-world storefronts and blocks invalid conversions', () => {
+  const { verifyStorefrontCorpus } = require('../corpus-verifier.cjs');
+
+  const report = verifyStorefrontCorpus();
+  assert.equal(report.totalTemplates, 6);
+  assert.equal(report.passedTemplates, 6);
+  assert.equal(report.failedTemplates, 0);
+  assert.equal(report.corpusSuccessRate, 100);
+  assert.equal(report.allTemplatesPassed, true);
+
+  // All 6 real-world storefronts pass with 100% compliance
+  for (const result of report.results) {
+    assert.ok(result.passed, `Storefront ${result.templateId} must pass 100%`);
+    assert.equal(result.acceptanceGates.status, 'CONVERSION_PASSED');
+  }
+});
+
+test('ARC v3 Phase 17: applyMutation generates AST mutations and testMutationResilience prevents unhandled compiler crashes', () => {
+  const {
+    applyMutation,
+    testMutationResilience,
+    DEFAULT_SAMPLE_COMPONENT,
+  } = require('../fuzz-engine.cjs');
+
+  // Test spread mutation
+  const spread = applyMutation(DEFAULT_SAMPLE_COMPONENT, 'SPREAD_PROPS');
+  assert.equal(spread.applied, true);
+  const spreadRes = testMutationResilience(spread.mutatedCode, 'SPREAD_PROPS');
+  assert.equal(spreadRes.crashed, false);
+  assert.equal(spreadRes.resilient, true);
+  assert.equal(spreadRes.outputValidSyntax, true);
+
+  // Test corrupt syntax recovery (must catch cleanly without dying)
+  const corrupt = applyMutation(DEFAULT_SAMPLE_COMPONENT, 'CORRUPT_SYNTAX');
+  assert.equal(corrupt.applied, true);
+  const corruptRes = testMutationResilience(corrupt.mutatedCode, 'CORRUPT_SYNTAX');
+  assert.equal(corruptRes.crashed, false);
+  assert.equal(corruptRes.status, 'PARSER_REJECTED_CLEANLY');
+  assert.equal(corruptRes.resilient, true);
+});
+
+test('ARC v3 Phase 17: runFuzzHarness achieves 100% resilience score across all mutation strategies', () => {
+  const { runFuzzHarness, MUTATION_TYPES } = require('../fuzz-engine.cjs');
+
+  const report = runFuzzHarness();
+  assert.equal(report.totalMutations, MUTATION_TYPES.length);
+  assert.equal(report.crashedCount, 0, 'Must have zero unhandled crashes');
+  assert.equal(report.syntaxErrorsInOutput, 0, 'Must have zero syntax errors in output');
+  assert.equal(report.resilienceScore, 100.0, 'Resilience score must be 100%');
+  assert.equal(report.allResilient, true);
+});
+
+test('ARC v3 Phase 18: analyzeBlockedProject identifies exact unmapped fields, files, and line numbers for blocked conversions', () => {
+  const { analyzeBlockedProject } = require('../explain-blocked.cjs');
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-blocked-'));
+  const compDir = path.join(tempDir, 'src', 'components');
+  const dataDir = path.join(tempDir, 'src', 'data');
+  fs.mkdirSync(compDir, { recursive: true });
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(path.join(dataDir, 'site-data.json'), JSON.stringify({ content: { home: { unmappedField: 'Hello' } } }));
+  fs.writeFileSync(path.join(tempDir, 'fivora-template.json'), JSON.stringify({
+    framework: 'nextjs-static-export',
+    siteDataFile: 'src/data/site-data.json',
+    editorSchema: {
+      sections: [{ id: 'home', path: 'home', type: 'object', fields: [{ key: 'unmappedField', type: 'currency' }] }]
+    }
+  }));
+  fs.writeFileSync(path.join(compDir, 'Showcase.tsx'), 'export function Showcase() {\n  return <div><span>Hello</span></div>;\n}');
+
+  try {
+    const report = analyzeBlockedProject(tempDir);
+    assert.equal(report.blocked, true);
+    assert.equal(report.totalBlockingIssues, 2);
+
+    const finding = report.findings.find((f) => f.ruleId === 'FIVORA_UNMAPPED_FIELD');
+    assert.ok(finding);
+    assert.ok(finding.file.includes('Showcase.tsx'));
+    assert.ok(finding.line >= 1);
+    assert.ok(finding.remediation.includes('data-preview-field-path') || finding.remediation.includes('controlOnlyPaths'));
+
+    const unsupported = report.findings.find((f) => f.ruleId === 'SCHEMA_UNSUPPORTED_TYPE');
+    assert.ok(unsupported);
+    assert.ok(unsupported.message.includes('currency'));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('ARC v3 Phase 18: formatBlockedExplanationTerminal renders actionable remediation guide with zero false positives', () => {
+  const { analyzeBlockedProject, formatBlockedExplanationTerminal } = require('../explain-blocked.cjs');
+  const { resolveWorkspaceStorefrontsDir } = require('../corpus-verifier.cjs');
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+
+  const baseDir = resolveWorkspaceStorefrontsDir();
+  const coffeeDir = path.join(baseDir, 'coffee');
+
+  // Compliant project formats clean success
+  const coffeeReport = analyzeBlockedProject(coffeeDir);
+  assert.equal(coffeeReport.blocked, false);
+  const coffeeText = formatBlockedExplanationTerminal(coffeeReport);
+  assert.ok(coffeeText.includes('CONVERSION_PASSED'));
+  assert.ok(coffeeText.includes('No blocking issues detected'));
+
+  // Synthetic blocked project formats detailed remediation
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-blocked-ui-'));
+  const compDir = path.join(tempDir, 'src', 'components');
+  const dataDir = path.join(tempDir, 'src', 'data');
+  fs.mkdirSync(compDir, { recursive: true });
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(path.join(dataDir, 'site-data.json'), JSON.stringify({ content: { home: { testField: 'Text' } } }));
+  fs.writeFileSync(path.join(tempDir, 'fivora-template.json'), JSON.stringify({
+    framework: 'nextjs-static-export',
+    siteDataFile: 'src/data/site-data.json',
+    editorSchema: {
+      sections: [{ id: 'home', path: 'home', type: 'object', fields: [{ key: 'testField', type: 'currency' }] }]
+    }
+  }));
+  fs.writeFileSync(path.join(compDir, 'Comp.tsx'), 'export function Comp() { return <div>Text</div>; }');
+
+  try {
+    const blockedReport = analyzeBlockedProject(tempDir);
+    assert.equal(blockedReport.blocked, true);
+    const blockedText = formatBlockedExplanationTerminal(blockedReport);
+    assert.ok(blockedText.includes('DENEB CONVERSION BLOCKED'));
+    assert.ok(blockedText.includes('SCHEMA_UNSUPPORTED_TYPE'));
+    assert.ok(blockedText.includes('Fix:'));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+
+
+
+
 
 
 

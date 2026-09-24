@@ -530,7 +530,16 @@ function collectLooseText(code) {
   return /<(h[1-6]|p|Button|span)[^>]*>\s*[A-Za-z]/.test(code);
 }
 
-function analyzeFile({ code, relativeFile, profile, graph, ownerScope, componentMeta, ir = profile?.ir || null }) {
+function analyzeFile(optionsOrFile, codeArg, profileArg) {
+  let code, relativeFile, profile, graph, ownerScope, componentMeta, ir;
+  if (typeof optionsOrFile === 'string') {
+    relativeFile = optionsOrFile;
+    code = codeArg;
+    profile = profileArg;
+    ir = profile?.ir || null;
+  } else {
+    ({ code, relativeFile, profile, graph, ownerScope, componentMeta, ir = profile?.ir || null } = optionsOrFile || {});
+  }
   const adapters = activeAdapters(profile);
   const fileSkip = skipReasonForFile(relativeFile, code);
   if (fileSkip) {
@@ -1165,6 +1174,8 @@ function analyzeFile({ code, relativeFile, profile, graph, ownerScope, component
     alreadyEditable: fileAlreadyEditable(code),
     bindings: Object.fromEntries([...bindings.entries()].filter(([, v]) => typeof v === 'string')),
     imports,
+    code,
+    relativeFile,
   };
 }
 

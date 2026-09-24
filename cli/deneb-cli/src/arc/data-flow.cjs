@@ -98,12 +98,30 @@ function unrollCollectionSource(exprNode, aliasMap = new Map()) {
     }
   }
 
+  // Direct member expression: category.products or data.items
+  if (curr.type === 'MemberExpression' && !curr.computed && curr.property?.type === 'Identifier') {
+    if (curr.object?.type === 'Identifier') {
+      const parentName = curr.object.name;
+      const propName = curr.property.name;
+      return {
+        rootName: `${parentName}.${propName}`,
+        parentIdentifier: parentName,
+        childProp: propName,
+        chain: [],
+        kind: 'nested-member',
+      };
+    }
+  }
+
   return null;
 }
 
 /**
- * Collects variable aliases inside an AST that point to arrays.
- * e.g. `const featuredProducts = products.slice(0, 4);`
+ * Collects variable aliases inside an AST that point to arrays or destructured fields.
+ * Handles:
+ * - Chained array pipelines: const featured = products.slice(0, 4);
+ * - Renamed destructuring: const { title: heading, image: heroImage } = hero;
+ * - Deep destructuring: const { product: { name, price } } = props;
  */
 function collectVariableAliases(ast) {
   const aliases = new Map();
@@ -113,6 +131,7 @@ function collectVariableAliases(ast) {
   recast.types.visit(ast, {
     visitVariableDeclarator(pathNode) {
       const node = pathNode.node;
+      // 1. Direct identifier assignment: const a = b.slice(...)
       if (node.id?.type === 'Identifier' && node.init) {
         const varName = node.id.name;
         const resolved = unrollCollectionSource(node.init, aliases);
@@ -124,6 +143,47 @@ function collectVariableAliases(ast) {
           });
         }
       }
+
+      // 2. Destructuring assignment: const { title: heading, image: heroImg } = hero;
+      if (node.id?.type === 'ObjectPattern' && node.init) {
+        const initName = node.init.type === 'Identifier'
+          ? node.init.name
+          : (node.init.type === 'MemberExpression' && node.init.property?.name);
+
+        if (initName) {
+          for (const prop of node.id.properties || []) {
+            if (prop.type === 'ObjectProperty' || prop.type === 'Property') {
+              const origKey = prop.key && (prop.key.name || prop.key.value);
+              // Renamed destructuring: { title: heading }
+              if (prop.value?.type === 'Identifier') {
+                const aliasName = prop.value.name;
+                aliases.set(aliasName, {
+                  rootName: initName,
+                  sourceProp: origKey,
+                  aliasName,
+                  kind: 'destructured-alias',
+                });
+              }
+              // Deep destructuring: { product: { name, price } }
+              else if (prop.value?.type === 'ObjectPattern') {
+                for (const deepProp of prop.value.properties || []) {
+                  if (deepProp.value?.type === 'Identifier') {
+                    const deepAlias = deepProp.value.name;
+                    const deepKey = deepProp.key && (deepProp.key.name || deepProp.key.value);
+                    aliases.set(deepAlias, {
+                      rootName: `${initName}.${origKey}`,
+                      sourceProp: deepKey,
+                      aliasName: deepAlias,
+                      kind: 'deep-destructured-alias',
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
       this.traverse(pathNode);
     },
   });

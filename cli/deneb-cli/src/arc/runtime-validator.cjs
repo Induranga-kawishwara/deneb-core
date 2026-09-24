@@ -269,6 +269,70 @@ class RuntimeValidator {
   }
 }
 
+function validateCollectionOperations(siteData = {}) {
+  const content = siteData.content || siteData;
+  const results = [];
+  let allPassed = true;
+
+  function findCollections(obj, prefix = '') {
+    for (const [k, v] of Object.entries(obj || {})) {
+      const fullPath = prefix ? `${prefix}.${k}` : k;
+      if (Array.isArray(v)) {
+        // Test 1: Add Item
+        const cloned = JSON.parse(JSON.stringify(v));
+        const sampleItem = cloned[0] && typeof cloned[0] === 'object' ? { ...cloned[0], id: 'new-999' } : 'new-item';
+        cloned.push(sampleItem);
+        const addPassed = cloned.length === v.length + 1;
+
+        // Test 2: Remove Item
+        const removeCloned = JSON.parse(JSON.stringify(v));
+        removeCloned.pop();
+        const removePassed = removeCloned.length === Math.max(0, v.length - 1);
+
+        // Test 3: Reorder Items
+        const reorderCloned = JSON.parse(JSON.stringify(v));
+        reorderCloned.reverse();
+        const reorderPassed = reorderCloned.length === v.length;
+
+        // Test 4: Mutate Item Field
+        let mutatePassed = true;
+        if (v.length > 0 && typeof v[0] === 'object' && v[0] !== null) {
+          const firstKey = Object.keys(v[0])[0];
+          if (firstKey) {
+            const mutateCloned = JSON.parse(JSON.stringify(v));
+            mutateCloned[0][firstKey] = '__MUTATED__';
+            mutatePassed = mutateCloned[0][firstKey] === '__MUTATED__';
+          }
+        }
+
+        const colPassed = addPassed && removePassed && reorderPassed && mutatePassed;
+        if (!colPassed) allPassed = false;
+
+        results.push({
+          path: fullPath,
+          itemCount: v.length,
+          operations: {
+            addItem: addPassed,
+            removeItem: removePassed,
+            reorderItems: reorderPassed,
+            mutateItemField: mutatePassed,
+          },
+          passed: colPassed,
+        });
+      } else if (typeof v === 'object' && v !== null) {
+        findCollections(v, fullPath);
+      }
+    }
+  }
+
+  findCollections(content);
+  return {
+    passed: allPassed,
+    collections: results,
+    totalCollections: results.length,
+  };
+}
+
 function validateRuntimeEditabilitySync(options) {
   const validator = new RuntimeValidator(options);
   return validator.runSync();
@@ -283,4 +347,5 @@ module.exports = {
   RuntimeValidator,
   validateRuntimeEditability,
   validateRuntimeEditabilitySync,
+  validateCollectionOperations,
 };

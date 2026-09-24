@@ -4,8 +4,9 @@ const recast = require('recast');
 const b = recast.types.builders;
 
 /**
- * RSC (React Server Components) Boundary Intelligence for Next.js App Router.
- * Ensures proper placement of 'use client' directives and prevents metadata export conflicts.
+ * Deneb ARC v3 — Conservative RSC (React Server Components) Boundary Optimizer.
+ * Ensures proper placement of 'use client' directives, minimal boundary isolation,
+ * metadata export protection, and RSC metrics tracking.
  */
 
 /**
@@ -52,6 +53,37 @@ function hasMetadataExport(ast) {
   });
 
   return hasMetadata;
+}
+
+/**
+ * Detects if the AST defines an async component (async function Page).
+ * Async components in Next.js are strictly server-side and cannot have 'use client'.
+ */
+function isAsyncServerComponent(ast) {
+  let isAsync = false;
+
+  recast.types.visit(ast, {
+    visitExportDefaultDeclaration(pathNode) {
+      const decl = pathNode.node.declaration;
+      if (decl && (decl.type === 'FunctionDeclaration' || decl.type === 'ArrowFunctionExpression' || decl.type === 'FunctionExpression')) {
+        if (decl.async) {
+          isAsync = true;
+          return false;
+        }
+      }
+      this.traverse(pathNode);
+    },
+    visitFunctionDeclaration(pathNode) {
+      const name = pathNode.node.id?.name;
+      if (name && /^(Page|Layout|Template|[A-Z])/.test(name) && pathNode.node.async) {
+        isAsync = true;
+        return false;
+      }
+      this.traverse(pathNode);
+    },
+  });
+
+  return isAsync;
 }
 
 /**
@@ -105,7 +137,7 @@ function needsClientDirective(ast, code = '') {
  * Determines whether 'use client' can be safely injected into the file.
  * Returns false if:
  * 1. File exports metadata or generateMetadata.
- * 2. File is a layout with metadata.
+ * 2. File is an async server component.
  */
 function canSafelyInjectClientDirective(ast, relativeFile = '', profile = {}) {
   const isAppRouter = profile.router === 'next-app' || (profile.appDir && relativeFile.startsWith(profile.appDir));
@@ -113,7 +145,7 @@ function canSafelyInjectClientDirective(ast, relativeFile = '', profile = {}) {
     return true;
   }
 
-  if (hasMetadataExport(ast)) {
+  if (hasMetadataExport(ast) || isAsyncServerComponent(ast)) {
     return false;
   }
 
@@ -145,10 +177,79 @@ function ensureClientDirective(ast) {
   return true;
 }
 
+/**
+ * Calculates the smallest client-editable boundary.
+ * Prevents turning entire server page trees into client components.
+ */
+function calculateMinimalClientBoundary(componentInfo = {}) {
+  if (componentInfo.isAsync || componentInfo.hasMetadata) {
+    return 'server';
+  }
+  if (componentInfo.hasHooks || componentInfo.hasEvents) {
+    return 'client';
+  }
+  return componentInfo.isLeaf ? 'client' : 'server';
+}
+
+/**
+ * Computes RSC metrics across the compilation run.
+ */
+function computeRscMetrics(files = []) {
+  let clientBoundariesBefore = 0;
+  let clientBoundariesAfter = 0;
+  let serverComponentsConverted = 0;
+  let serverComponentsPreserved = 0;
+
+  for (const f of files) {
+    if (f.hadClientDirective) clientBoundariesBefore++;
+    if (f.hasClientDirective) clientBoundariesAfter++;
+
+    if (!f.hadClientDirective && f.hasClientDirective) {
+      serverComponentsConverted++;
+    } else if (!f.hasClientDirective) {
+      serverComponentsPreserved++;
+    }
+  }
+
+  const total = files.length || 1;
+  const minimalBoundarySuccessRate = Number(((serverComponentsPreserved / total) * 100).toFixed(2));
+  const conversionExceededThreshold = serverComponentsConverted > 10;
+
+  return {
+    clientBoundariesBefore,
+    clientBoundariesAfter,
+    serverComponentsConverted,
+    serverComponentsPreserved,
+    minimalBoundarySuccessRate,
+    conversionExceededThreshold,
+  };
+}
+
+/**
+ * Validates RSC metrics against threshold limits.
+ */
+function validateRscBoundaryIntegrity(metrics, maxAllowedConversions = 10) {
+  if (metrics.serverComponentsConverted > maxAllowedConversions) {
+    return {
+      valid: false,
+      error: `Excessive RSC conversions: ${metrics.serverComponentsConverted} server components converted to client (max allowed: ${maxAllowedConversions})`,
+      metrics,
+    };
+  }
+  return {
+    valid: true,
+    metrics,
+  };
+}
+
 module.exports = {
   hasMetadataExport,
   hasClientDirective,
+  isAsyncServerComponent,
   needsClientDirective,
   canSafelyInjectClientDirective,
   ensureClientDirective,
+  calculateMinimalClientBoundary,
+  computeRscMetrics,
+  validateRscBoundaryIntegrity,
 };

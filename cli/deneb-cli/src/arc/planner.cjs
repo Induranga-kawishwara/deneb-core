@@ -5,6 +5,7 @@ const { inferSection, inferFieldName, buildFieldPath, classifyFieldType, uniqueP
 const { classifyHref } = require('./adapters.cjs');
 const { loadFingerprintBoost } = require('./learning.cjs');
 const { appendStyleBindTransforms } = require('./style-candidates.cjs');
+const { classifyDataCandidate, isEditableClassification } = require('./data-classification.cjs');
 
 function recipeBoost(candidate, recipe) {
   if (!recipe) return 0;
@@ -47,7 +48,18 @@ function planTransformations({ profile, analyses, recipe, ir }) {
         0.99,
         (candidate.confidence || 0) + recipeBoost(candidate, recipe) + (fingerprintHint.boost || 0),
       );
-      const decision = decideThreshold(confidence, candidate);
+      const dataClass = classifyDataCandidate(candidate, {
+        file: candidate.file,
+        componentName: candidate.componentName,
+        tag: candidate.tag,
+      });
+
+      let decision = decideThreshold(confidence, candidate);
+      if (!isEditableClassification(dataClass.classification)) {
+        decision = 'skip';
+        candidate.reason = candidate.reason || `non-editable-${dataClass.classification.toLowerCase()}`;
+      }
+
       const section = inferSection({
         componentName: candidate.componentName,
         fileName: candidate.file,
@@ -84,11 +96,13 @@ function planTransformations({ profile, analyses, recipe, ir }) {
         fallback: candidate.value,
         labelFallback: candidate.label,
         fieldType: classifyFieldType(candidate.kind, candidate.value || candidate.label),
+        dataClassification: dataClass.classification,
         section,
         scope,
         explain: {
           detected: `${candidate.tag} ${candidate.kind}`,
           why: candidate.reason,
+          classification: dataClass.classification,
           recipe: recipe?.name || null,
           confidence,
           fingerprintBoost: fingerprintHint.boost || 0,
@@ -103,6 +117,7 @@ function planTransformations({ profile, analyses, recipe, ir }) {
           reason: candidate.reason || 'low-confidence',
           confidence,
           kind: candidate.kind,
+          classification: dataClass.classification,
         });
         continue;
       }

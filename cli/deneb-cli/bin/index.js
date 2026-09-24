@@ -920,11 +920,19 @@ async function initProject(targetInput, options = {}) {
       const { runUniversalTemplateConversion } = require('../src/tools/template-converter.cjs');
       conversionRes = runUniversalTemplateConversion(targetDir, projectName, detectedPages, options);
     } else {
-      const { runDenebArc } = require('../src/arc/index.cjs');
-      conversionRes = await runDenebArc(targetDir, projectName, {
+      const { runTransactionalPipeline } = require('../src/arc/index.cjs');
+      const pipelineRes = runTransactionalPipeline(targetDir, {
         ...options,
+        projectName,
         detectedPages,
       });
+      conversionRes = pipelineRes.result || pipelineRes;
+      if (pipelineRes.rolledBack) {
+        console.log('\n\x1b[31m✖ DENEB CONVERSION BLOCKED — Original project files preserved intact.\x1b[0m');
+        console.log(`\x1b[33m  Reason:\x1b[0m ${pipelineRes.reasons?.[0] || '100% Fivora Contract / Acceptance Gate validation failed'}`);
+        console.log(`\n  Run \x1b[36m\x1b[1mnpx @deneb-ui/cli explain --blocked\x1b[0m for exact file locations, line numbers, and fixes.\n`);
+        process.exit(1);
+      }
     }
   } catch (err) {
     console.error(`\x1b[33m⚠ Note:\x1b[0m Automated conversion encountered an issue: ${err.message}. Falling back to default generation.`);
@@ -1543,13 +1551,28 @@ if (command === 'init' || command === 'arc') {
     console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
     process.exit(1);
   });
-} else if (command === 'explain') {
+} else if (command === 'explain' || command === 'explain-blocked') {
+  const isBlocked = command === 'explain-blocked' || commandArgs.includes('--blocked') || commandArgs.includes('-b');
+  const isJson = commandArgs.includes('--json');
+  const targetInput = commandArgs.find((a) => !a.startsWith('-')) || '.';
+
+  if (isBlocked) {
+    try {
+      const { analyzeBlockedProject, printBlockedExplanation } = require('../src/arc/explain-blocked.cjs');
+      const report = analyzeBlockedProject(targetInput);
+      printBlockedExplanation(report, { json: isJson });
+      process.exit(report.blocked ? 1 : 0);
+    } catch (err) {
+      console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
+      process.exit(1);
+    }
+  }
+
   const fileInput = commandArgs.find((a) => !a.startsWith('-'));
   if (!fileInput) {
-    console.error('\x1b[31mError:\x1b[0m Please specify a component file to explain (e.g. deneb explain src/components/Hero.tsx)');
+    console.error('\x1b[31mError:\x1b[0m Please specify a component file to explain (e.g. deneb explain src/components/Hero.tsx) or use --blocked to diagnose conversion failures (e.g. deneb explain --blocked)');
     process.exit(1);
   }
-  const isJson = commandArgs.includes('--json');
   try {
     const { explainFile, printExplanation } = require('../src/arc/explain.cjs');
     const explanation = explainFile(fileInput, { root: '.' });
@@ -1644,6 +1667,9 @@ if (command === 'init' || command === 'arc') {
 Core Commands:
   init              Deneb ARC: convert an existing React/Next.js app into a Fivora-editable storefront
                     flags: --dry-run  --explain  --recipe <name>  --legacy  --ai  --ai-dry-run  --telemetry off|anonymous|enhanced
+  explain           Explain ARC refactoring decisions for a file, or diagnose blocked conversions
+                    e.g. deneb explain src/components/Hero.tsx
+                    e.g. deneb explain --blocked [dir] (shows exact file locations, line numbers, and fixes)
   doctor            Run comprehensive environment, manifest, visual editing AST & asset diagnostic checks (flags: --fix, --json)
   save-recipe       Learn and save calibrated fixes & schemas into reusable recipe bank (e.g. deneb save-recipe . shoes-store)
   learn             Alias for save-recipe
