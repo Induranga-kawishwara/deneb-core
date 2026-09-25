@@ -12,6 +12,7 @@ const {
 } = require('../../ast.cjs');
 const { BROAD_CONTENT_CONTAINERS } = require('../../fivora-contract.cjs');
 const { injectSiteDataHook } = require('../runtime/provider.cjs');
+const { ensureClientDirective } = require('../../rsc-boundary.cjs');
 
 function sanitizeContradictoryMarkers(ast) {
   let cleaned = 0;
@@ -378,11 +379,37 @@ function healDecorativeOverlays(ast) {
 
 function healMissingSiteDataHooks(code, filePath = 'file.tsx') {
   if (!code.includes('siteData')) return code;
+
+  // Never touch files mounting SiteDataProvider
+  if (code.includes('SiteDataProvider')) return code;
+
+  // Never touch Server Component layouts or metadata files
+  const isLayout = /(?:^|[/\\])layout\.(?:tsx|jsx|js|ts)$/.test(filePath);
+  const isClient = /['"]use client['"]/.test(code);
+  if (isLayout && !isClient) return code;
+
+  // Never touch plain utilities or config files that contain zero JSX
+  const hasJsx = /<[a-zA-Z][\s\S]*?>/.test(code);
+  const isHookFile = /(?:^|[/\\])use[A-Z]/.test(filePath);
+  if (!hasJsx && !isHookFile) return code;
+
   try {
     const ast = parseSource(code, filePath);
-    const injected = injectSiteDataHook(ast);
+    const fileContext = {
+      filePath,
+      isServerComponent: !isClient,
+      isClientComponent: isClient,
+      mountsProvider: code.includes('SiteDataProvider'),
+    };
+    const injected = injectSiteDataHook(ast, filePath, fileContext);
     if (injected) {
-      ensureImport(ast, '@deneb-ui/ui', ['useSiteData']);
+      if (!isClient) {
+        ensureClientDirective(ast);
+      }
+      const importSpecifier = code.includes('@/lib/siteDataContext')
+        ? '@/lib/siteDataContext'
+        : '@deneb-ui/ui';
+      ensureImport(ast, importSpecifier, ['useSiteData']);
       return printSource(ast, code);
     }
   } catch {}

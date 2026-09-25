@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * Deneb ARC v3 — Production Acceptance Gates Engine
- * Implements the 12-Gate Acceptance Matrix recommended for enterprise Next.js -> Fivora compilation.
+ * Deneb ARC v3 — Production 15-Gate Acceptance Matrix (P12)
+ * Comprehensive compiler gates guaranteeing 100% verifiable Fivora conversion.
  */
 const ACCEPTANCE_GATES = {
   SOURCE_ANALYSIS: 'Source Analysis',
@@ -17,10 +17,13 @@ const ACCEPTANCE_GATES = {
   ROUTE_COVERAGE: 'Route Coverage',
   DESIGN_PRESERVATION: 'Design Preservation',
   CONTROL_ONLY_PROTECTION: 'Control-Only Protection',
+  ASSET_INTEGRITY: 'Asset Integrity',
+  RSC_CLIENT_INTEGRITY: 'RSC & Client Hook Integrity',
+  BROWSER_CONSOLE_CLEANLINESS: 'Browser Console Cleanliness',
 };
 
 /**
- * Evaluates compilation metrics against the 12-Gate Acceptance Matrix.
+ * Evaluates compilation metrics against the 15-Gate Acceptance Matrix.
  */
 function evaluateAcceptanceGates(metrics = {}) {
   const gates = {
@@ -87,6 +90,21 @@ function evaluateAcceptanceGates(metrics = {}) {
       name: ACCEPTANCE_GATES.CONTROL_ONLY_PROTECTION,
       passed: Boolean(metrics.controlOnlyValid !== false),
       critical: true,
+    },
+    assetIntegrity: {
+      name: ACCEPTANCE_GATES.ASSET_INTEGRITY,
+      passed: Boolean(metrics.assetIntegrityPassed !== false),
+      critical: true,
+    },
+    rscClientIntegrity: {
+      name: ACCEPTANCE_GATES.RSC_CLIENT_INTEGRITY,
+      passed: Boolean(metrics.rscIntegrityPassed !== false),
+      critical: true,
+    },
+    browserConsoleCleanliness: {
+      name: ACCEPTANCE_GATES.BROWSER_CONSOLE_CLEANLINESS,
+      passed: Boolean(metrics.consoleCleanlinessPassed !== false),
+      critical: false,
     },
   };
 

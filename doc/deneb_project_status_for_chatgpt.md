@@ -1,527 +1,336 @@
-# DENEB UI Framework — Complete Project Status Report
+# DENEB UI Framework & ARC Algorithm — Complete Project Status & Architecture Report
 
-> **Date:** September 24, 2026  
-> **Version:** 2.0.88 (Monorepo) / ARC Engine v2.2.0  
+> **Date:** September 25, 2026  
+> **Monorepo Version:** v2.0.90  
+> **ARC Engine Version:** v2.2.0 (incorporating ARC v3 Modular Architecture)  
 > **Authors:** Chamika Gayashan & Induranga Kawishwara  
-> **Purpose:** This document describes the current state of the Deneb project to help determine what features to develop next.
+> **Target Audience / Purpose:** Comprehensive technical briefing for ChatGPT (or advanced AI coding agents) to consult on improving Deneb and the ARC algorithm. The primary objective is to make `npx @deneb-ui/cli init` reliably scan **any arbitrary web template** and convert it into a **100% visually editable, production-grade storefront** without build errors, runtime crashes, or Fivora contract violations.
 
 ---
 
-## ⚠️ CRITICAL CONSTRAINT — READ FIRST
+## ⚠️ CRITICAL CONSTRAINTS & OPERATING BOUNDARIES — READ FIRST
 
-**I can ONLY modify the `deneb/core` project. The `Fivora-main` project (backend, admin-panel, developer-panel, shopOwner-panel, websiteAgent-panel, fivora-web) is maintained by a separate team and I CANNOT change it.** All feature development must happen within Deneb's scope. Fivora-main details are provided below only as context for understanding the platform Deneb integrates with.
-
----
-
-## 1. WHAT IS DENEB?
-
-Deneb UI is a **visual-first React component library + CLI toolchain** that converts standard Next.js storefronts into **Fivora-compatible, visually editable templates**. It is published as an npm monorepo under the `@deneb-ui` organization.
-
-### The Core Value Proposition
-
-1. **Shop owners** build e-commerce storefronts using normal Next.js + React
-2. **Deneb CLI** (`npx @deneb-ui/cli init`) auto-converts that storefront code so every text, image, and action becomes **live-editable** through Fivora's visual editor
-3. The converted template is then uploaded to Fivora where **end users (merchants)** can customize it without writing code
-4. **Deneb ARC** (Adaptive Refactoring Compiler) is the AI-powered engine inside the CLI that performs this automatic conversion
+1. **Scope Boundary:** You can **ONLY** modify the `deneb/core` project (the CLI, the ARC engine, `@deneb-ui/core`, `@deneb-ui/ui`, and `@deneb-ui/create-template`).
+2. **Third-Party Platform Boundary:** The `Fivora-main` repository (NestJS backend, admin-panel, developer-panel, shopOwner-panel, websiteAgent-panel, fivora-web) is maintained by a separate platform team and **CANNOT** be modified. All template transformations, visual editing contracts, data structures, and schemas must strictly conform to Fivora's existing preflight and ingest contracts.
+3. **Template Preservation:** ARC must preserve original design, CSS/Tailwind classes, animations, responsiveness, and layout with **≥98% design preservation**. It must **never** blow away original code or regenerate pages from scratch.
 
 ---
 
-## 2. DENEB MONOREPO STRUCTURE (v2.0.88)
+## 1. WHAT IS DENEB & WHAT DOES `npx @deneb-ui/cli init` DO?
+
+Deneb is an ecosystem consisting of:
+1. **A Headless Style & Visual Edit Engine** (`@deneb-ui/core`): Real-time style patching via DOM variables (`--deneb-*`), font loading, and visual preview protocol messaging.
+2. **A Component Library** (`@deneb-ui/ui`): 40+ visual-first, editable commerce components (ProductGrid, Hero, CustomerReviews, CartDrawer, etc.).
+3. **A Developer CLI & Adaptive Refactoring Compiler** (`@deneb-ui/cli` containing **ARC**): The compiler that scans a developer's Next.js storefront repository, analyzes its AST, plans editable bindings, transforms JSX into editable contracts, generates `site-data.json` and `fivora-template.json`, and validates against Fivora's ingest rules.
+
+### The Developer Experience Goal
+A developer builds an e-commerce storefront using normal React and Next.js (App Router or Pages Router, with Tailwind, CSS Modules, or custom styles).
+They run:
+```bash
+npx @deneb-ui/cli init
+```
+ARC scans the entire project, identifies every heading, paragraph, card, image, action button, list collection, and theme color, and binds them to Fivora's live preview contracts (`data-preview-field-path`, `data-preview-list-path`, `data-preview-style-target`).
+When uploaded to the Fivora marketplace, a non-technical merchant can click **any element on the screen** to edit copy, swap images, change colors, adjust typography, or reorder products in real time with 0ms lag.
+
+---
+
+## 2. MONOREPO STRUCTURE & RECENT UPDATES (v2.0.90)
 
 ```
 deneb/core/
 ├── packages/
-│   ├── deneb-core/         → @deneb-ui/core  (Headless style engine, CSS variables, DOM patcher, preview protocol)
-│   ├── deneb-ui/           → @deneb-ui/ui    (40+ editable React components for storefronts)
-│   └── create-template/    → @deneb-ui/create-template  (Scaffold new storefront templates)
+│   ├── deneb-core/         → @deneb-ui/core (Headless style engine, CSS variables, DOM patcher, preview protocol)
+│   ├── deneb-ui/           → @deneb-ui/ui (40+ editable React components for storefronts)
+│   └── create-template/    → @deneb-ui/create-template (Scaffolder for new storefronts)
 ├── cli/
-│   └── deneb-cli/          → @deneb-ui/cli   (CLI: init, validate, zip, doctor, lab, add + ARC engine)
+│   └── deneb-cli/          → @deneb-ui/cli (CLI commands: init, validate, zip, doctor, lab, add + ARC engine)
 │       └── src/
-│           ├── arc/        → ★ THE ARC ENGINE (33 modules, ~450KB of source code)
-│           ├── tools/      → CLI tool commands (doctor, validator, template-lab, converter, preview-bridge)
-│           ├── sites/      → Universal page selection logic
-│           ├── common/     → Shared utilities
-│           ├── platform/   → Platform contract definitions
-│           └── recipes/    → Recipe engine for known template patterns
+│           ├── arc/        → ★ THE ARC ENGINE (41 modules, 5 subdirectories)
+│           │   ├── transforms/     → Modularized AST transforms (primitives, collections, components, assets, routing, runtime, healing)
+│           │   ├── adapters/       → 10 UI library adapters (shadcn, Radix, Swiper, Embla, etc.)
+│           │   ├── __tests__/      → 9 comprehensive test suites (124+ automated tests passing)
+│           │   └── ...             → IR builder, data-classification, semantic scanner, planner, etc.
+│           ├── tools/      → CLI tools (deneb-doctor, template-validator, local-template-lab)
+│           ├── common/     → Platform contracts and visual edit definitions
+│           └── platform/   → Platform contract definitions
 ├── templates/
 │   └── nextjs/             → Reference storefront template
-├── scripts/                → Build, bump, consistency checks, smoke tests
-├── doc/                    → Architecture docs, implementation plans
-└── .github/workflows/      → CI/CD + npm publish with provenance
+└── doc/                    → Architectural blueprints and specifications
+```
+
+### Recent Monorepo Updates (Commits up to `ff906db` / v2.0.90):
+- **Live Catalog Polling Safeguards (`SiteDataProvider.tsx`, `PlatformProductDetail.tsx`, `EditableProductGrid.tsx`):**
+  Added guards to suppress automatic polling of `/site-catalog/[slug]/live-data` during preview mode or when the slug is `'template-validation'`. This prevents noisy 404/500 console cascades during static exports.
+- **Contract Attribute Quote Stripping (`template-visual-edit-contract.ts`):**
+  Fixed `isHiddenHtmlElement` so CSS utility classes like `"overflow-hidden"` inside quoted strings are not falsely classified as the HTML `hidden` attribute.
+- **Resilient CI Test Suites:**
+  Stabilized corpus and explain-blocked test runners in isolated CI environments.
+
+---
+
+## 3. THE ARC ENGINE PIPELINE (HOW IT CURRENTLY WORKS)
+
+ARC processes a project through 13 sequential phases:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 1: SCANNER & DEPENDENCY GRAPH (scanner.cjs)                               │
+│  • Detects Next.js version, App Router vs Pages Router, mixed JS/TS              │
+│  • Locates all pages, components, layouts, and public assets                     │
+│  • Builds project-wide import/export dependency graph                            │
+└──────────────────────────────────────┬───────────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────┐
+│  PHASE 2: PROJECT IR BUILDER (ir-builder.cjs)                                    │
+│  • Constructs project Intermediate Representation                                │
+│  • Component interfaces, prop shapes, and data source arrays                     │
+│  • Maps .map() loops to data sources & child components                          │
+│  • Resolves Next.js static asset imports to public URLs                          │
+└──────────────────────────────────────┬───────────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────┐
+│  PHASE 3: SEMANTIC ANALYSIS (semantic.cjs)                                       │
+│  • Walks AST to classify every JSX element (heading, text, image, action, list)  │
+│  • Evaluates library adapters (shadcn, Radix, Swiper, Embla, Accordion, etc.)    │
+│  • Detects user-facing content vs internal technical markers                     │
+│  • Generates candidate transformation list with initial confidence scores        │
+└──────────────────────────────────────┬───────────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────┐
+│  PHASE 4: DATA CLASSIFICATION & FLOW (data-classification.cjs, data-flow.cjs)    │
+│  • Classifies data into 7 tiers (platform, business, content, style, dynamic, etc)│
+│  • Protects platform-controlled data from visual overwrite                       │
+│  • Unrolls nested member collections (e.g. category.products.map())              │
+│  • Resolves destructuring and spread props across component boundaries           │
+└──────────────────────────────────────┬───────────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────┐
+│  PHASE 5: PLANNING & CONFIDENCE SCORING (planner.cjs)                            │
+│  • Evaluates thresholds:                                                         │
+│      - AUTO (>= 0.85): Transform automatically with high certainty               │
+│      - VALIDATE (0.60 - 0.84): Transform with contract verification              │
+│      - SKIP (< 0.60): Discard candidate (MAJOR SOURCE OF UNEDITABLE CONTENT)     │
+│  • Generates unique, non-colliding field paths (e.g. `home.heroTitle`)           │
+│  • Plans style binding operations (`data-preview-style-target`)                  │
+└──────────────────────────────────────┬───────────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────┐
+│  PHASE 6: RSC BOUNDARY OPTIMIZER (rsc-boundary.cjs)                              │
+│  • Analyzes Server Component vs Client Component boundaries                      │
+│  • Prevents illegal hook injections into async server components or layouts      │
+│  • Determines where `'use client'` must be placed                                │
+└──────────────────────────────────────┬───────────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────┐
+│  PHASE 7: MODULAR TRANSFORMATION (transforms/ directory)                         │
+│  • Modular sub-engines: primitives, collections, components, assets, routing     │
+│  • Injects `data-preview-field-path`, `data-preview-list-path`, etc.             │
+│  • Replaces hardcoded literals with `siteData` bindings                          │
+│  • Splits action/label contracts for links and buttons                           │
+│  • Instruments root layout with `<SiteDataProvider>`                             │
+└──────────────────────────────────────┬───────────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────┐
+│  PHASE 8: RESIDUAL PASS (residual.cjs)                                           │
+│  • Catches any visible literal text that bypassed the primary transformer        │
+│  • Either binds to a residual field path or marks `data-preview-static`          │
+│  • Intended to guarantee 100% visible text coverage                              │
+└──────────────────────────────────────┬───────────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────┐
+│  PHASE 9: MANIFEST & SITE DATA GENERATION (manifest.cjs)                         │
+│  • Emits `site-data.json` containing default values for all bound fields         │
+│  • Emits `fivora-template.json` containing `editorSchema`, pages, and navigation │
+│  • Registers `controlOnlyPaths` for platform-managed data                        │
+└──────────────────────────────────────┬───────────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────┐
+│  PHASE 10: MULTI-LAYER VALIDATION (fivora-contract.cjs, validator.cjs)           │
+│  • AST Syntax Audit via Recast parser                                            │
+│  • Fivora Strict Contract Audit (no markers on broad containers, unique paths)   │
+│  • Action/Label collision audit                                                  │
+│  • 12-Gate Acceptance Matrix (acceptance-gates.cjs)                              │
+│  • Visual Preservation Score calculation (must be ≥ 98%)                         │
+└──────────────────────────────────────┬───────────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────┐
+│  PHASE 11: HEALING & SANITIZATION (transforms/healing/sanitizer.cjs, doctor.cjs) │
+│  • Cleans contradictory markers, legacy links, and decorative overlays           │
+│  • Auto-heals TypeScript map callbacks and JSON imports                          │
+│  • Injects missing `useSiteData()` bindings (Source of recent bugs)              │
+└──────────────────────────────────────┬───────────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────┐
+│  PHASE 12: LEARNING & EXPERIENCE (learning.cjs)                                  │
+│  • Stores AST fingerprint outcomes in `~/.deneb/arc/experiences.json`            │
+│  • Boosts confidence on previously successful patterns                           │
+└──────────────────────────────────────┬───────────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────┐
+│  PHASE 13: TRANSACTIONAL COMMIT OR ROLLBACK (workspace.cjs)                      │
+│  • Commits transformed files to workspace if all gates pass                      │
+│  • Executes atomic rollback if critical validation fails                         │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. PACKAGE DETAILS
+## 4. FIELD REPORT: REAL-WORLD BUGS ENCOUNTERED IN THE VANTA STOREFRONT
 
-### 3.1 `@deneb-ui/core` (Headless Style Engine)
-- **Purpose:** CSS variable system, DOM patcher, real-time preview protocol for Fivora visual editing
-- **Key exports:**
-  - Style patching: `patchElementStyle`, `patchStyleByPath`, `styleToCssVariables`, `collectStyleTargetsFromHtml`
-  - Theme system: `THEME_PALETTES`, `FONT_PAIRINGS`, `generateThemeVariables`, `parseVisualCustomization`, `customizationToTheme`
-  - Font system: `DENEB_FONT_REGISTRY` (large Google Fonts catalog), `buildGoogleFontsStylesheetUrl`, `collectFontIdsFromSiteData`
-  - Validation: style tree validators
-- **TypeScript, builds to `dist/`**
+During recent live testing of `npx @deneb-ui/cli init` on a production-ready footwear storefront (`vanta-shoes-template`), several critical failure points were identified. **These empirical findings illustrate the exact gaps ChatGPT needs to help solve:**
 
-### 3.2 `@deneb-ui/ui` (Component Library — 40+ Components)
-- **Purpose:** Visual-first React components purpose-built for editable commerce storefronts
-- **Key component categories:**
-  - **Core primitives:** EditableText, EditableHeading, EditableParagraph, EditableBadge, EditableQuote, EditableButton, EditableImage, EditableMap, EditableList, EditableBox, EditableGrid, EditableSection, EditableDialog
-  - **Commerce:** EditableProductCard, EditableProductGrid, EditableProductDetail, EditableProductShowcase, PlatformProductDetail, EditableCartDrawer, EditableFilterSidebar, EditablePricingCard, ProductQuickView
-  - **Social proof:** EditableCustomerReviews, EditableGoogleFeedback, EditableTestimonialCard, EditableTestimonialSection, EditableTestimonialCarousel
-  - **Layout & Navigation:** EditableNavbar, EditableFooter, EditableHero (Centered + Split variants), EditableAnnouncementBar, EditableCategoryPills, StickyMobileBar
-  - **Content:** EditableServiceCard, EditableCard, EditableFAQAccordion, EditableContactForm, EditableBeforeAfterSlider, EditableBookingModal
-  - **Platform integration:** SiteDataProvider (context provider for editable data), ThemeStyles, ThemeToggle, FontLoader, ResponsiveBaseStyles, DenebComponentStyles, CookieConsentBanner, TrustBadges, PlatformAdditionalPages
-  - **Cart system:** useCart hook, EditableCartDrawer
-  - **Utility hooks:** useComponentStyle, useWhatsAppForm, useDenebFonts
-- **Also exports canonical aliases** (e.g., `Button`, `Card`, `Hero`, `Footer`, etc. — shadcn/HeroUI naming style)
-- **Peer deps:** React 18 or 19
-- **TypeScript, builds to `dist/`**
-- **Has `platform-contract.json`** defining platform-controlled field paths that Fivora manages (not user-editable in visual editor)
+### Bug 1: Indiscriminate Hook Injection Breaks Server Components & Plain TS
+* **What Happened:**
+  The doctor/healing check `[DNB-SCP-001]` (`Component Scope siteData Binding`) scanned all files for references to `siteData`. When found, it unshifted `const siteData = useSiteData()` into the function body and added `import { useSiteData } from '@deneb-ui/ui'`.
+* **The Consequences:**
+  1. **Root Layout Crash:** In Next.js App Router, `src/app/layout.tsx` is an async/server component that renders `<SiteDataProvider>`. Injecting `useSiteData()` inside `RootLayout` threw a runtime fatal error: `TypeError: (0, useSiteData) is not a function` because a context hook cannot be called inside a server component or outside its own provider.
+  2. **Plain Utility TypeScript Collision:** In `src/lib/requiredPages.ts`, the function was `export function getRequiredPages(siteData: SiteData)`. The healer injected `const siteData = useSiteData()` inside the function, resulting in: `Module parse failed: Identifier 'siteData' has already been declared`.
+  3. **404 Route Server Crash:** In `src/app/not-found.tsx`, the hook was injected into a component that lacked the `'use client'` directive, causing any 404 or missing asset to cascade into a 500 internal server error.
+* **Root Cause in Code:**
+  `cli/deneb-cli/src/arc/transforms/runtime/provider.cjs` and `sanitizer.cjs` blindly inject the hook without checking:
+  - Is the function an async component or Server Component?
+  - Does the function already accept `siteData` as a parameter?
+  - Is the component the provider itself (`SiteDataProvider`)?
+  - Is the file marked with `'use client'`?
 
-### 3.3 `@deneb-ui/cli` (CLI Toolchain)
-- **Purpose:** Full developer workflow — scaffold, convert, validate, and package Fivora-ready templates
-- **CLI commands available:** `deneb init`, `deneb validate`, `deneb zip`, `deneb doctor`, `deneb lab`, `deneb add`
-- **Contains the ARC engine** (see next section)
-- **Dependencies:** `@babel/parser`, `recast` (AST tools), `@octokit/rest` (GitHub API), `adm-zip`, `dotenv`
-- **Key tools:**
-  - `deneb-doctor.cjs` — Project health diagnostic (75KB)
-  - `deneb-template-validator.cjs` — Full template validation (141KB)
-  - `template-converter.cjs` — Legacy regex-based converter (38KB, superseded by ARC)
-  - `local-template-lab.cjs` — Local preview lab (20KB)
-  - `template-preview-focus-bridge.cjs` — Preview/focus bridge for visual editing (69KB)
-  - `recipe-engine.cjs` — Recipe matching engine for known patterns
+### Bug 2: The "137 Low-Confidence Candidates Skipped" Problem
+* **What Happened:**
+  ARC reported:
+  ```
+  ✓ 0 high-confidence transformations
+  ✓ 14 existing dynamic values preserved
+  ⚠ 137 low-confidence candidates skipped
+  ```
+* **The Consequences:**
+  Over 85% of the template's copy, banners, category cards, feature lists, and promotional blocks were completely skipped and left static. The resulting website was only ~15% editable, falling far short of the "100% editable" value proposition.
+* **Root Cause in Code:**
+  `planner.cjs` sets a hard threshold of `0.60`. Elements wrapped in complex Tailwind layouts, composite strings with template expressions, or non-standard JSX tags received scores around 0.35–0.55 and were discarded rather than safely elevated or wrapped with span extractors.
 
-### 3.4 `@deneb-ui/create-template` (Scaffolder)
-- **Purpose:** `npm create @deneb-ui/template my-store` — scaffolds a new storefront from reference template
-- **Contains reference template for Next.js**
+### Bug 3: Fivora Strict Contract Schema Mismatches
+* **What Happened:**
+  ARC generated an `editorSchema` that Fivora's validator rejected with 4 blocking findings:
+  1. `editorSchema path "shop.priceLkrLabel" declares unsupported type "currency"` (Fivora only accepts `text`, `textarea`, `number`, `image`, `url`, `boolean`, `select`, `color`).
+  2. `editorSchema declares duplicate editable field path "site.announcement.linkUrl" in sections "site_announcement" and "site"` (Collision across multiple sections).
+  3. `Route "/products/detail" is missing data-preview-page-key="products_detail"`.
+  4. `Route "/products/vanta-aero-x" is missing data-preview-page-key="products_vanta-aero-x"`.
+* **Root Cause in Code:**
+  - `manifest.cjs` inferred schema types without validating against Fivora's allowed whitelist.
+  - Section naming did not enforce global uniqueness for leaf field paths.
+  - Dynamic App Router routes (subfolders with pages) were not assigned proper `data-preview-page-key` attributes.
+
+### Bug 4: Broken Asset References Cascading to Server 500s
+* **What Happened:**
+  `site-data.json` had `"logoUrl": "/fivora-logo.png"`. That file did not exist in the project's `public/` directory (only `logo.svg` existed). The browser requested `/fivora-logo.png`, Next.js triggered `not-found.tsx`, and because `not-found.tsx` had an invalid server hook, the entire dev server threw 500 errors on every initial page load.
 
 ---
 
-## 4. THE ARC ENGINE — COMPLETE STATUS
+## 5. THE CORE ARCHITECTURAL CHALLENGE: GETTING TO TRUE 100% EDITABILITY
 
-### 4.1 What ARC Does
+To achieve true 100% editability on any web template, ARC must solve several fundamental AST challenges:
 
-**ARC (Adaptive Refactoring Compiler)** is an AST-driven, AI-augmented engine that automatically converts any standard Next.js storefront into a Fivora-compatible visually editable template. It is the **core innovation** of Deneb.
+### 1. Leaf vs Container Disambiguation
+Fivora strictly forbids `data-preview-field-path` on broad layout containers (`<header>`, `<nav>`, `<section>`, `<div>`). The marker must reside on the exact leaf element rendering the text (`<h1>`, `<h2>`, `<p>`, `<span>`, `<a>`).
+* *Challenge:* When text is mixed with icons or badges (e.g. `<button><Icon /> Buy Now</button>`), putting the marker on the button breaks icon rendering. ARC must wrap only the raw text node in a `<span data-preview-field-path="...">Buy Now</span>`.
 
-### 4.2 ARC Pipeline — How It Works (Step by Step)
-
+### 2. Composite & Interpolated Expressions
+Real storefronts rarely have pure static strings. They have:
+```tsx
+<h2>Trending in {currentCategory || 'Footwear'} ({itemCount} items)</h2>
 ```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  STEP 1: SCAN — scanProject()                                                  │
-│  • Detects framework (Next.js version, App Router vs Pages Router)             │
-│  • Finds all JSX/TSX files, build the file list                                │
-│  • Identifies routes (pages), components, layouts                              │
-│  • Detects component libraries (shadcn, HeroUI, etc)                           │
-│  • Resolves TypeScript path aliases                                            │
-│  • Reads package.json, tsconfig.json                                           │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  STEP 2: DEPENDENCY GRAPH — buildDependencyGraph()                             │
-│  • Maps import relationships between all files                                 │
-│  • Identifies which components are used on which pages/routes                  │
-│  • Determines "owner scope" for field paths                                    │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  STEP 3: IR BUILD — buildProjectIR()                                           │
-│  • Constructs project-wide Intermediate Representation                         │
-│  • Component Graph: declarations, exports, prop shapes, interfaces             │
-│  • Data Sources: array declarations, sample object shapes                      │
-│  • Collection Flow: maps .map() loops to data sources & child components       │
-│  • Asset Imports: Next.js static imports → clean public URLs                   │
-│  • CSS Background Images: discovers Tailwind bg-[url(...)] and inline styles   │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  STEP 4: SEMANTIC ANALYSIS — analyzeFile() for each JSX file                   │
-│  • Walks AST to identify every JSX element                                     │
-│  • Classifies each element: text, heading, image, action, link, form, etc.     │
-│  • Detects user-facing vs technical content                                    │
-│  • Generates "candidates" for transformation with confidence scores            │
-│  • Uses adapter system (shadcn, Embla, Swiper, Radix, etc.)                    │
-│  • Resolves imported data bindings across file boundaries                      │
-│  • Text Fragment Analysis for complex text compositions                        │
-│  • Collects design snapshots (classNames, styles) for preservation             │
-│  File: semantic.cjs (1,200 lines, 47KB)                                        │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  STEP 5: PLANNING — planTransformations()                                      │
-│  • Assigns confidence thresholds:                                              │
-│    - AUTO (>= 0.85): Transform automatically                                  │
-│    - VALIDATE (>= 0.60): Transform but needs validation                        │
-│    - SKIP (< 0.60): Skip transformation                                        │
-│  • Applies recipe boosts and fingerprint boosts from learning                  │
-│  • Infers field paths (section.fieldName) for each candidate                   │
-│  • Classifies field types (text, textarea, image, url, number, boolean, etc.)  │
-│  • Builds unique field paths, avoiding collisions                              │
-│  • Appends style bind transforms                                              │
-│  File: planner.cjs (391 lines)                                                 │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  STEP 6: AI AGENT (Optional, --ai flag)                                        │
-│  • Classifies known vs unknown components                                      │
-│  • Uses GPT-4o-mini to generate editable wrappers for unknown components       │
-│  • Self-healing validation loop (up to 3 retries)                              │
-│  • Auto-opens PRs to deneb-ui/core for new components                          │
-│  • Auto-generates documentation pages                                          │
-│  File: ai-agent.cjs, ai-prompts.cjs, ai-evaluator.cjs                          │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  STEP 7: TRANSFORMATION — applyFilePlan() for each file                        │
-│  • Rewrites JSX elements to be editable using recast (AST manipulation)        │
-│  • Adds data-preview-field-path attributes                                     │
-│  • Adds data-preview-list-path for collections                                 │
-│  • Adds data-preview-item-path for list items                                  │
-│  • Adds data-preview-page-key for multi-page routing                           │
-│  • Replaces hardcoded strings with siteData bindings                           │
-│  • Injects useSiteData hook imports                                            │
-│  • Instruments layout file with SiteDataProvider                               │
-│  • Handles RSC (React Server Components) boundaries                            │
-│  • Splits action/label contracts for interactive elements                      │
-│  File: transformer.cjs (2,752 lines, 101KB — THE LARGEST FILE)                 │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  STEP 8: RESIDUAL PASS — applyResidualPass()                                  │
-│  • Catches everything the main pass missed                                     │
-│  • Every remaining visible literal text is either:                              │
-│    - Bound to a field path, OR                                                 │
-│    - Marked data-preview-static with a reason                                  │
-│  • This ensures 100% visual text coverage                                      │
-│  File: residual.cjs (456 lines)                                                │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  STEP 9: DATA GENERATION — buildSiteDataAndManifest()                          │
-│  • Generates site-data.json (initial content values for all bound fields)      │
-│  • Generates fivora-template.json (manifest with editor schema, pages, etc.)   │
-│  • Prunes unbound leaves from site data                                        │
-│  • Applies font theme based on fonts used in the project                       │
-│  • Computes control-only paths (fields managed by Fivora, not visual editor)   │
-│  File: manifest.cjs (732 lines)                                                │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  STEP 10: VALIDATION — Multi-Layer Validation                                  │
-│  Layer A: AST Syntax — parseSource() on every transformed file                 │
-│  Layer B: Contract Validation — orphan paths, missing schema, collisions       │
-│  Layer C: Fivora Contract Audit (ported from Fivora backend):                  │
-│    • Marker placement rules (no field-path on broad containers like div/main)  │
-│    • Action/label collision detection                                          │
-│    • Path coverage (every schema field has a marker in the source)             │
-│    • Schema uniqueness (no duplicate editor fields)                            │
-│    • Page coverage (every route has a page key)                                │
-│    • Preview runtime check                                                     │
-│    • Static marker authorship audit                                            │
-│    • Empty state source audit                                                  │
-│    • Select options validation                                                 │
-│    • List bounds audit                                                         │
-│    • Route-owned marker coverage                                               │
-│  Layer D: Design Preservation Score (must be >= 98%)                           │
-│  Layer E: Runtime Editability Verification:                                    │
-│    • Contract simulation verification (in-process)                             │
-│    • Optional Playwright headless browser testing                              │
-│  File: validator.cjs, fivora-contract.cjs (794 lines), runtime-validator.cjs   │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  STEP 11: AI EVALUATOR (Post-transform, optional)                              │
-│  • RSC boundary integrity check                                                │
-│  • Component export verification in page/layout files                          │
-│  • Fivora strict leaf contract verification                                    │
-│  • Manifest route ↔ file 1:1 correspondence                                   │
-│  • Self-healing: uses OpenAI to fix detected issues automatically              │
-│  File: ai-evaluator.cjs (451 lines)                                            │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  STEP 12: LEARNING — recordExperience()                                        │
-│  • Records transformation outcomes (success/failure per fingerprint)            │
-│  • Stores locally in ~/.deneb/arc/experiences.json                              │
-│  • Fingerprint boosting: successful patterns get confidence boost next time    │
-│  • Rule states: observed → candidate → experimental → verified → stable        │
-│  • Architecture registry: learns project structure patterns                    │
-│  • No network upload — purely local persistence                                │
-│  File: learning.cjs (273 lines)                                                │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  STEP 13: REPORTING — buildReport()                                            │
-│  • Generates complete JSON report with all metrics                             │
-│  • If critical failure: ROLLS BACK all changes                                 │
-│  • If contract failure: prints warnings but keeps changes                      │
-│  • Saves report to .deneb/runs/<runId>/                                        │
-│  • Supports --dry-run (simulates without writing)                              │
-│  • Supports --explain (detailed transformation explanations)                   │
-│  • Supports --json (machine-readable output)                                   │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
+* *Challenge:* How does ARC extract this into an editable field without breaking the dynamic runtime expressions `{currentCategory}` and `{itemCount}`?
 
-### 4.3 ARC Module Inventory (33 Source Files)
+### 3. Collection Lists (.map()) & Spread Props
+Product grids, customer review sliders, and navigation links iterate over arrays.
+* *Challenge:* ARC must annotate the parent container with `data-preview-list-path="products"` and the card root with `data-preview-item-path="products[${index}]"`. If the developer uses destructuring (`items.map(({ id, title, price }) => ...)`), ARC must track the alias scope without corrupting TypeScript types.
 
-| Module | Lines | Size | Purpose |
-|--------|-------|------|---------|
-| `transformer.cjs` | 2,752 | 101KB | AST transformation engine (largest file) |
-| `semantic.cjs` | 1,200 | 47KB | Semantic analysis, element classification |
-| `index.cjs` | 1,079 | 42KB | Main pipeline orchestrator |
-| `fivora-contract.cjs` | 794 | 29KB | Fivora platform contract validation (ported from backend) |
-| `manifest.cjs` | 732 | 27KB | Site data & manifest generation |
-| `scanner.cjs` | 658 | 23KB | Project scanning & dependency detection |
-| `ir-builder.cjs` | 582 | 22KB | Intermediate Representation builder |
-| `ast.cjs` | ~600 | 18KB | AST parsing, utilities, code printers |
-| `ai-evaluator.cjs` | 451 | 18KB | AI-powered self-healing evaluator |
-| `residual.cjs` | 456 | 17KB | Residual pass — catches what main pass missed |
-| `planner.cjs` | 391 | 16KB | Confidence scoring & transformation planning |
-| `ai-agent.cjs` | 335 | 12KB | OpenAI API integration, component adaptation |
-| `printer.cjs` | ~300 | 11KB | Terminal output formatting |
-| `learning.cjs` | 273 | 10KB | Experience recording & fingerprint learning |
-| `runtime-validator.cjs` | 287 | 9KB | Runtime editability verification |
-| `pr-agent.cjs` | ~250 | 9KB | GitHub PR automation for new components |
-| `next-config.cjs` | ~250 | 8KB | next.config.js manipulation |
-| `ai-prompts.cjs` | ~200 | 8KB | AI prompt engineering templates |
-| `validator.cjs` | ~200 | 8KB | AST & contract validators |
-| `field-paths.cjs` | ~200 | 7KB | Field path inference & naming |
-| `adapters.cjs` | 174 | 6KB | Component library adapter system |
-| `data-flow.cjs` | ~150 | 5KB | Data flow analysis (.map() unrolling) |
-| `component-registry.cjs` | 159 | 5KB | Known component master lookup |
-| `text-fragment-analyzer.cjs` | ~130 | 5KB | Complex text composition analysis |
-| `rsc-boundary.cjs` | ~120 | 5KB | React Server Component boundary handling |
-| `fs-utils.cjs` | ~120 | 4KB | File system utilities |
-| `diff.cjs` | ~100 | 4KB | Diff generation for explain mode |
-| `explain.cjs` | ~100 | 4KB | Transformation explanation generator |
-| `canonical-paths.cjs` | ~80 | 3KB | Path canonicalization |
-| `style-candidates.cjs` | ~80 | 3KB | Style binding candidate detection |
-| `font-plan.cjs` | ~50 | 2KB | Font ID collection from site data |
-| `recipes-v2.cjs` | ~40 | 2KB | Recipe V2 matching |
-| `version.cjs` | 23 | 412B | Version constants |
+### 4. React Server Component (RSC) Boundaries
+Next.js App Router enforces strict rules:
+- Server Components cannot use hooks (`useContext`, `useSiteData`).
+- Components providing Context Providers (`SiteDataProvider`) cannot consume their own context.
+- Client components must have `'use client'` at the very top.
+* *Challenge:* ARC must automatically detect file boundaries and inject `'use client'` only where necessary, avoiding invalid hook placement in server layouts or pure utility helper files.
 
-**Total ARC Engine: ~12,000+ lines of code, ~450KB of source**
-
-### 4.4 ARC Adapter System (10 Library Adapters)
-
-| Adapter | Supported Libraries |
-|---------|-------------------|
-| `ui-frameworks.cjs` | shadcn/ui, Radix UI, HeroUI/NextUI, Chakra UI, Mantine, Ant Design, Material UI, daisyUI |
-| `swiper.cjs` | Swiper.js carousel |
-| `embla.cjs` | Embla Carousel |
-| `slick.cjs` | react-slick |
-| `accordion.cjs` | Accordion patterns |
-| `dialog.cjs` | Dialog/Modal patterns |
-| `gallery.cjs` | Gallery patterns |
-| `tabs.cjs` | Tabs patterns |
-| `picture-source.cjs` | `<picture>` / `<source>` elements |
-| `registry.cjs` | Adapter registration & dispatch |
-
-### 4.5 ARC Confidence System
-
-```
-Confidence >= 0.85 (AUTO)     → Transform automatically, high certainty
-Confidence >= 0.60 (VALIDATE) → Transform but flag for validation
-Confidence <  0.60 (SKIP)     → Skip, too uncertain to transform
-```
-
-Confidence is boosted by:
-- Recipe matching (up to +0.08)
-- Fingerprint learning from past successful runs
-- Adapter recognition (known UI library patterns)
-
-### 4.6 ARC Tests
-
-- **Single test file:** `cli/deneb-cli/src/arc/__tests__/arc.test.cjs` (116KB, comprehensive)
-- **Run command:** `node --test cli/deneb-cli/src/arc/__tests__/arc.test.cjs`
-- **Fixture files** in `__fixtures__/` for test scenarios
+### 5. Idempotent Transformation
+A developer may run `deneb init` multiple times as they update their template.
+* *Challenge:* Subsequent runs must detect existing markers, imports, and wrappers, leaving them intact without duplicating `useSiteData()`, duplicating span wrappers, or generating schema collisions.
 
 ---
 
-## 5. WHAT ARC CAN CURRENTLY DO (COMPLETED FEATURES ✅)
+## 6. CURRENT INVENTORY OF ARC SOURCE FILES (41 MODULES)
 
-1. ✅ Full AST-based transformation (no regex hacks)
-2. ✅ Semantic element classification (text, heading, image, action, form, etc.)
-3. ✅ Automatic field-path generation with collision avoidance
-4. ✅ Multi-page support with page keys
-5. ✅ Collection support (.map() → list/item markers)
-6. ✅ Cross-file import resolution for data bindings
-7. ✅ Intermediate Representation (IR) for project-wide understanding
-8. ✅ Residual pass for 100% visible text coverage
-9. ✅ Fivora strict contract validation (ported from backend)
-10. ✅ Design preservation scoring (must maintain ≥98%)
-11. ✅ React Server Component (RSC) boundary handling
-12. ✅ Next.js App Router + Pages Router support
-13. ✅ Static export configuration for Fivora hosting
-14. ✅ Backup & rollback on critical failure
-15. ✅ AI Agent for unknown component adaptation (GPT-4o-mini)
-16. ✅ AI Evaluator self-healing (RSC boundaries, exports, leaf contracts)
-17. ✅ GitHub PR automation for new components
-18. ✅ Learning system with fingerprint persistence
-19. ✅ Component library adapters (shadcn, Radix, Swiper, Embla, etc.)
-20. ✅ Dry-run mode, explain mode, JSON output mode
-21. ✅ Runtime editability verification (contract simulation + optional Playwright)
-22. ✅ Action/label splitting for interactive elements
-23. ✅ Form submission action handling (WhatsApp, email, etc.)
-24. ✅ Recipe system for known template patterns
-25. ✅ Font system with large Google Fonts registry
-26. ✅ Theme system with CSS variables
-27. ✅ Real-time style patching via DOM patcher
-28. ✅ Platform contract for Fivora-managed fields
-29. ✅ Template Lab for local preview
-30. ✅ Doctor command for project health diagnostics
-31. ✅ 40+ editable React components in @deneb-ui/ui
-32. ✅ Cart system with useCart hook
-33. ✅ Visual customization (colors, typography, spacing, layout)
-34. ✅ Auto-reconciliation of unknown paths to controlOnlyPaths
-35. ✅ CI/CD pipeline with npm publish + provenance
-
----
-
-## 6. FIVORA-MAIN — CONTEXT ONLY (CANNOT MODIFY)
-
-### 6.1 What is Fivora?
-
-Fivora is the **platform** that Deneb templates are deployed to. It provides:
-- Visual editing UI for merchants to customize storefront templates
-- AI content generation agent
-- Template marketplace
-- Site hosting and deployment (via CapRover)
-- Payment processing (PayHere)
-- Analytics, contact forms, chatbots
-- Multi-tenant architecture with roles: Admin, Developer, Shop Owner, Website Agent
-
-### 6.2 Fivora Architecture
-
-```
-Fivora-main/
-├── backend/           → NestJS REST API + Prisma ORM (PostgreSQL)
-│   └── src/
-│       ├── templates/           → Template upload, validation, sandbox
-│       ├── sites/               → Site instance management (204KB main service!)
-│       │   ├── site-instances.service.ts       → Core site management
-│       │   ├── template-preview-focus-bridge.ts → Visual editing bridge (123KB)
-│       │   ├── universal-template-theme.ts     → Theme management (39KB)
-│       │   ├── universal-page-selection.ts     → Page management
-│       │   ├── static-site-seo.ts              → SEO optimization
-│       │   ├── caprover-domain-provisioner.ts  → Domain management
-│       │   └── universal-chatbot.ts            → Chatbot integration
-│       ├── visual-customization/ → Visual customization API
-│       ├── ai-content/          → AI content generation
-│       ├── auth/                → Authentication
-│       ├── catalog/             → Product catalog
-│       ├── payments/            → Payment processing
-│       ├── storage/             → File storage
-│       └── ... (26 modules total)
-│
-├── admin-panel/       → React + Vite administrator dashboard
-├── developer-panel/   → React + Vite template developer portal
-├── shopOwner-panel/   → React + Vite shop owner portal
-├── websiteAgent-panel/→ React + Vite merchant/agent portal
-└── fivora-web/        → Next.js marketing and storefront web app
-```
-
-### 6.3 Key Fivora Platform Capabilities (Deneb Must Integrate With)
-
-- **Template Upload & Validation:** Fivora backend validates uploaded templates against strict contracts
-- **Visual Editing Protocol:** Uses `data-preview-field-path`, `data-preview-list-path`, `data-preview-item-path`, `data-preview-page-key` attributes
-- **Template Preview Focus Bridge:** Real-time visual editing synchronization (123KB — the largest file in Fivora)
-- **Universal Template Theme:** Theme system with palette management
-- **Site Instance Management:** Creates and manages individual merchant sites
-- **Developer Guide:** Fivora maintains a 159KB developer template guide for template developers
-- **CI/CD:** GitHub Actions → CapRover deployment
-
-### 6.4 Platform-Controlled Fields (Deneb Must Respect)
-
-These fields are managed by Fivora and must NOT have visual editing markers:
-- `__fivoraIntake.*` (tone, language, business summary, reference URL)
-- `additionalPages[*].id`, `additionalPages[*].route`
-- `common.*` (currency, whatsapp, email, address, contact, hours, newsletter)
-- `contact.*` (phone, map link, whatsapp)
-- `products[*].id`, `products[*].isAvailable`, `products[*].measurement`, `products[*].unit`, `products[*].currency`
-- `testimonials[*].id`, `categories[*].slug`, `services[*].id`
-- `about.collageImages[*].id`
+| Category | File | Description |
+|---|---|---|
+| **Pipeline Core** | `index.cjs` (47KB) | Main pipeline orchestrator, run phases, error handling |
+| | `scanner.cjs` (23KB) | Project scanning, framework detection, route identification |
+| | `ir-builder.cjs` (26KB) | Intermediate representation, component graph, data flows |
+| | `semantic.cjs` (48KB) | AST semantic analysis, candidate generation |
+| | `planner.cjs` (16KB) | Confidence scoring, transformation planning, path allocation |
+| | `manifest.cjs` (27KB) | Site data generation, `fivora-template.json` generator |
+| | `residual.cjs` (18KB) | Residual pass for uncovered visible text |
+| | `workspace.cjs` (8KB) | Transactional staging, commit, and atomic rollback |
+| **Transforms** | `transforms/element-transform.cjs` | Core JSX element transformation dispatcher |
+| | `transforms/transform-context.cjs` | Scoped transformation state and AST path management |
+| | `transforms/primitives/` | Sub-transforms for text, headings, badges, buttons, images |
+| | `transforms/collections/` | Sub-transforms for `.map()` loops and array bindings |
+| | `transforms/components/` | Custom component wrappers and prop mappings |
+| | `transforms/assets/` | Background images, SVG icons, static asset path normalization |
+| | `transforms/routing/` | Page key injection (`data-preview-page-key`) |
+| | `transforms/runtime/provider.cjs` | Layout instrumentation and `<SiteDataProvider>` mounting |
+| | `transforms/healing/sanitizer.cjs` | Marker sanitization, container cleanup, hook injection |
+| **Validation & Audit** | `fivora-contract.cjs` (29KB) | Exact port of Fivora platform ingest and validation rules |
+| | `acceptance-gates.cjs` (4KB) | 12-Gate acceptance evaluation |
+| | `validator.cjs` (8KB) | AST syntax check, duplicate marker check |
+| | `visual-regression.cjs` (6KB) | Visual preservation score across viewports |
+| | `interaction-verifier.cjs` (6KB) | Interactive element (modals, dropdowns, accordions) audit |
+| | `corpus-verifier.cjs` (10KB) | Multi-storefront batch verification |
+| **Data & Classification**| `data-classification.cjs` (6KB) | 7-tier data classification engine |
+| | `data-flow.cjs` (7KB) | Collection unrolling, destructuring resolution |
+| | `canonical-paths.cjs` (7KB) | Field path canonicalization and alias resolution |
+| | `field-paths.cjs` (7KB) | Semantic field path naming conventions |
+| **Architecture & RSC** | `rsc-boundary.cjs` (8KB) | Server/Client component boundary detection |
+| | `adapters/` (6KB) | UI library adapters (shadcn, Radix, Swiper, Embla, etc.) |
+| | `component-registry.cjs` (5KB) | Known component dictionary |
+| | `font-plan.cjs` (2KB) | Discovered font mapping to Google Fonts registry |
+| **AI & Self-Healing** | `ai-agent.cjs` (12KB) | Optional OpenAI agent for unknown component adaptation |
+| | `ai-evaluator.cjs` (18KB) | AI self-healing for AST and contract violations |
+| | `learning.cjs` (10KB) | Fingerprint experience recording and local boosting |
+| | `fuzz-engine.cjs` (18KB) | AST mutation fuzzing and compiler resilience testing |
+| | `explain-blocked.cjs` (15KB) | Remediation generator for blocked conversions |
 
 ---
 
-## 7. EXISTING DEMO STOREFRONTS
+## 7. QUESTIONS & ROADMAP FOR CHATGPT CONSULTATION
 
-The `deneb/` directory contains several demo storefronts that have been converted with ARC:
+Please review this document and provide concrete architectural recommendations, algorithm designs, and code-level patterns to address the following:
 
-| Storefront | Industry | Location |
-|-----------|----------|----------|
-| `car-sale` | Automotive sales | `deneb/car-sale/` |
-| `coffee` | Coffee shop | `deneb/coffee/` |
-| `mobile-shop` | Mobile phone sales | `deneb/mobile-shop/` |
-| `restu-web` | Restaurant | `deneb/restu-web/` |
-| `salon-web` | Beauty salon | `deneb/salon-web/` |
-| `shoe` | Shoe store | `deneb/shoe/` |
-| `ui` | Main documentation/demo site | `deneb/ui/` |
+### Question 1: How to Safely Elevate the 137 Skipped Candidates to 100% Coverage?
+- What heuristic or AST-pattern matching algorithm should ARC use to classify low-confidence candidates (currently `< 0.60`) so that banners, feature sections, and complex card layouts become fully editable without risking false positives?
+- How should we structure a multi-stage confidence elevation pass that analyzes parent context, sibling tags, and Tailwind classes to safely boost candidate certainty?
 
----
+### Question 2: How to Guarantee 100% Safe Hook & Scope Injection (`[DNB-SCP-001]`)?
+- What exact AST verification rules must `injectSiteDataHook` implement to guarantee it **NEVER**:
+  - Injects into Server Components or async functions?
+  - Injects into non-component utility functions (e.g. `getRequiredPages`)?
+  - Injects a duplicate identifier when a function parameter is already named `siteData`?
+  - Injects into the Root Layout component that mounts `<SiteDataProvider>`?
+- When a client component references `siteData`, how should ARC ensure `'use client'` is automatically added to the top of the file without disrupting comments or directives?
 
-## 8. CURRENT TECHNICAL DEBT & KNOWN LIMITATIONS
+### Question 3: How to Handle Complex Mixed Expressions Without Breaking JSX?
+- For complex JSX children like `<h1>Shop {collection.name} ({count} items)</h1>`, what is the best algorithm to:
+  - Option A: Wrap individual literal text fragments in discrete `<span data-preview-field-path="...">` elements?
+  - Option B: Lift the entire expression into a formatted template string in `site-data.json` with token interpolation?
+  - What are the tradeoffs in Fivora's visual editor?
 
-1. **transformer.cjs is 2,752 lines / 101KB** — The largest single file, increasingly difficult to maintain
-2. **CJS modules** — The ARC engine uses CommonJS (.cjs), not ESM
-3. **No unit tests per module** — Only one monolithic 116KB test file for the entire ARC engine
-4. **No TypeScript in ARC** — The ARC engine is all plain JavaScript (.cjs files)
-5. **Template support limited to Next.js** — No Vite/Remix/Astro template support
-6. **Recipe system (v2) is minimal** — Only basic recipe matching, needs more industry-specific recipes
-7. **Adapter system** — Works well for known libraries but struggles with custom component libraries
-8. **AI Agent** — Dependent on OpenAI API key, no fallback LLM support
-9. **No hot-reload support** in template lab
-10. **Font system** — Limited to Google Fonts, no custom font upload
+### Question 4: How to Auto-Harmonize the Schema Against Fivora Ingest Rules?
+- How can `manifest.cjs` guarantee that:
+  - No unsupported types (like `"currency"`, `"object"`, `"custom"`) are ever emitted into `editorSchema`?
+  - Field paths are globally unique across all sections (preventing duplicate path errors)?
+  - Dynamic and nested App Router routes (e.g. `src/app/products/[slug]/page.tsx` or `src/app/products/detail/page.tsx`) automatically receive valid `data-preview-page-key` attributes?
 
----
-
-## 9. WHAT TO DEVELOP NEXT — OPEN QUESTIONS FOR YOU
-
-Given the constraints (can only modify Deneb, cannot change Fivora-main), please advise on the following:
-
-### 9.1 Priority Features to Consider
-1. **More editable components** — What additional component types would increase template versatility?
-2. **Industry-specific recipe packs** — Should we create specialized recipes for restaurants, salons, e-commerce, etc.?
-3. **Framework expansion** — Should we support Vite, Remix, or Astro in addition to Next.js?
-4. **Transformer modularization** — Should we split the 2,752-line transformer.cjs into smaller modules?
-5. **TypeScript migration of ARC** — Should we rewrite ARC in TypeScript?
-6. **ESM migration** — Should we move from CJS to ESM modules?
-7. **Better testing strategy** — Should we split the monolithic test into per-module tests?
-8. **Plugin system for ARC** — Allow third-party adapter/recipe contributions?
-9. **More AI capabilities** — More AI-assisted template optimization? Different LLM support?
-10. **Performance optimization** — Is ARC fast enough for large projects?
-11. **Documentation** — What documentation improvements would help adoption?
-12. **Versioning strategy** — Should we move to semantic versioning with changelogs?
-13. **Editor/IDE integration** — VSCode extension for Deneb development?
-14. **Analytics/Telemetry** — Optional telemetry for understanding usage patterns?
-15. **New component categories** — Blog, portfolio, booking, real-estate, education?
-
-### 9.2 Questions I Need Help Answering
-- What is the **highest-impact feature** we should build next to increase adoption?
-- Are there **architectural improvements** that would make the codebase more maintainable?
-- Should we **prioritize breadth** (more components, more frameworks) or **depth** (better accuracy, more adapters)?
-- What **testing strategy** would give us the most confidence?
-- Are there **industry best practices** from similar tools (e.g., Builder.io, Framer, Webflow) we should learn from?
+### Question 5: What is the Optimal Architecture for ARC v3?
+- Given that `transformer.cjs` has now been modularized into `transforms/`, what further architectural decoupling or testing strategies should we adopt to ensure long-term maintainability?
+- Should the AST engine remain in CommonJS (`.cjs`) or is a TypeScript/ESM migration warranted?
 
 ---
 
-## 10. TECHNOLOGY STACK SUMMARY
-
-| Layer | Technology |
-|-------|-----------|
-| Language | JavaScript (CJS) + TypeScript |
-| Framework Support | Next.js (App Router + Pages Router) |
-| AST Parsing | `@babel/parser` + `recast` |
-| AI Integration | OpenAI API (GPT-4o-mini) |
-| Component Library | React 18/19, TypeScript |
-| Style Engine | CSS Variables, DOM patching |
-| Font System | Google Fonts registry |
-| Package Management | npm workspaces (monorepo) |
-| CI/CD | GitHub Actions |
-| Publishing | npm with provenance |
-| Testing | Node.js native test runner |
-| GitHub Automation | @octokit/rest |
-
----
-
-*This document was generated from the actual codebase at D:\OFFICE\deneb\core on September 24, 2026. All line counts, file sizes, and feature descriptions are based on the current state of the code.*
+*Document compiled and verified against D:\OFFICE\deneb\core on September 25, 2026. All package versions, file paths, test results, and empirical field findings reflect the live codebase state.*
