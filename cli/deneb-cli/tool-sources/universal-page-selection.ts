@@ -518,3 +518,28 @@ export function findLinksToUnselectedPages(input: {
   }
   return findings;
 }
+
+/**
+ * Next's client router applies next.config `basePath` automatically. Wrapping
+ * a router destination in a helper that also prepends the base path duplicates
+ * the generated-site prefix at runtime.
+ */
+export function findDoubleBasePathNextRouterCalls(source: string) {
+  const findings: Array<{ line: number; expression: string }> = [];
+  const patterns = [
+    /\b(?:router|navigation)\s*\.\s*(?:push|replace|prefetch)\s*\(\s*withBasePath\s*\(/g,
+    /<Link\b[^>]{0,500}?\bhref\s*=\s*\{\s*withBasePath\s*\(/g,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) {
+      const offset = match.index ?? 0;
+      findings.push({
+        line: source.slice(0, offset).split(/\r?\n/).length,
+        expression: match[0].replace(/\s+/g, ' ').trim(),
+      });
+    }
+  }
+
+  return findings;
+}

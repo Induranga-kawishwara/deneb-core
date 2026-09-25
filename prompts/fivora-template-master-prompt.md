@@ -154,9 +154,10 @@ COMPONENT REPLACEMENT RULES — FOLLOW WITHOUT EXCEPTION
 
 STATIC BUILD
 1. Configure output: 'export', trailingSlash, images.unoptimized: true, and basePath/assetPrefix from the manifest environment variable.
-2. Prefix local public assets and imperative navigation with the base path. Test a non-empty base path.
-3. Remove runtime-only APIs, Server Actions, middleware, ISR, runtime database calls, and ungenerated dynamic routes.
-4. Do not weaken TypeScript, lint, security, visual markers, or the manifest to force a green build.
+2. Next.js `<Link>` and `useRouter()` apply `next.config` `basePath` automatically. Pass logical routes directly (`router.push(pageRoute(pageKey))` or `<Link href={pageRoute(pageKey)}>`). Never wrap those destinations with `withBasePath(...)`; reserve that helper for `window.location` and local asset URLs.
+3. Prefix local public assets and imperative navigation with the base path. Test a non-empty base path.
+4. Remove runtime-only APIs, Server Actions, middleware, ISR, runtime database calls, and ungenerated dynamic routes.
+5. Do not weaken TypeScript, lint, security, visual markers, or the manifest to force a green build.
 
 PUBLISHED SEO AND TRACKING OWNERSHIP
 1. Render meaningful merchant content in semantic exported HTML. Use one descriptive page heading, logical heading levels, crawlable anchor links between selected pages, and accurate image alt text.
