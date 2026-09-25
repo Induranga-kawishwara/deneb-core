@@ -660,7 +660,7 @@ async function validateWorkspace(
       if (sourceBytes > MAX_SOURCE_BYTES) break;
       for (const finding of findDoubleBasePathNextRouterCalls(source)) {
         findings.push(
-          `${relativePath}:${finding.line} calls the Next client router with withBasePath(...).`,
+          `${relativePath}:${finding.line} passes an already base-path-prefixed destination to Next navigation: ${finding.expression}`,
         );
       }
     }
@@ -670,7 +670,7 @@ async function validateWorkspace(
         [
           'Template navigation validation failed before dependency installation.',
           ...findings.slice(0, 12).map((finding) => `- ${finding}`),
-          '- Next router.push/router.replace and <Link> already apply next.config basePath. Pass the route only, for example router.push(pageRoute(pageKey)) or <Link href={pageRoute(pageKey)}>; reserve withBasePath(...) for window.location and plain asset URLs.',
+          '- Next router.push/router.replace/router.prefetch and next/link already apply next.config basePath. Pass the route only, for example router.push(pageRoute(pageKey)) or <Link href={pageRoute(pageKey)}>; reserve base-path helpers for window.location and plain asset URLs.',
         ].join('\n'),
       );
     }

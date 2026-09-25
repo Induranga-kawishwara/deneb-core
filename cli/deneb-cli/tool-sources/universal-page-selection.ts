@@ -525,21 +525,201 @@ export function findLinksToUnselectedPages(input: {
  * the generated-site prefix at runtime.
  */
 export function findDoubleBasePathNextRouterCalls(source: string) {
-  const findings: Array<{ line: number; expression: string }> = [];
-  const patterns = [
-    /\b(?:router|navigation)\s*\.\s*(?:push|replace|prefetch)\s*\(\s*withBasePath\s*\(/g,
-    /<Link\b[^>]{0,500}?\bhref\s*=\s*\{\s*withBasePath\s*\(/g,
-  ];
+  const findings: Array<{
+    line: number;
+    expression: string;
+    offset: number;
+  }> = [];
+  const routerNames = new Set(['router', 'navigation']);
+  const routerHookNames = new Set(['useRouter']);
+  const linkNames = new Set(['Link']);
 
-  for (const pattern of patterns) {
-    for (const match of source.matchAll(pattern)) {
-      const offset = match.index ?? 0;
-      findings.push({
-        line: source.slice(0, offset).split(/\r?\n/).length,
-        expression: match[0].replace(/\s+/g, ' ').trim(),
-      });
+  const escapeRegExp = (value: string) =>
+    value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const compact = (value: string) => {
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    return normalized.length > 180
+      ? `${normalized.slice(0, 177)}...`
+      : normalized;
+  };
+  const readBalanced = (
+    start: number,
+    opening: '(' | '{',
+    closing: ')' | '}',
+  ) => {
+    let depth = 1;
+    let quote: "'" | '"' | '`' | null = null;
+    let escaped = false;
+    let lineComment = false;
+    let blockComment = false;
+
+    for (let index = start; index < source.length; index += 1) {
+      const character = source[index];
+      const nextCharacter = source[index + 1];
+
+      if (lineComment) {
+        if (character === '\n') lineComment = false;
+        continue;
+      }
+      if (blockComment) {
+        if (character === '*' && nextCharacter === '/') {
+          blockComment = false;
+          index += 1;
+        }
+        continue;
+      }
+      if (quote) {
+        if (escaped) {
+          escaped = false;
+        } else if (character === '\\') {
+          escaped = true;
+        } else if (character === quote) {
+          quote = null;
+        }
+        continue;
+      }
+      if (character === '/' && nextCharacter === '/') {
+        lineComment = true;
+        index += 1;
+        continue;
+      }
+      if (character === '/' && nextCharacter === '*') {
+        blockComment = true;
+        index += 1;
+        continue;
+      }
+      if (character === "'" || character === '"' || character === '`') {
+        quote = character;
+        continue;
+      }
+      if (character === opening) {
+        depth += 1;
+      } else if (character === closing) {
+        depth -= 1;
+        if (depth === 0) return source.slice(start, index);
+      }
+    }
+
+    return source.slice(start, Math.min(source.length, start + 4_000));
+  };
+  const containsBasePathReference = (expression: string) => {
+    const stripNonCode = (value: string) =>
+      value
+        .replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/g, ' ')
+        .replace(/`(?:\\.|[^`\\])*`/g, ' ')
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/\/\/[^\r\n]*/g, ' ');
+    const templateExpressions = [...expression.matchAll(/\$\{([\s\S]*?)\}/g)]
+      .map((match) => stripNonCode(match[1]))
+      .join(' ');
+    const codeOnly = stripNonCode(expression);
+    return /\b(?:[A-Za-z_$][\w$]*\s*\.\s*)*[A-Za-z_$][\w$]*(?:base_?path|path_?base)[\w$]*\b/i.test(
+      `${codeOnly} ${templateExpressions}`,
+    );
+  };
+  const addFinding = (offset: number, expression: string) => {
+    findings.push({
+      line: source.slice(0, offset).split(/\r?\n/).length,
+      expression: compact(expression),
+      offset,
+    });
+  };
+
+  for (const match of source.matchAll(
+    /\bimport\s*\{([^}]*)\}\s*from\s*['"]next\/(?:navigation|router)['"]/g,
+  )) {
+    for (const importedName of match[1].split(',')) {
+      const alias = importedName
+        .trim()
+        .match(/^useRouter(?:\s+as\s+([A-Za-z_$][\w$]*))?$/)?.[1];
+      if (alias) routerHookNames.add(alias);
     }
   }
 
-  return findings;
+  const hookAlternation = [...routerHookNames].map(escapeRegExp).join('|');
+  const routerAssignmentPattern = new RegExp(
+    `\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*(?::[^=;]+)?=\\s*(?:${hookAlternation})\\s*\\(`,
+    'g',
+  );
+  for (const match of source.matchAll(routerAssignmentPattern)) {
+    routerNames.add(match[1]);
+  }
+
+  for (const match of source.matchAll(
+    /\bimport\s+([^;]{0,300}?)\s+from\s*['"]next\/link['"]/g,
+  )) {
+    const importClause = match[1].trim();
+    const defaultImport = importClause.match(/^([A-Za-z_$][\w$]*)/i)?.[1];
+    if (defaultImport && defaultImport !== 'type') linkNames.add(defaultImport);
+    for (const namedImport of importClause.matchAll(
+      /\bdefault\s+as\s+([A-Za-z_$][\w$]*)/g,
+    )) {
+      linkNames.add(namedImport[1]);
+    }
+  }
+
+  for (const match of source.matchAll(
+    /\b([A-Za-z_$][\w$]*)\s*\.\s*(push|replace|prefetch)\s*\(/g,
+  )) {
+    const routerName = match[1];
+    if (
+      !routerNames.has(routerName) &&
+      !/(?:router|navigation)/i.test(routerName)
+    ) {
+      continue;
+    }
+    const destination = readBalanced(
+      (match.index ?? 0) + match[0].length,
+      '(',
+      ')',
+    );
+    if (containsBasePathReference(destination)) {
+      addFinding(
+        match.index ?? 0,
+        `${routerName}.${match[2]}(${destination})`,
+      );
+    }
+  }
+
+  const directHookCallPattern = new RegExp(
+    `\\b(?:${hookAlternation})\\s*\\(\\s*\\)\\s*\\.\\s*(push|replace|prefetch)\\s*\\(`,
+    'g',
+  );
+  for (const match of source.matchAll(directHookCallPattern)) {
+    const destination = readBalanced(
+      (match.index ?? 0) + match[0].length,
+      '(',
+      ')',
+    );
+    if (containsBasePathReference(destination)) {
+      addFinding(match.index ?? 0, `${match[0]}${destination})`);
+    }
+  }
+
+  const linkAlternation = [...linkNames].map(escapeRegExp).join('|');
+  const linkHrefPattern = new RegExp(
+    `<(${linkAlternation})\\b[^>]{0,2000}?\\bhref\\s*=\\s*\\{`,
+    'g',
+  );
+  for (const match of source.matchAll(linkHrefPattern)) {
+    const destination = readBalanced(
+      (match.index ?? 0) + match[0].length,
+      '{',
+      '}',
+    );
+    if (containsBasePathReference(destination)) {
+      addFinding(
+        match.index ?? 0,
+        `<${match[1]} href={${destination}}>`,
+      );
+    }
+  }
+
+  return findings
+    .sort((left, right) => left.offset - right.offset)
+    .filter(
+      (finding, index, ordered) =>
+        index === 0 || finding.offset !== ordered[index - 1].offset,
+    )
+    .map(({ line, expression }) => ({ line, expression }));
 }
