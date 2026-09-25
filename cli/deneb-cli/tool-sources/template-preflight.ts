@@ -586,11 +586,55 @@ async function validateWorkspace(
   }
 
   await reporter.step('Check required package files', async () => {
-    await access(join(sourceDir, 'package.json')).catch(() => {
+    const pkgPath = join(sourceDir, 'package.json');
+    await access(pkgPath).catch(() => {
       throw new Error(
         'Template package must contain package.json at ZIP root.',
       );
     });
+
+    let pkgJson: Record<string, unknown> | null = null;
+    try {
+      pkgJson = JSON.parse(await readFile(pkgPath, 'utf8')) as Record<string, unknown>;
+    } catch {
+      // Ignored here
+    }
+
+    const deps = {
+      ...((pkgJson?.dependencies as Record<string, string>) || {}),
+      ...((pkgJson?.devDependencies as Record<string, string>) || {}),
+    };
+    const isNext = Boolean(deps.next);
+
+    if (isNext) {
+      const notFoundCandidates = [
+        'src/app/not-found.tsx',
+        'src/app/not-found.jsx',
+        'src/app/not-found.js',
+        'app/not-found.tsx',
+        'app/not-found.jsx',
+        'app/not-found.js',
+        'src/pages/404.tsx',
+        'src/pages/404.jsx',
+        'src/pages/404.js',
+        'pages/404.tsx',
+        'pages/404.jsx',
+        'pages/404.js',
+      ];
+      const hasNotFound = await Promise.any(
+        notFoundCandidates.map(async (candidate) => {
+          await access(join(sourceDir, candidate));
+          return true;
+        }),
+      ).catch(() => false);
+
+      if (!hasNotFound) {
+        reporter.warn(
+          'Template is missing an explicit 404/not-found page (e.g. "src/app/not-found.tsx"). ' +
+            'In Next.js 15 static export, missing not-found.tsx causes Next.js to fall back to legacy "_error.js" and crash with "TypeError: Cannot read properties of null (reading \'useContext\')".',
+        );
+      }
+    }
   });
 
   const { contentDefaults, originalSiteData, siteDataPath } =
