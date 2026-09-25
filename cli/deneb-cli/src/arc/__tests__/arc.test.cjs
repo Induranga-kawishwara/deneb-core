@@ -32,7 +32,9 @@ test('DENEB preflight rejects a Next router destination with a duplicated base p
   fs.mkdirSync(componentDir, { recursive: true });
   fs.writeFileSync(
     path.join(componentDir, 'BrokenNavigation.tsx'),
-    "router.push(withBasePath(pageRoute('about')));\n"
+    "import { useRouter as useStorefrontRouter } from 'next/navigation';\n" +
+      'const storefrontNav = useStorefrontRouter();\n' +
+      "storefrontNav.replace(prefixBasePath(pageRoute('about')));\n"
   );
 
   try {
@@ -52,7 +54,7 @@ test('DENEB preflight rejects a Next router destination with a duplicated base p
       output,
       /Template navigation validation failed before dependency installation\./
     );
-    assert.match(output, /src\/components\/BrokenNavigation\.tsx:1/);
+    assert.match(output, /src\/components\/BrokenNavigation\.tsx:3/);
     assert.doesNotMatch(output, /Install dependencies/);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -3914,7 +3916,6 @@ test('ARC v3 Phase 18: formatBlockedExplanationTerminal renders actionable remed
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
-
 
 
 
