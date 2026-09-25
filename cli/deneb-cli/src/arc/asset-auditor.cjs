@@ -58,9 +58,10 @@ function auditProjectAssets(projectDir, siteData = {}) {
       return;
     }
 
-    // Must look like a path or filename (starts with / or has a file extension)
-    if (!trimmed.startsWith('/') && !/\.[a-zA-Z0-9]+$/.test(trimmed)) {
-      return;
+    // Must look like an asset file with a recognized media/font/file extension
+    const cleanPath = trimmed.split('?')[0].split('#')[0];
+    if (!/\.(png|jpe?g|svg|webp|gif|avif|ico|mp4|webm|pdf|woff2?|otf|ttf)$/i.test(cleanPath)) {
+      return; // Route path / navigation link, not a static public asset
     }
 
     // Normalize leading slash
@@ -88,8 +89,8 @@ function auditProjectAssets(projectDir, siteData = {}) {
       const fieldPath = currentPath ? `${currentPath}.${key}` : key;
       const lowerKey = key.toLowerCase();
       const isTextKey = lowerKey.includes('text') || lowerKey.includes('title') || lowerKey.includes('label') || lowerKey.includes('desc') || lowerKey.includes('alt') || lowerKey.includes('phone') || lowerKey.includes('whatsapp') || lowerKey.includes('email');
-      const isAssetKey = !isTextKey && (lowerKey.includes('image') || lowerKey.includes('logo') || lowerKey.includes('avatar') || lowerKey.includes('icon') || lowerKey.includes('src') || lowerKey.endsWith('url'));
-      const hasFileExt = typeof val === 'string' && /\.(png|jpe?g|svg|webp|gif|avif|ico|mp4|webm)$/i.test(val.trim());
+      const isAssetKey = !isTextKey && (lowerKey.includes('image') || lowerKey.includes('logo') || lowerKey.includes('avatar') || lowerKey.includes('icon') || lowerKey.includes('src') || lowerKey.includes('poster') || lowerKey.includes('thumb'));
+      const hasFileExt = typeof val === 'string' && /\.(png|jpe?g|svg|webp|gif|avif|ico|mp4|webm|pdf|woff2?|otf|ttf)$/i.test(val.trim().split('?')[0]);
 
       if (typeof val === 'string' && (isAssetKey || hasFileExt)) {
         checkAssetPath(val, `site-data.json -> ${fieldPath}`);

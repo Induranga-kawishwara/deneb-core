@@ -1085,6 +1085,7 @@ async function collectFiles(
   excludedPath?: string,
 ) {
   const ignoredDirectories = new Set([
+    '.deneb',
     '.git',
     '.next',
     '.turbo',
@@ -1120,12 +1121,19 @@ async function clearGeneratedBuildArtifacts(
 ) {
   const outputPath = resolveWithin(sourceDir, outputDirectory);
   if (outputPath !== resolve(sourceDir)) {
-    await rm(outputPath, { recursive: true, force: true });
+    await rm(outputPath, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200,
+    });
   }
   for (const relativePath of ['.next', '.turbo']) {
     await rm(resolveWithin(sourceDir, relativePath), {
       recursive: true,
       force: true,
+      maxRetries: 5,
+      retryDelay: 200,
     });
   }
 }
