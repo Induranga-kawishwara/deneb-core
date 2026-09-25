@@ -285,10 +285,9 @@ function collectFieldsFromPlan(plan) {
         fields.push({ path: t.highlightField, type: 'text', value: t.highlightFallback });
       }
       if (t.operation === 'bind-highlighted-heading' && t.field) {
-        const highlightFrag = (t.fragments || []).find((f) => f.type === 'span' || f.type === 'format');
-        if (highlightFrag) {
-          fields.push({ path: `${t.field}Highlight`, type: 'text', value: highlightFrag.text });
-        }
+        const highlightFrag = (t.fragments || []).find((f) => f.type === 'span' || f.type === 'format' || f.type === 'inline-format' || f.tag === 'span');
+        const highlightVal = highlightFrag ? (highlightFrag.text || 'Highlight') : (t.highlightFallback || 'Highlight');
+        fields.push({ path: `${t.field}Highlight`, type: 'text', value: highlightVal });
       }
       if (t.propTransforms) {
         for (const [propName, propInfo] of Object.entries(t.propTransforms)) {

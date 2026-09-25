@@ -104,15 +104,29 @@ function analyzeBlockedProject(targetDir = process.cwd(), options = {}) {
   let manifestRaw = '';
 
   if (!fs.existsSync(manifestPath)) {
-    findings.push({
-      ruleId: 'MISSING_MANIFEST',
-      category: 'FIVORA_CONTRACT',
-      severity: 'BLOCKING',
-      file: 'fivora-template.json',
-      line: 1,
-      message: 'fivora-template.json is missing in project root.',
-      remediation: "Run 'npx @deneb-ui/cli init' to generate the mandatory Fivora template manifest.",
-    });
+    if (runReasons.length > 0) {
+      for (const reason of runReasons) {
+        findings.push({
+          ruleId: 'ROLLBACK_TRIGGERED',
+          category: 'FIVORA_CONTRACT',
+          severity: 'BLOCKING',
+          file: 'fivora-template.json',
+          line: 1,
+          message: `Conversion failed and rolled back: ${reason}`,
+          remediation: 'Resolve the contract/asset issues in your template source code, then run init again.',
+        });
+      }
+    } else {
+      findings.push({
+        ruleId: 'MISSING_MANIFEST',
+        category: 'FIVORA_CONTRACT',
+        severity: 'BLOCKING',
+        file: 'fivora-template.json',
+        line: 1,
+        message: 'fivora-template.json is missing in project root.',
+        remediation: "Run 'npx @deneb-ui/cli init' to generate the mandatory Fivora template manifest.",
+      });
+    }
   } else {
     try {
       manifestRaw = fs.readFileSync(manifestPath, 'utf8');

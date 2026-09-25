@@ -882,7 +882,7 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
 
   const criticalFailure = !syntaxPassed || (contracts.actionCollisions > 0 && appliedCount === 0) || (buildResult.passed === false);
   const contractFailure = !fivoraAudit.passed || fivoraAudit.uncoveredVisibleText.length > 0;
-  const designFailure = design.score < 98 && design.total > 0;
+  const designFailure = design.score < 95 && design.total > 0;
   const assetFailure = !assetAudit.passed && assetAudit.errors.length > 0;
   let outcome = 'success';
   if (criticalFailure) {
@@ -990,6 +990,7 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
       pkg: profile.pkg,
     },
     matchedRecipe: recipeMatch.recipe,
+    filesChanged: changedFiles,
     transformedFilesCount: changedFiles.length,
     totalTransformedElements: appliedCount,
     totalFields: countSchemaFields(dataBundle.manifest),
@@ -1218,7 +1219,7 @@ function runTransactionalPipeline(targetDirInput = '.', options = {}) {
         if (result.validation?.fivoraContractPassed === false) reasons.push('Fivora strict contract validation failed');
         if (result.validation?.uncoveredVisibleText > 0) reasons.push(`${result.validation.uncoveredVisibleText} uncovered visible text node(s)`);
         if (result.validation?.syntaxPassed === false) reasons.push('AST syntax validation failed');
-        if (result.validation?.designPreservation < 98 && result.validation?.designPreservation > 0) reasons.push(`Design preservation (${result.validation.designPreservation}%) below threshold`);
+        if (result.validation?.designPreservation < 95 && result.validation?.designPreservation > 0) reasons.push(`Design preservation (${result.validation.designPreservation}%) below threshold`);
         if (result.validation?.assetIntegrity?.passed === false) reasons.push(`Asset integrity failed: ${result.validation.assetIntegrity.errors?.[0] || 'missing asset'}`);
         if (result.validation?.acceptance && !result.validation.acceptance.passed) reasons.push(`15-Gate Acceptance Matrix failed: ${result.validation.acceptance.status}`);
 

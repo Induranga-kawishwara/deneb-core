@@ -87,7 +87,7 @@ function injectDualModeTheme(ast, jsonIdent, providerImport = '@deneb-ui/ui') {
   if (!hasThemeStyles) {
     let stylesInjected = false;
     const snippet = parseSource(
-      `<ThemeStyles theme={${jsonIdent}?.template?.structure?.theme || ${jsonIdent}?.theme} enableDualMode />`,
+      `<ThemeStyles theme={(${jsonIdent} as any)?.template?.structure?.theme || (${jsonIdent} as any)?.theme} enableDualMode />`,
       'snippet.tsx'
     );
     const stylesEl = snippet.program.body[0].expression;
