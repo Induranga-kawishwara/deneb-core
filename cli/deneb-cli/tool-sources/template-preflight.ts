@@ -49,6 +49,7 @@ import {
   type TemplateVisualEditingArtifact,
 } from '../src/common/template-visual-edit-contract';
 import {
+  findDoubleBasePathNextRouterCalls,
   findLinksToUnselectedPages,
   getTemplateValidationSelectedPages,
   normalizeTemplatePageDefinitions,
@@ -634,6 +635,44 @@ async function validateWorkspace(
             'In Next.js 15 static export, missing not-found.tsx causes Next.js to fall back to legacy "_error.js" and crash with "TypeError: Cannot read properties of null (reading \'useContext\')".',
         );
       }
+    }
+  });
+
+  await reporter.step('Validate client navigation source', async () => {
+    const sourceFiles = await collectFiles(
+      sourceDir,
+      /\.(?:[cm]?[jt]sx?)$/i,
+      resolveWithin(sourceDir, manifest.outputDirectory?.trim() || 'out'),
+    );
+    const findings: string[] = [];
+    let sourceBytes = 0;
+
+    for (const filePath of sourceFiles.slice(0, MAX_SOURCE_FILES)) {
+      const relativePath = relative(sourceDir, filePath).split(sep).join('/');
+      if (
+        relativePath === 'template-authoring-kit' ||
+        relativePath.startsWith('template-authoring-kit/')
+      ) {
+        continue;
+      }
+      const source = await readFile(filePath, 'utf8');
+      sourceBytes += Buffer.byteLength(source);
+      if (sourceBytes > MAX_SOURCE_BYTES) break;
+      for (const finding of findDoubleBasePathNextRouterCalls(source)) {
+        findings.push(
+          `${relativePath}:${finding.line} calls the Next client router with withBasePath(...).`,
+        );
+      }
+    }
+
+    if (findings.length > 0) {
+      throw new Error(
+        [
+          'Template navigation validation failed before dependency installation.',
+          ...findings.slice(0, 12).map((finding) => `- ${finding}`),
+          '- Next router.push/router.replace and <Link> already apply next.config basePath. Pass the route only, for example router.push(pageRoute(pageKey)) or <Link href={pageRoute(pageKey)}>; reserve withBasePath(...) for window.location and plain asset URLs.',
+        ].join('\n'),
+      );
     }
   });
 

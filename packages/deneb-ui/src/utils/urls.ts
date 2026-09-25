@@ -157,7 +157,13 @@ export function isSafeExternalLink(url?: string | null): boolean {
 }
 
 /**
- * Resolves static assets and routes with subpath prefix support (e.g. Fivora preview lab).
+ * Resolves static assets and plain browser URLs with subpath prefix support
+ * (e.g. Fivora preview lab).
+ *
+ * Do not pass this result to Next.js `<Link>`, `router.push`,
+ * `router.replace`, or `router.prefetch`; Next applies `basePath` to those
+ * destinations automatically. Use this helper for local asset URLs and direct
+ * `window.location` navigation only.
  */
 export function withBasePath(value?: string | null): string {
   const url = value?.trim() ?? '';

@@ -21,6 +21,44 @@ const { classifyActionIntent } = require('../adapters.cjs');
 const { validateGeneratedCode } = require('../ai-agent.cjs');
 const { auditRuntimeIntegrity, healRuntimeIntegrity, runAiEvaluatorPipeline } = require('../ai-evaluator.cjs');
 
+test('DENEB preflight rejects a Next router destination with a duplicated base path before install', () => {
+  const starter = path.resolve(
+    __dirname,
+    '../../../../../packages/create-template/template'
+  );
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deneb-navigation-preflight-'));
+  fs.cpSync(starter, tempDir, { recursive: true });
+  const componentDir = path.join(tempDir, 'src', 'components');
+  fs.mkdirSync(componentDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(componentDir, 'BrokenNavigation.tsx'),
+    "router.push(withBasePath(pageRoute('about')));\n"
+  );
+
+  try {
+    const validator = path.resolve(
+      __dirname,
+      '../../tools/deneb-template-validator.cjs'
+    );
+    const result = require('node:child_process').spawnSync(
+      process.execPath,
+      [validator, 'validate', tempDir, '--skip-install', '--skip-build'],
+      { encoding: 'utf8' }
+    );
+    const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+
+    assert.equal(result.status, 1);
+    assert.match(
+      output,
+      /Template navigation validation failed before dependency installation\./
+    );
+    assert.match(output, /src\/components\/BrokenNavigation\.tsx:1/);
+    assert.doesNotMatch(output, /Install dependencies/);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test('field-paths recognizes list action CTA keys', () => {
   assert.equal(isListActionCtaKey('preOrderCta'), true);
   assert.equal(isListActionCtaKey('addToTrayCta'), true);
@@ -3876,7 +3914,6 @@ test('ARC v3 Phase 18: formatBlockedExplanationTerminal renders actionable remed
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
-
 
 
 
