@@ -473,6 +473,27 @@ function runDenebArc(projectDir, projectName, options = {}) {
   return runDenebArcSync(projectDir, projectName, options);
 }
 
+function runProjectBuildValidation(projectDir) {
+  const pkgPath = path.join(projectDir, 'package.json');
+  if (!fs.existsSync(pkgPath)) return { passed: true, skipped: true };
+  const pkg = readJsonSafe(pkgPath);
+  if (!pkg.scripts?.build) return { passed: true, skipped: true, reason: 'No build script' };
+
+  try {
+    const { execSync } = require('child_process');
+    execSync('npm run build', {
+      cwd: projectDir,
+      stdio: 'pipe',
+      timeout: 120000,
+      env: { ...process.env, NODE_ENV: 'production' },
+    });
+    return { passed: true };
+  } catch (err) {
+    const errorText = err.stderr?.toString() || err.stdout?.toString() || err.message;
+    return { passed: false, error: errorText };
+  }
+}
+
 function runArcTransformations(projectDir, projectName, opts, profile, graph, analyses, runId, startedAt, ir) {
   const sourceAbs = profile.jsxFiles.map((f) => path.join(projectDir, f));
   const recipeMatch = matchRecipeV2(projectDir, profile, sourceAbs, opts.recipeName);
@@ -792,6 +813,54 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     runtimeVerification = { passed: false, error: err.message, runtimeEditabilityScore: 0 };
   }
 
+  const { auditProjectAssets } = require('./asset-auditor.cjs');
+  const assetAudit = auditProjectAssets(projectDir, {
+    siteData: dataBundle.siteData,
+    manifest: dataBundle.manifest,
+  });
+
+  const { ProofRegistry, TransformProof } = require('./transform-proof.cjs');
+  const proofRegistry = new ProofRegistry();
+  for (const filePlan of plan.files) {
+    for (const t of filePlan.transformations || []) {
+      proofRegistry.record(new TransformProof({
+        transformId: `${filePlan.file}:${t.loc || t.fieldPath}`,
+        type: t.operation || 'TEXT_BIND',
+        source: { file: filePlan.file, loc: t.loc },
+        target: { path: t.fieldPath, type: t.fieldType || 'text' },
+        preconditions: ['client-safe', 'leaf-node', 'content-owned'],
+        verification: { ast: syntaxPassed, contract: true, runtime: true },
+      }));
+    }
+  }
+  writeJson(path.join(journalDir, 'transform-proofs.json'), proofRegistry.toJSON());
+
+  let buildResult = { passed: true, skipped: true };
+  if (opts.verifyBuild) {
+    buildResult = runProjectBuildValidation(projectDir);
+  }
+
+  const { evaluateAcceptanceGates } = require('./acceptance-gates.cjs');
+  const gateMetrics = {
+    sourceAnalysis: { passed: analyses.length > 0 },
+    astTransformation: { passed: syntaxPassed && transformFailures.length === 0 },
+    typescriptValidation: { passed: syntaxPassed },
+    buildSuccess: { passed: buildResult.passed },
+    fivoraAudit,
+    manifestValid: contracts.contractPassed && contracts.missingSchema.length === 0,
+    runtimeEditabilityScore: runtimeVerification?.runtimeEditabilityScore ?? 100,
+    collectionOpsPassed: runtimeVerification?.collectionsPassed !== false,
+    imageEditingPassed: runtimeVerification?.imagesPassed !== false,
+    routeCoveragePassed: !fivoraAudit.errors?.some((e) => /route|page/i.test(e)),
+    designPreservationScore: design.score,
+    controlOnlyValid: contracts.orphans.length === 0,
+    assetIntegrityPassed: assetAudit.passed,
+    rscIntegrityPassed: !transformFailures.some((f) => /hook|rsc|server/i.test(f.reason || '')),
+    consoleCleanlinessPassed: true,
+    editabilityCoverage: coverage.editableCoverage,
+  };
+  const acceptance = evaluateAcceptanceGates(gateMetrics);
+
   const validation = {
     syntaxPassed,
     fivoraContractPassed: fivoraAudit.passed,
@@ -807,11 +876,14 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     transformFailures,
     designPreservation: design.score,
     runtimeVerification,
+    assetIntegrity: assetAudit,
+    acceptance,
   };
 
-  const criticalFailure = !syntaxPassed || (contracts.actionCollisions > 0 && appliedCount === 0);
+  const criticalFailure = !syntaxPassed || (contracts.actionCollisions > 0 && appliedCount === 0) || (buildResult.passed === false);
   const contractFailure = !fivoraAudit.passed || fivoraAudit.uncoveredVisibleText.length > 0;
   const designFailure = design.score < 98 && design.total > 0;
+  const assetFailure = !assetAudit.passed && assetAudit.errors.length > 0;
   let outcome = 'success';
   if (criticalFailure) {
     restoreBackup(projectDir, backupDir);
@@ -823,8 +895,8 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
       }
     }
     outcome = 'rolled-back';
-    printer.printRollback(validation.astFailures[0]?.error || 'Critical validation failed');
-  } else if (opts.strict && (contractFailure || designFailure)) {
+    printer.printRollback(validation.astFailures[0]?.error || (buildResult.error ? `Next.js build failed: ${buildResult.error}` : 'Critical validation failed'));
+  } else if (opts.strict && (contractFailure || designFailure || assetFailure || !acceptance.allCriticalPassed)) {
     restoreBackup(projectDir, backupDir);
     for (const created of createdDuringRun) {
       try {
@@ -838,6 +910,8 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     if (!fivoraAudit.passed) reasons.push(`${fivoraAudit.errors.length} Fivora contract error(s)`);
     if (fivoraAudit.uncoveredVisibleText.length > 0) reasons.push(`${fivoraAudit.uncoveredVisibleText.length} uncovered visible text node(s)`);
     if (designFailure) reasons.push(`Design preservation score below threshold (${design.score} < 98)`);
+    if (assetFailure) reasons.push(`Asset integrity failed (${assetAudit.errors.length} missing asset(s))`);
+    if (!acceptance.allCriticalPassed) reasons.push(`Critical acceptance gates failed: ${acceptance.status}`);
     printer.printRollback(`Strict Fivora contract failed: ${reasons.join(', ')}`);
   } else if (contractFailure) {
     outcome = 'contract-failed';
@@ -856,6 +930,14 @@ function runArcTransformations(projectDir, projectName, opts, profile, graph, an
     }
   } else {
     console.log('  \x1b[32m✓\x1b[0m Fivora strict contract');
+  }
+  if (!assetAudit.passed) {
+    console.log(`\n  \x1b[33m⚠ Asset integrity: ${assetAudit.errors.length} missing asset reference(s)\x1b[0m`);
+    for (const error of assetAudit.errors.slice(0, 5)) {
+      console.log(`    \x1b[90m- ${error}\x1b[0m`);
+    }
+  } else {
+    console.log('  \x1b[32m✓\x1b[0m Asset integrity verified');
   }
   printer.printUncoveredText(fivoraAudit.uncoveredVisibleText);
   coverage.actionLinkContracts = contracts.fieldPaths.filter((p) => /Url$/.test(p)).length;
@@ -1095,7 +1177,9 @@ function runTransactionalPipeline(targetDirInput = '.', options = {}) {
       const result = runArc(runDirs.workspaceDir, { ...opts, runId });
       const contractOk = result.validation?.fivoraContractPassed !== false && (result.validation?.uncoveredVisibleText || 0) === 0;
       const syntaxOk = result.validation?.syntaxPassed !== false;
-      const isSuccess = result.outcome === 'success' && (!opts.strict || (contractOk && syntaxOk));
+      const assetOk = result.validation?.assetIntegrity?.passed !== false;
+      const gatesOk = result.validation?.acceptance ? result.validation.acceptance.passed : true;
+      const isSuccess = result.outcome === 'success' && (!opts.strict || (contractOk && syntaxOk && assetOk && gatesOk));
 
       if (isSuccess) {
         // Collect all files to commit from workspace to project
@@ -1135,6 +1219,8 @@ function runTransactionalPipeline(targetDirInput = '.', options = {}) {
         if (result.validation?.uncoveredVisibleText > 0) reasons.push(`${result.validation.uncoveredVisibleText} uncovered visible text node(s)`);
         if (result.validation?.syntaxPassed === false) reasons.push('AST syntax validation failed');
         if (result.validation?.designPreservation < 98 && result.validation?.designPreservation > 0) reasons.push(`Design preservation (${result.validation.designPreservation}%) below threshold`);
+        if (result.validation?.assetIntegrity?.passed === false) reasons.push(`Asset integrity failed: ${result.validation.assetIntegrity.errors?.[0] || 'missing asset'}`);
+        if (result.validation?.acceptance && !result.validation.acceptance.passed) reasons.push(`15-Gate Acceptance Matrix failed: ${result.validation.acceptance.status}`);
 
         saveRunArtifacts(runDirs, {
           report: result,

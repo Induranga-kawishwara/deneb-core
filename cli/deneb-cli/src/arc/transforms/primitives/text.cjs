@@ -7,9 +7,25 @@ const {
 } = require('../../ast.cjs');
 
 function replaceTextChildren(node, fieldPath, fallback, fieldType) {
+  const children = node.children || [];
+  const hasDynamicExpr = children.some(
+    (c) =>
+      c &&
+      c.type === 'JSXExpressionContainer' &&
+      c.expression &&
+      c.expression.type !== 'StringLiteral' &&
+      c.expression.type !== 'Literal'
+  );
+
+  // If there are dynamic runtime expressions, preserve them and wrap the static literal text
+  if (hasDynamicExpr) {
+    wrapLiteralTextChildren(node, fieldPath, fallback);
+    return;
+  }
+
   const nextChildren = [];
   let replaced = false;
-  for (const child of node.children || []) {
+  for (const child of children) {
     if (!child) continue;
     if (child.type === 'JSXText' && child.value.replace(/\s+/g, '').length) {
       nextChildren.push(b.jsxExpressionContainer(siteDataBinding(fieldPath.split('.'), fallback, fieldType)));
@@ -35,7 +51,7 @@ function replaceTextChildren(node, fieldPath, fallback, fieldType) {
 
 /**
  * Replaces literal text children with an editable <span>, leaving the container
- * element and every one of its classes untouched.
+ * element, icons, and dynamic expressions untouched.
  */
 function wrapLiteralTextChildren(node, fieldPath, fallback) {
   const nextChildren = [];

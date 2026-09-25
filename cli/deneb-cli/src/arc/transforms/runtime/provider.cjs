@@ -77,11 +77,24 @@ function functionReferencesSiteData(fn) {
   return found;
 }
 
-function injectSiteDataHook(ast) {
+const {
+  SCOPE_STATUS,
+  classifySiteDataRequirement,
+} = require('./site-data-scope.cjs');
+
+function injectSiteDataHook(ast, filePath = 'file.tsx', options = {}) {
   let injected = false;
   let anyFunctionReferencedSiteData = false;
   let alreadyHasUseSiteData = false;
 
+  const fileContext = {
+    filePath,
+    isServerComponent: options.isServerComponent ?? false,
+    isClientComponent: options.isClientComponent ?? false,
+    mountsProvider: options.mountsProvider ?? false,
+  };
+
+  // Inspect file-level AST properties
   recast.types.visit(ast, {
     visitCallExpression(pathNode) {
       if (pathNode.node.callee && pathNode.node.callee.name === 'useSiteData') {
@@ -90,13 +103,35 @@ function injectSiteDataHook(ast) {
       }
       this.traverse(pathNode);
     },
+    visitJSXElement(pathNode) {
+      const opening = pathNode.node.openingElement;
+      if (opening && opening.name) {
+        const name = opening.name.name;
+        if (name === 'SiteDataProvider' || name === 'BaseSiteDataProvider' || name === 'DenebDataProvider') {
+          fileContext.mountsProvider = true;
+        }
+      }
+      this.traverse(pathNode);
+    },
   });
 
-  function injectIntoFunction(fn) {
+  // If this file mounts SiteDataProvider, consumer hook injection is forbidden
+  if (fileContext.mountsProvider) {
+    return false;
+  }
+
+  function injectIntoFunction(fn, fnName) {
     if (!fn || !fn.body || fn.body.type !== 'BlockStatement') return false;
+
+    const requirement = classifySiteDataRequirement(fn, fnName, fileContext);
+    if (requirement !== SCOPE_STATUS.HOOK_SAFE) {
+      return false;
+    }
+
     const body = fn.body.body;
     const already = body.some((stmt) => recast.print(stmt).code.includes('useSiteData'));
     if (already) return false;
+
     const hook = b.variableDeclaration('const', [
       b.variableDeclarator(
         b.identifier('siteData'),
@@ -108,40 +143,45 @@ function injectSiteDataHook(ast) {
     return true;
   }
 
-  // Pass 1: Inject useSiteData() into EVERY component function that references siteData
+  // Pass 1: Inject useSiteData() into component functions that reference siteData
   recast.types.visit(ast, {
     visitFunctionDeclaration(pathNode) {
+      const name = pathNode.node.id ? pathNode.node.id.name : null;
       if (functionReferencesSiteData(pathNode.node)) {
         anyFunctionReferencedSiteData = true;
-        if (injectIntoFunction(pathNode.node)) injected = true;
+        if (injectIntoFunction(pathNode.node, name)) injected = true;
       }
       this.traverse(pathNode);
     },
     visitFunctionExpression(pathNode) {
+      const parent = pathNode.parent && pathNode.parent.node;
+      const name = parent && parent.type === 'VariableDeclarator' && parent.id ? parent.id.name : null;
       if (functionReferencesSiteData(pathNode.node)) {
         anyFunctionReferencedSiteData = true;
-        if (injectIntoFunction(pathNode.node)) injected = true;
+        if (injectIntoFunction(pathNode.node, name)) injected = true;
       }
       this.traverse(pathNode);
     },
     visitArrowFunctionExpression(pathNode) {
+      const parent = pathNode.parent && pathNode.parent.node;
+      const name = parent && parent.type === 'VariableDeclarator' && parent.id ? parent.id.name : null;
       if (functionReferencesSiteData(pathNode.node)) {
         anyFunctionReferencedSiteData = true;
-        if (injectIntoFunction(pathNode.node)) injected = true;
+        if (injectIntoFunction(pathNode.node, name)) injected = true;
       }
       this.traverse(pathNode);
     },
   });
 
-  // Pass 2: If no component references siteData yet (e.g. before subsequent AST edits),
-  // ensure the primary component receives useSiteData()
+  // Pass 2: If no component references siteData yet, ensure the primary component receives useSiteData()
   if (!injected && !anyFunctionReferencedSiteData && !alreadyHasUseSiteData) {
     recast.types.visit(ast, {
       visitExportDefaultDeclaration(pathNode) {
         if (injected) return false;
         const decl = pathNode.node.declaration;
         if (decl && (decl.type === 'FunctionDeclaration' || decl.type === 'ArrowFunctionExpression' || decl.type === 'FunctionExpression')) {
-          injected = injectIntoFunction(decl);
+          const name = decl.id ? decl.id.name : 'DefaultExport';
+          injected = injectIntoFunction(decl, name);
         }
         this.traverse(pathNode);
       },
@@ -149,7 +189,7 @@ function injectSiteDataHook(ast) {
         if (injected) return false;
         const name = pathNode.node.id && pathNode.node.id.name;
         if (name && /^[A-Z]/.test(name)) {
-          injected = injectIntoFunction(pathNode.node);
+          injected = injectIntoFunction(pathNode.node, name);
           return false;
         }
         this.traverse(pathNode);
@@ -159,20 +199,10 @@ function injectSiteDataHook(ast) {
         const id = pathNode.node.id;
         const init = pathNode.node.init;
         if (id && id.type === 'Identifier' && /^[A-Z]/.test(id.name) && init && (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression')) {
-          injected = injectIntoFunction(init);
+          injected = injectIntoFunction(init, id.name);
           return false;
         }
         this.traverse(pathNode);
-      },
-    });
-  }
-
-  if (!injected && !anyFunctionReferencedSiteData && !alreadyHasUseSiteData) {
-    recast.types.visit(ast, {
-      visitFunctionDeclaration(pathNode) {
-        if (injected) return false;
-        injected = injectIntoFunction(pathNode.node);
-        return false;
       },
     });
   }

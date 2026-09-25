@@ -6,6 +6,7 @@ const { classifyHref } = require('./adapters.cjs');
 const { loadFingerprintBoost } = require('./learning.cjs');
 const { appendStyleBindTransforms } = require('./style-candidates.cjs');
 const { classifyDataCandidate, isEditableClassification } = require('./data-classification.cjs');
+const { recoverCandidateConfidence } = require('./confidence-recovery.cjs');
 
 function recipeBoost(candidate, recipe) {
   if (!recipe) return 0;
@@ -44,10 +45,21 @@ function planTransformations({ profile, analyses, recipe, ir }) {
         });
         continue;
       }
-      const confidence = Math.min(
+      let confidence = Math.min(
         0.99,
         (candidate.confidence || 0) + recipeBoost(candidate, recipe) + (fingerprintHint.boost || 0),
       );
+
+      // Multi-stage recovery pass for low-confidence candidates (< 0.60)
+      let recovered = false;
+      if (confidence < CONFIDENCE.VALIDATE && !candidate.skip) {
+        const rec = recoverCandidateConfidence(candidate);
+        if (rec.recovered) {
+          confidence = rec.confidence;
+          recovered = true;
+        }
+      }
+
       const dataClass = classifyDataCandidate(candidate, {
         file: candidate.file,
         componentName: candidate.componentName,

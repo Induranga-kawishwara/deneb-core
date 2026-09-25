@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const { readJsonSafe, writeJson, deepMerge, isPlainObject } = require('./fs-utils.cjs');
 const { ARC_VERSION, SCHEMA_VERSION } = require('./version.cjs');
@@ -12,6 +13,7 @@ const {
   canonicalizeMarkerPath,
   wildcardPath,
 } = require('./fivora-contract.cjs');
+const { sanitizeEditorSections } = require('./fivora-schema-authority.cjs');
 
 function pruneUnboundLeaves(content, isBound) {
   function walk(node, path) {
@@ -322,14 +324,24 @@ function collectStylesFromPlan(plan, existingStyles) {
   return styles;
 }
 
-function baseContent(projectName, routes) {
+function baseContent(projectName, routes, projectDir) {
   const navLabels = {};
   for (const page of routes) navLabels[page.id] = page.label || page.id;
+  let logoUrl = '';
+  if (projectDir) {
+    const candidates = ['logo.svg', 'logo.png', 'logo-dark.svg', 'icon.svg', 'icon.png', 'fivora-logo.png'];
+    for (const cand of candidates) {
+      if (fs.existsSync(path.join(projectDir, 'public', cand))) {
+        logoUrl = `/${cand}`;
+        break;
+      }
+    }
+  }
   return {
     common: {
       websiteTitle: projectName,
       shortDescription: `A high-converting storefront built for the Fivora platform.`,
-      logoUrl: '/fivora-logo.png',
+      logoUrl,
       headerCtaLabel: 'Contact Us',
       copyright: `© ${new Date().getFullYear()} ${projectName}. All rights reserved.`,
       navLabels,
@@ -519,7 +531,7 @@ function buildSiteDataAndManifest({
       ...(r.required ? { required: true } : {}),
     }));
 
-  const content = baseContent(projectName, routes);
+  const content = baseContent(projectName, routes, projectDir);
 
   // Recipes may hint schema shape, but must not dump another storefront's content
   // into an unrelated project. Extracted values always win.
@@ -678,7 +690,7 @@ function buildSiteDataAndManifest({
     pages: routes,
     editorSchema: {
       version: 1,
-      sections: editorSections,
+      sections: sanitizeEditorSections(editorSections),
     },
   };
 

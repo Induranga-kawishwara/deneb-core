@@ -27,11 +27,9 @@ function inferPageKey(relativeFile) {
  * rather than being guessed from the filename — Pages Router uses
  * `pages/contact.jsx`, App Router uses `app/contact/page.tsx`.
  *
- * `<main>` is preferred, but any project shape is supported by falling back to
- * the outermost element the page component returns.
+ * <main> is preferred, then any host element (div/section), then any root component element.
  */
 function instrumentPageKey(code, relativeFile, pageKey) {
-  if (code.includes('data-preview-page-key')) return { code, updated: false };
   const key = pageKey || inferPageKey(relativeFile);
 
   let ast;
@@ -41,40 +39,61 @@ function instrumentPageKey(code, relativeFile, pageKey) {
     return { code, updated: false };
   }
 
-  const attribute = () =>
-    b.jsxAttribute(b.jsxIdentifier('data-preview-page-key'), b.stringLiteral(key));
-
+  let existingAttr = null;
   let target = null;
+  let fallbackTarget = null;
+
   recast.types.visit(ast, {
     visitJSXOpeningElement(pathNode) {
+      const attrs = pathNode.node.attributes || [];
+      const pageKeyAttr = attrs.find(
+        (a) => a.type === 'JSXAttribute' && a.name && a.name.name === 'data-preview-page-key'
+      );
+      if (pageKeyAttr) {
+        existingAttr = pageKeyAttr;
+        return false;
+      }
+
       const name = pathNode.node.name && pathNode.node.name.name;
       if (!target && name === 'main') {
         target = pathNode.node;
-        return false;
+      } else if (!fallbackTarget && typeof name === 'string' && /^[a-z]/.test(name)) {
+        fallbackTarget = pathNode.node;
+      } else if (!fallbackTarget) {
+        // Root custom component (e.g. <PlatformProductDetail />)
+        fallbackTarget = pathNode.node;
       }
+
       this.traverse(pathNode);
     },
   });
 
-  if (!target) {
-    // No <main>: use the first host element of the returned tree so the marker
-    // still lands inside this route's exported HTML.
-    recast.types.visit(ast, {
-      visitJSXElement(pathNode) {
-        if (target) return false;
-        const name = getJsxName(pathNode.node);
-        if (typeof name === 'string' && /^[a-z]/.test(name)) {
-          target = pathNode.node.openingElement;
-          return false;
-        }
-        this.traverse(pathNode);
-      },
-    });
+  // If already has data-preview-page-key, ensure its value matches the expected page key
+  if (existingAttr) {
+    let currentValue = null;
+    if (existingAttr.value) {
+      if (existingAttr.value.type === 'StringLiteral') {
+        currentValue = existingAttr.value.value;
+      } else if (existingAttr.value.type === 'JSXExpressionContainer' && existingAttr.value.expression.type === 'StringLiteral') {
+        currentValue = existingAttr.value.expression.value;
+      }
+    }
+    if (currentValue === key) {
+      return { code, updated: false };
+    }
+    // Update to correct key
+    existingAttr.value = b.stringLiteral(key);
+    return { code: printSource(ast, code), updated: true };
   }
 
-  if (!target) return { code, updated: false };
-  target.attributes = target.attributes || [];
-  target.attributes.unshift(attribute());
+  const finalTarget = target || fallbackTarget;
+  if (!finalTarget) return { code, updated: false };
+
+  finalTarget.attributes = finalTarget.attributes || [];
+  finalTarget.attributes.unshift(
+    b.jsxAttribute(b.jsxIdentifier('data-preview-page-key'), b.stringLiteral(key))
+  );
+
   return { code: printSource(ast, code), updated: true };
 }
 
