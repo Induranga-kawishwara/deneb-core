@@ -34,6 +34,8 @@
     "autoprefixer": "^10.4.20"
   },
   "overrides": {
+    "react": "$react",
+    "react-dom": "$react-dom",
     "sharp": "0.35.3",
     "content-type": "2.1.0",
     "@octokit/request": {
