@@ -46,6 +46,9 @@ export interface ProductItem {
   id?: string | number;
   name?: string;
   title?: string;
+
+  // Dual Pricing Engine (Fixed vs Price Range)
+  isPriceRange?: boolean;
   productName?: string;
   itemTitle?: string;
   brand?: string;
@@ -252,13 +255,31 @@ export function EditableProductCard({
     typeof rawPriceCandidate === 'number'
       ? rawPriceCandidate
       : parseFloat(String(rawPriceCandidate || '').replace(/[^0-9.]/g, '')) || 0;
+  const isRange = Boolean(
+    product?.isPriceRange ||
+    (product?.minPrice !== undefined && product?.maxPrice !== undefined) ||
+    product?.priceRange
+  );
+
+  let rangePriceString = '';
+  if (isRange) {
+    if (product?.priceRange) {
+      rangePriceString = String(product.priceRange);
+    } else {
+      const minNum = typeof product?.minPrice === 'number' ? product.minPrice : parseFloat(String(product?.minPrice || '').replace(/[^0-9.]/g, '')) || 0;
+      const maxNum = typeof product?.maxPrice === 'number' ? product.maxPrice : parseFloat(String(product?.maxPrice || '').replace(/[^0-9.]/g, '')) || 0;
+      rangePriceString = `${formatCurrency(minNum, currency)} – ${formatCurrency(maxNum, currency)}`;
+    }
+  }
+
   const baseFormattedPrice =
+    rangePriceString || (
     rawPriceCandidate !== undefined && rawPriceCandidate !== null && String(rawPriceCandidate).trim() !== ''
       ? typeof rawPriceCandidate === 'string' &&
         (rawPriceCandidate.includes('LKR') || rawPriceCandidate.includes('-') || rawPriceCandidate.includes('–'))
         ? rawPriceCandidate
         : formatCurrency(basePriceNum, currency)
-      : '';
+      : '');
 
   const displayPrice = resolvedPrice.formattedPrice || baseFormattedPrice;
   const hasPrice = showPrice && Boolean(displayPrice && displayPrice.trim() !== '');
