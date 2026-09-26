@@ -182,7 +182,14 @@ COMPONENT REPLACEMENT RULES — FOLLOW WITHOUT EXCEPTION
       a) Delete or hide entire unwanted sections (e.g. Testimonials, FAQ, Promos) with 1 click (sets display: none via section blueprint) without breaking document flow.
       b) Center or align section headings and content instantly (center={true} or align="center" maps to text-align and CSS variables).
       c) Apply section-wide background color, gradients, and custom vertical padding.
-      d) Reorder sections via drag-and-drop.
+      d) Reorder sections with 1-click Move Up (⬆️) and Move Down (⬇️) buttons. The parent page container MUST declare Flexbox column layout:
+         ```css
+         body > main, main, [data-preview-page-key] {
+           display: flex;
+           flex-direction: column;
+         }
+         ```
+         Changing CSS `order` (order: 1, order: 2, or --deneb-section-order) moves sections up or down (e.g. moving Contact section below Products and Services) instantly and safely without mutating the DOM tree or causing React hydration mismatches.
 
 14. DUAL PRODUCT PRICING (Fixed Price vs. Price Range) & APPAREL VARIANTS:
     - Products support both SINGLE FIXED PRICE (price: 3500, compareAtPrice: 4500) and DYNAMIC PRICE RANGES (minPrice: 2500, maxPrice: 4500, or priceRange: "LKR 2,500 – LKR 4,500", isPriceRange: true).
