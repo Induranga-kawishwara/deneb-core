@@ -10,6 +10,7 @@ import {
 } from '@/lib/siteDataContext';
 import { pageRoute, withBasePath } from '@/lib/utils';
 import {
+  EditableSection,
   EditableText,
   EditableList,
   EditableCard,
@@ -38,8 +39,14 @@ export default function HomePage() {
     [];
 
   return (
-    <div data-preview-page-key="home">
-      <section className="hero" data-design-section="home-hero">
+    <div data-preview-page-key="home" style={{ display: 'flex', flexDirection: 'column' }}>
+      <EditableSection
+        name="home-hero"
+        order={siteData?.styles?.['home-hero.section']?.order ?? 1}
+        centered={siteData?.styles?.['home-hero.section']?.centered ?? false}
+        hidden={siteData?.styles?.['home-hero.section']?.hidden ?? false}
+        className="hero"
+      >
         <div className="hero-copy">
           <EditableText
             variant="eyebrow"
@@ -116,11 +123,14 @@ export default function HomePage() {
             data-preview-field-path="home.bannerImageUrl"
           />
         </div>
-      </section>
+      </EditableSection>
 
-      <section
+      <EditableSection
+        name="home-introduction"
+        order={siteData?.styles?.['home-introduction.section']?.order ?? 2}
+        centered={siteData?.styles?.['home-introduction.section']?.centered ?? false}
+        hidden={siteData?.styles?.['home-introduction.section']?.hidden ?? false}
         className="page-section"
-        data-design-section="home-introduction"
       >
         <div className="home-intro-copy">
           <EditableText
@@ -163,11 +173,14 @@ export default function HomePage() {
             })}
           </div>
         </div>
-      </section>
+      </EditableSection>
 
-      <section
+      <EditableSection
+        name="home-features"
+        order={siteData?.styles?.['home-features.section']?.order ?? 3}
+        centered={siteData?.styles?.['home-features.section']?.centered ?? false}
+        hidden={siteData?.styles?.['home-features.section']?.hidden ?? false}
         className="page-section alt"
-        data-design-section="home-features"
       >
         <div className="section-header">
           <EditableText
@@ -216,11 +229,14 @@ export default function HomePage() {
             );
           }}
         </EditableList>
-      </section>
+      </EditableSection>
 
-      <section
+      <EditableSection
+        name="home-products"
+        order={siteData?.styles?.['home-products.section']?.order ?? 4}
+        centered={siteData?.styles?.['home-products.section']?.centered ?? false}
+        hidden={siteData?.styles?.['home-products.section']?.hidden ?? false}
         className="page-section"
-        data-design-section="home-products"
       >
         <div className="section-header product-section-header">
           <EditableText
@@ -254,6 +270,16 @@ export default function HomePage() {
             const currency = contentText(product.currency) || 'LKR';
             const badge = contentText(product.badge);
             const category = contentText(product.category);
+
+            // Dual Pricing Engine (Fixed vs Price Range)
+            const isRange = Boolean(
+              product.isPriceRange ||
+              (product.minPrice !== undefined && product.maxPrice !== undefined) ||
+              product.priceRange
+            );
+            const priceDisplay = isRange
+              ? (product.priceRange || `${currency} ${product.minPrice} – ${currency} ${product.maxPrice}`)
+              : `${currency} ${price}`;
 
             return (
               <EditableCard
@@ -318,7 +344,7 @@ export default function HomePage() {
                       size="xl"
                       color="primary"
                       data-preview-field-path={`products[${index}].price`}
-                      defaultValue={`${currency} ${price}`}
+                      defaultValue={priceDisplay}
                     />
                     {compareAt > 0 && (
                       <EditableText
@@ -346,7 +372,7 @@ export default function HomePage() {
             );
           })}
         </div>
-      </section>
+      </EditableSection>
     </div>
   );
 }

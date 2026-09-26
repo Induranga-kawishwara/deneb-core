@@ -12,7 +12,12 @@ export interface EditableSectionProps extends React.HTMLAttributes<HTMLElement> 
    * Required fivora design section identifier (e.g. "home-hero", "home-features", "products", "testimonials").
    * Automatically sets `data-design-section`, `data-section-id`, and `id` for full editor targeting.
    */
-  name: string;
+  name?: string;
+
+  /**
+   * Alias for name (e.g. "hero", "services", "contact").
+   */
+  sectionId?: string;
 
   /**
    * Vertical section padding ("none" | "xs" | "sm" | "md" | "lg" | "xl" | "2xl" or custom CSS).
@@ -48,6 +53,7 @@ export interface EditableSectionProps extends React.HTMLAttributes<HTMLElement> 
    * Quick toggle to center all content and text horizontally.
    */
   center?: boolean;
+  centered?: boolean;
 
   /**
    * Whether this section is hidden or deleted.
@@ -78,6 +84,7 @@ export interface EditableSectionProps extends React.HTMLAttributes<HTMLElement> 
 export function EditableSection({
   as: Component = "section",
   name,
+  sectionId,
   padding = "lg",
   bg,
   color,
@@ -85,6 +92,7 @@ export function EditableSection({
   border,
   align,
   center,
+  centered,
   hidden,
   order,
   container,
@@ -95,6 +103,7 @@ export function EditableSection({
   children,
   ...props
 }: EditableSectionProps) {
+  const resolvedSectionKey = sectionId || name || "section";
   const resolvedPadding =
     padding !== undefined ? (SECTION_PADDING_MAP[String(padding)] || String(padding)) : undefined;
 
@@ -105,10 +114,11 @@ export function EditableSection({
       ? border
       : undefined;
 
-  const stylePath = `${name}.section`;
+  const stylePath = `${resolvedSectionKey}.section`;
   const { cssVars: styleVars } = useComponentStyle(stylePath, "section");
 
-  const resolvedAlign = align || (center ? "center" : undefined);
+  const isCentered = centered ?? center;
+  const resolvedAlign = align || (isCentered ? "center" : undefined);
 
   const sectionStyle: React.CSSProperties = {
     ...(resolvedPadding ? { padding: resolvedPadding } : {}),
@@ -143,13 +153,13 @@ export function EditableSection({
 
   return (
     <Component
-      id={id || name}
-      data-design-section={name}
-      data-section-id={name}
+      id={id || resolvedSectionKey}
+      data-design-section={resolvedSectionKey}
+      data-section-id={resolvedSectionKey}
       data-section-visible={hidden ? "false" : "true"}
       data-preview-style-target={stylePath}
       data-preview-style-type="section"
-      className={`deneb-section editable-section ${className}`.trim()}
+      className={`deneb-section editable-section ${isCentered ? "is-centered" : ""} ${className}`.trim()}
       style={sectionStyle}
       {...(props as any)}
     >
@@ -157,3 +167,5 @@ export function EditableSection({
     </Component>
   );
 }
+
+export default EditableSection;

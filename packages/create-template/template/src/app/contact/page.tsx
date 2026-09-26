@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { EditableText, EditableBox } from '@deneb-ui/ui';
+import { EditableSection, EditableText, EditableBox } from '@deneb-ui/ui';
 import { contentObject, contentText, useSiteData } from '@/lib/siteDataContext';
 
 export default function ContactPage() {
@@ -51,8 +51,14 @@ export default function ContactPage() {
   }
 
   return (
-    <div data-preview-page-key="contact">
-      <section className="page-section page-heading" data-design-section="contact-heading">
+    <div data-preview-page-key="contact" style={{ display: 'flex', flexDirection: 'column' }}>
+      <EditableSection
+        name="contact-heading"
+        order={siteData?.styles?.['contact-heading.section']?.order ?? 1}
+        centered={siteData?.styles?.['contact-heading.section']?.centered ?? false}
+        hidden={siteData?.styles?.['contact-heading.section']?.hidden ?? false}
+        className="page-section page-heading"
+      >
         <EditableText
           variant="h1"
           size="4xl"
@@ -67,9 +73,15 @@ export default function ContactPage() {
           data-preview-field-path="contact.intro"
           defaultValue={contentText(contact.intro)}
         />
-      </section>
+      </EditableSection>
 
-      <section className="page-section contact-grid" data-design-section="contact-details">
+      <EditableSection
+        name="contact-details"
+        order={siteData?.styles?.['contact-details.section']?.order ?? 2}
+        centered={siteData?.styles?.['contact-details.section']?.centered ?? false}
+        hidden={siteData?.styles?.['contact-details.section']?.hidden ?? false}
+        className="page-section contact-grid"
+      >
         <EditableBox className="card contact-details" balance radius="xl">
           <EditableText
             variant="h3"
@@ -175,7 +187,7 @@ export default function ContactPage() {
             )}
           </form>
         </EditableBox>
-      </section>
+      </EditableSection>
     </div>
   );
 }
