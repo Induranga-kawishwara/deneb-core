@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { withBasePath } from './utils';
-import { resolveProductOptions, MeasurementUnit } from './utils/productOptions';
+import {
+  resolveProductOptions,
+  resolveVariantPrice,
+  MeasurementUnit,
+  ProductVariant,
+} from './utils/productOptions';
 import { createWhatsAppUrl } from './utils/urls';
 
 export interface ProductDetailItem {
@@ -43,6 +48,13 @@ export interface ProductDetailItem {
   colors?: Array<string | { name: string; hex?: string; image?: string }> | string;
   colorsText?: string;
   colorsLabel?: string;
+  variants?: ProductVariant[];
+  variantPrices?: Record<string, number | string>;
+  minPrice?: string | number;
+  maxPrice?: string | number;
+  priceMin?: string | number;
+  priceMax?: string | number;
+  priceRange?: [number | string, number | string] | string;
 
   [key: string]: unknown;
 }
@@ -91,13 +103,11 @@ export interface EditableProductDetailProps extends React.HTMLAttributes<HTMLEle
  * - Truly Adaptive: Seamlessly renders shoes/apparel (sizes), liquids/cosmetics (ml, L),
  *   food/groceries (g, kg), single-dimension items, and simple products without variants.
  * - Multi-image gallery with active thumbnail selector and basePath resolution.
- * - Dynamic color swatches with optional color-to-image auto-switching.
+ * - Dynamic color swatches with optional color-to-image auto-switching and variant pricing.
+ * - Fixed prices vs price ranges (e.g., LKR 2,500 – LKR 4,500).
  * - Floating badges with conditional rendering (zero hidden marker contract violations).
  * - Live synchronized field paths for Title, Price, Description, CTAs, and Policies.
- * - Direct WhatsApp Click-to-Order integration with dynamic variant snippets.
- * - Context-aware specifications and Shipping & Returns tabs.
- *
- * Created by Chamika Gayashan & Induranga Kawishwara
+ * - Direct WhatsApp order link with dynamic variant & option injection.
  */
 export function EditableProductDetail({
   sectionPath = 'product',
@@ -200,17 +210,43 @@ export function EditableProductDetail({
     }
   }, [effectiveColors, selectedColor]);
 
+  // Dynamic Price & Variant Resolution
+  const resolvedPrice = useMemo(
+    () => resolveVariantPrice(product, selectedSize, selectedColor),
+    [product, selectedSize, selectedColor]
+  );
+
+  // Sync variant image if variant has a dedicated image
+  useEffect(() => {
+    if (resolvedPrice.variantImage && resolvedPrice.variantImage !== activeImage) {
+      setActiveImage(resolvedPrice.variantImage);
+    }
+  }, [resolvedPrice.variantImage]);
+
   const handleSelectColor = (c: { name: string; hex?: string; image?: string }) => {
     setSelectedColor(c.name);
     if (c.image) {
       setActiveImage(c.image);
+    } else {
+      const v = (product.variants as any[])?.find(
+        (item) =>
+          String(item.color || '').trim().toLowerCase() === c.name.toLowerCase() &&
+          (item.image || item.imageUrl || item.photo)
+      );
+      if (v) {
+        setActiveImage(v.image || v.imageUrl || v.photo);
+      }
     }
   };
 
   const name = String(product.name || product.title || (product as any).productName || (product as any).itemTitle || 'Product Title');
   const rawPriceCandidate = product.price ?? (product as any).cost ?? (product as any).amount ?? (product as any).productPrice;
-  const price = rawPriceCandidate !== undefined && rawPriceCandidate !== null ? String(rawPriceCandidate) : 'LKR 0';
+  const basePrice = rawPriceCandidate !== undefined && rawPriceCandidate !== null ? String(rawPriceCandidate) : 'LKR 0';
   const originalPrice = product.originalPrice ?? product.compareAtPrice;
+
+  const displayPrice = resolvedPrice.formattedPrice || basePrice;
+  const displayOriginalPrice = resolvedPrice.formattedOriginalPrice || (originalPrice ? String(originalPrice) : undefined);
+
   const isAvailable = product.isAvailable !== false;
   const description = String(product.description || '');
   const badge = String(product.badge || '');
@@ -233,7 +269,7 @@ export function EditableProductDetail({
     product.whatsappNumber
       ? createWhatsAppUrl(
           product.whatsappNumber,
-          product.whatsappMessage || `Hi, I would like to order ${name}${orderSnippet ? ` ${orderSnippet}` : ''} - ${price}`
+          product.whatsappMessage || `Hi, I would like to order ${name}${orderSnippet ? ` ${orderSnippet}` : ''} - ${displayPrice}`
         )
       : ''
   );
@@ -331,17 +367,17 @@ export function EditableProductDetail({
               {isAvailable ? 'In Stock' : 'Out of Stock'}
             </span>
 
-            {/* Price */}
+            {/* Price (Fixed or Range or Dynamic Variant Price) */}
             <div className="mt-4 flex items-baseline gap-3">
               <span
                 data-preview-field-path={`${sectionPath}.price`}
                 className="text-3xl font-black text-lime-400 tracking-tight"
               >
-                {price}
+                {displayPrice}
               </span>
-              {originalPrice ? (
+              {displayOriginalPrice ? (
                 <span className="text-lg font-medium text-slate-500 line-through">
-                  {String(originalPrice)}
+                  {String(displayOriginalPrice)}
                 </span>
               ) : null}
             </div>
@@ -426,7 +462,7 @@ export function EditableProductDetail({
               <button
                 type="button"
                 disabled={!isAvailable}
-                onClick={() => onAddToSelection?.(product, selectedSize || undefined, selectedColor || undefined)}
+                onClick={() => onAddToSelection?.({ ...product, price: resolvedPrice.numericPrice || product.price }, selectedSize || undefined, selectedColor || undefined)}
                 className="w-full py-4 px-6 rounded-2xl font-black text-sm uppercase tracking-wider bg-lime-400 text-slate-950 hover:bg-lime-300 active:scale-98 transition-all duration-150 shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 disabled:shadow-none"
               >
                 <span data-preview-field-path={`${sectionPath}.addToSelectionLabel`}>
