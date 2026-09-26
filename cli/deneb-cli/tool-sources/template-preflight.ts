@@ -44,6 +44,7 @@ import {
 import {
   buildTemplateVisualEditingEmptyContent,
   buildTemplateVisualEditingProbeContent,
+  extractTemplateVisualEditMarkers,
   validateTemplateVisualEditingContract,
   validateTemplateVisualEditingEmptyState,
   type TemplateVisualEditingArtifact,
@@ -61,7 +62,12 @@ const CLI_VERSION = '1.0.0';
 const MANIFEST_FILE_NAME = 'fivora-template.json';
 const MAX_SOURCE_FILES = 2_500;
 const MAX_SOURCE_BYTES = 12 * 1024 * 1024;
-const VALIDATION_BASE_PATH = '/template-validation';
+// Build both strict fixtures with the same hosting contract used by the
+// interactive preview. The final populated fixture can then be inspected as
+// the preview export instead of compiling a third time with a different path.
+const VALIDATION_BASE_PATH =
+  '/uploads/generated-sites/template-preview/simulation';
+const VALIDATION_PUBLIC_URL = `https://fivora.example.invalid${VALIDATION_BASE_PATH}/`;
 
 const FIVORA_INSTALL_ENV: Record<string, string> = {
   NODE_ENV: 'development',
@@ -73,6 +79,16 @@ const FIVORA_INSTALL_ENV: Record<string, string> = {
   NPM_CONFIG_omit: '',
   NPM_CONFIG_IGNORE_SCRIPTS: 'true',
   npm_config_ignore_scripts: 'true',
+  NPM_CONFIG_PREFER_OFFLINE: 'true',
+  npm_config_prefer_offline: 'true',
+  NPM_CONFIG_AUDIT: 'false',
+  npm_config_audit: 'false',
+  NPM_CONFIG_FUND: 'false',
+  npm_config_fund: 'false',
+  NPM_CONFIG_UPDATE_NOTIFIER: 'false',
+  npm_config_update_notifier: 'false',
+  NPM_CONFIG_PROGRESS: 'false',
+  npm_config_progress: 'false',
   PNPM_CONFIG_IGNORE_SCRIPTS: 'true',
   YARN_IGNORE_SCRIPTS: 'true',
   YARN_PRODUCTION: 'false',
@@ -154,7 +170,11 @@ class Reporter {
         durationMs: Date.now() - started,
         ...(detail ? { detail } : {}),
       });
-      if (!this.options.json) process.stdout.write(`  ✓ ${name}\n`);
+      if (!this.options.json) {
+        process.stdout.write(
+          `  ✓ ${name} (${formatDuration(Date.now() - started)})\n`,
+        );
+      }
       return value;
     } catch (error) {
       this.report.steps.push({
@@ -508,45 +528,14 @@ async function auditTemplateDependencies(
   }
 }
 
-async function simulateInteractivePreviewWarmup(
+async function validateReusableInteractivePreviewExport(
   sourceDir: string,
   manifest: TemplatePackageManifest,
-  originalSiteData: string,
-  siteDataPath: string,
-  options: CliOptions,
-  reporter: Reporter,
 ) {
-  if (options.skipBuild) {
-    reporter.skip(
-      'Simulate interactive preview warm-up',
-      'Skipped by --skip-build.',
-    );
-    return;
-  }
-
-  // 1. Restore the template's bundled demo site-data.json
-  await writeFile(siteDataPath, originalSiteData, 'utf8');
-
-  // 2. Clear build artifacts before preview export
+  // The populated probe was built with the production preview base path and
+  // representative editable data. Validate that exact export rather than
+  // restoring demo data and running an otherwise identical third Next build.
   const outputDirectory = manifest.outputDirectory?.trim() || 'out';
-  await clearGeneratedBuildArtifacts(sourceDir, outputDirectory);
-
-  // 3. Run production build under simulated platform preview base path
-  const simulatedBasePath = '/uploads/generated-sites/template-preview/simulation';
-  const previewCommandEnv: Record<string, string> = {
-    NODE_ENV: 'production',
-    ...(manifest.basePathEnvVar?.trim()
-      ? { [manifest.basePathEnvVar.trim()]: simulatedBasePath }
-      : { NEXT_PUBLIC_SITE_BASE_PATH: simulatedBasePath }),
-    ...(manifest.publicSiteUrlEnvVar?.trim()
-      ? { [manifest.publicSiteUrlEnvVar.trim()]: `https://fivora.com${simulatedBasePath}/` }
-      : {}),
-  };
-
-  const buildCommand = manifest.buildCommand?.trim() || 'npm run build';
-  await runCommand(buildCommand, sourceDir, previewCommandEnv, options.json);
-
-  // 4. Verify static export output exists
   const outputPath = resolveWithin(sourceDir, outputDirectory);
   await access(outputPath).catch(() => {
     throw new Error(
@@ -554,7 +543,6 @@ async function simulateInteractivePreviewWarmup(
     );
   });
 
-  // 5. Test generated HTML files
   const htmlFiles = await collectFiles(outputPath, /\.html$/i);
   if (htmlFiles.length === 0) {
     throw new Error(
@@ -684,6 +672,8 @@ async function validateWorkspace(
   const selectedPages = getTemplateValidationSelectedPages(
     manifest.pages ?? [],
   );
+  const previewPages =
+    manifest.pages?.map((page) => page.id) ?? selectedPages;
 
   try {
     await reporter.step('Check platform runtime compatibility', async () => {
@@ -706,89 +696,14 @@ async function validateWorkspace(
       );
     }
 
-    const probeContent = buildTemplateVisualEditingProbeContent(
-      contentDefaults,
-      editorSchema,
-    );
-    await writeFixture(siteDataPath, probeContent, selectedPages);
-    await buildOrReuseExport(
-      sourceDir,
-      manifest,
-      options,
-      reporter,
-      'Build probe-content fixture',
-    );
-    const probeArtifacts = await readArtifacts(
-      sourceDir,
-      manifest.outputDirectory?.trim() || 'out',
-    );
-    await reporter.step('Validate probe-content contract', () => {
-      const result = validateTemplateVisualEditingContract({
-        manifestVersion: manifest.version,
-        visualEditing: manifest.visualEditing,
-        pages: manifest.pages,
-        contentDefaults: probeContent,
-        editorSchema,
-        artifacts: probeArtifacts,
-      });
-      const pageDefinitions = normalizeTemplatePageDefinitions(
-        { pages: manifest.pages },
-        manifest.pages?.map((page) => page.id) ?? [],
-      );
-      const selectedPageFiles = new Set(
-        result.markers
-          .filter(
-            (marker) =>
-              marker.kind === 'page' &&
-              marker.artifactKind === 'html' &&
-              selectedPages.includes(marker.value),
-          )
-          .map((marker) => marker.filePath),
-      );
-      result.errors.push(
-        ...new Set(
-          probeArtifacts
-            .filter(
-              (artifact) =>
-                artifact.kind === 'html' &&
-                selectedPageFiles.has(artifact.filePath),
-            )
-            .flatMap((artifact) =>
-              findLinksToUnselectedPages({
-                html: artifact.content,
-                pageDefinitions,
-                selectedPages,
-                basePath: VALIDATION_BASE_PATH,
-              }).map(
-                (finding) =>
-                  `${artifact.filePath} still renders href="${finding.href}" for unselected page "${finding.pageId}". Filter every header, hero, body, card, and footer link with requirements.requiredPages.`,
-              ),
-            ),
-        ),
-      );
-      for (const warning of result.warnings) reporter.warn(warning);
-      assertContractPassed(
-        'Template visual-editing contract validation failed.',
-        result.errors,
-      );
-    });
-
-    await reporter.step('Validate real-time style contract', () => {
-      const styleIssues = validateTemplateStyleContract({
-        siteData: probeContent,
-        artifacts: probeArtifacts,
-      });
-      assertContractPassed(
-        'Template real-time style validation failed.',
-        styleIssues.map((issue) => `${issue.path}: ${issue.message}`),
-      );
-    });
-
+    // Build the empty fixture first so structural errors fail as early as
+    // possible. The populated fixture remains on disk afterwards and becomes
+    // the reusable interactive preview export.
     const emptyContent = buildTemplateVisualEditingEmptyContent(
       contentDefaults,
       editorSchema,
     );
-    await writeFixture(siteDataPath, emptyContent);
+    await writeFixture(siteDataPath, emptyContent, selectedPages);
     await buildOrReuseExport(
       sourceDir,
       manifest,
@@ -809,6 +724,43 @@ async function validateWorkspace(
         editorSchema,
         artifacts: emptyArtifacts,
       });
+      const pageDefinitions = normalizeTemplatePageDefinitions(
+        { pages: manifest.pages },
+        previewPages,
+      );
+      const selectedPageFiles = new Set(
+        extractTemplateVisualEditMarkers(
+          emptyArtifacts.filter((artifact) => artifact.kind === 'html'),
+        ).markers
+          .filter(
+            (marker) =>
+              marker.kind === 'page' &&
+              marker.artifactKind === 'html' &&
+              selectedPages.includes(marker.value),
+          )
+          .map((marker) => marker.filePath),
+      );
+      result.errors.push(
+        ...new Set(
+          emptyArtifacts
+            .filter(
+              (artifact) =>
+                artifact.kind === 'html' &&
+                selectedPageFiles.has(artifact.filePath),
+            )
+            .flatMap((artifact) =>
+              findLinksToUnselectedPages({
+                html: artifact.content,
+                pageDefinitions,
+                selectedPages,
+                basePath: VALIDATION_BASE_PATH,
+              }).map(
+                (finding) =>
+                  `${artifact.filePath} still renders href="${finding.href}" for unselected page "${finding.pageId}". Filter every header, hero, body, card, and footer link with requirements.requiredPages.`,
+              ),
+            ),
+        ),
+      );
       for (const warning of result.warnings) reporter.warn(warning);
       assertContractPassed(
         'Template strict empty-state visual-editing validation failed.',
@@ -816,15 +768,51 @@ async function validateWorkspace(
       );
     });
 
-    await reporter.step('Simulate interactive preview warm-up', async () => {
-      await simulateInteractivePreviewWarmup(
-        sourceDir,
-        manifest,
-        originalSiteData,
-        siteDataPath,
-        options,
-        reporter,
+    const probeContent = buildTemplateVisualEditingProbeContent(
+      contentDefaults,
+      editorSchema,
+    );
+    await writeFixture(siteDataPath, probeContent, previewPages);
+    await buildOrReuseExport(
+      sourceDir,
+      manifest,
+      options,
+      reporter,
+      'Build probe-content fixture',
+    );
+    const probeArtifacts = await readArtifacts(
+      sourceDir,
+      manifest.outputDirectory?.trim() || 'out',
+    );
+    await reporter.step('Validate probe-content contract', () => {
+      const result = validateTemplateVisualEditingContract({
+        manifestVersion: manifest.version,
+        visualEditing: manifest.visualEditing,
+        pages: manifest.pages,
+        contentDefaults: probeContent,
+        editorSchema,
+        artifacts: probeArtifacts,
+      });
+      for (const warning of result.warnings) reporter.warn(warning);
+      assertContractPassed(
+        'Template visual-editing contract validation failed.',
+        result.errors,
       );
+    });
+
+    await reporter.step('Validate real-time style contract', () => {
+      const styleIssues = validateTemplateStyleContract({
+        siteData: probeContent,
+        artifacts: probeArtifacts,
+      });
+      assertContractPassed(
+        'Template real-time style validation failed.',
+        styleIssues.map((issue) => `${issue.path}: ${issue.message}`),
+      );
+    });
+
+    await reporter.step('Validate reusable interactive preview export', async () => {
+      await validateReusableInteractivePreviewExport(sourceDir, manifest);
     });
   } finally {
     await writeFile(siteDataPath, originalSiteData, 'utf8').catch(
@@ -863,8 +851,7 @@ async function buildOrReuseExport(
         : {}),
       ...(manifest.publicSiteUrlEnvVar?.trim()
         ? {
-            [manifest.publicSiteUrlEnvVar.trim()]:
-              'https://template-validation.example.invalid',
+            [manifest.publicSiteUrlEnvVar.trim()]: VALIDATION_PUBLIC_URL,
           }
         : {}),
       NODE_ENV: 'production',
@@ -1128,13 +1115,26 @@ async function clearGeneratedBuildArtifacts(
       retryDelay: 200,
     });
   }
-  for (const relativePath of ['.next', '.turbo']) {
-    await rm(resolveWithin(sourceDir, relativePath), {
-      recursive: true,
-      force: true,
-      maxRetries: 5,
-      retryDelay: 200,
-    });
+  // Keep only Next's documented compiler cache between strict fixtures. The
+  // route output itself is removed so stale HTML can never pass validation.
+  const nextDir = resolveWithin(sourceDir, '.next');
+  try {
+    const entries = await readdir(nextDir, { withFileTypes: true });
+    await Promise.all(
+      entries
+        .filter((entry) => entry.name !== 'cache')
+        .map((entry) =>
+          rm(join(nextDir, entry.name), {
+            recursive: true,
+            force: true,
+            maxRetries: 5,
+            retryDelay: 200,
+          }),
+        ),
+    );
+  } catch {
+    // `.next` does not exist on the first build. Preserve `.turbo` when the
+    // template's build command uses it as an incremental cache.
   }
 }
 
