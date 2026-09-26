@@ -1,6 +1,6 @@
 'use client';
 
-import { EditableSection, EditableText, EditableImage } from '@deneb-ui/ui';
+import { EditableText, EditableImage } from '@deneb-ui/ui';
 import { contentObject, contentText, contentList, useSiteData } from '@/lib/siteDataContext';
 
 export default function AboutPage() {
@@ -9,14 +9,8 @@ export default function AboutPage() {
   const collageImages = contentList(about.collageImages) as Array<{ id?: string; image?: string; caption?: string }>;
 
   return (
-    <div data-preview-page-key="about_us" style={{ display: 'flex', flexDirection: 'column' }}>
-      <EditableSection
-        name="about"
-        order={siteData?.styles?.['about.section']?.order ?? 1}
-        centered={siteData?.styles?.['about.section']?.centered ?? false}
-        hidden={siteData?.styles?.['about.section']?.hidden ?? false}
-        className="page-section split"
-      >
+    <div data-preview-page-key="about_us">
+      <section className="page-section split" data-design-section="about">
         <div className="split-copy">
           <EditableText
             variant="h1"
@@ -42,15 +36,9 @@ export default function AboutPage() {
           radius="xl"
           fit="cover"
         />
-      </EditableSection>
+      </section>
 
-      <EditableSection
-        name="about-heritage"
-        order={siteData?.styles?.['about-heritage.section']?.order ?? 2}
-        centered={siteData?.styles?.['about-heritage.section']?.centered ?? false}
-        hidden={siteData?.styles?.['about-heritage.section']?.hidden ?? false}
-        className="page-section"
-      >
+      <section className="page-section" data-design-section="about-heritage">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem', alignItems: 'start' }}>
           <div>
             <EditableText
@@ -135,7 +123,7 @@ export default function AboutPage() {
             ))}
           </div>
         </div>
-      </EditableSection>
+      </section>
     </div>
   );
 }
