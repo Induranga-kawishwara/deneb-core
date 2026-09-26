@@ -213,6 +213,39 @@ const FALLBACK_LOCAL_VISUAL_BRIDGE_SCRIPT = String.raw`
     const rect = target.getBoundingClientRect();
     const itemIndexMatch = itemPath?.match(/\[(\d+)\](?!.*\[\d+\])/);
 
+    const styleScopes = [];
+    const pushScope = (kind, key, label) => {
+      if (!key || styleScopes.some((s) => s.key === key)) return;
+      styleScopes.push({ kind, key, label });
+    };
+    pushScope('element', fieldPath, 'This element');
+    pushScope('card', itemPath, 'This card');
+    pushScope('grid', listPath, 'Entire grid');
+    const pageElement = target.closest('[data-preview-page-key]');
+    const pageKey = pageElement?.getAttribute('data-preview-page-key') || '';
+    const sectionElement = target.closest('section,[data-design-section],[data-section-id]');
+    if (sectionElement) {
+      const explicitSectionKey =
+        sectionElement.getAttribute('data-design-section') ||
+        sectionElement.getAttribute('data-section-id') ||
+        sectionElement.id;
+      const sectionSiblings = sectionElement.parentElement
+        ? Array.from(sectionElement.parentElement.children).filter(
+            (c) => c.tagName === 'SECTION',
+          )
+        : [];
+      const sectionIndex = sectionSiblings.indexOf(sectionElement) + 1;
+      const sectionKey =
+        explicitSectionKey || (sectionIndex > 0 ? 'nth-' + sectionIndex : '');
+      pushScope(
+        'section',
+        sectionKey ? 'section:' + (pageKey || 'all') + ':' + sectionKey : null,
+        'This section',
+      );
+    }
+    pushScope('page', pageKey ? 'page:' + pageKey : null, 'Current page');
+    pushScope('site', 'site:all', 'Whole website');
+
     const clickPayload = {
       type: CLICK_MESSAGE,
       fieldPath,
@@ -232,6 +265,7 @@ const FALLBACK_LOCAL_VISUAL_BRIDGE_SCRIPT = String.raw`
       itemIndex: itemIndexMatch ? Number(itemIndexMatch[1]) : null,
       descriptorKind: fieldPath ? 'field' : listPath ? 'collection' : null,
       relatedFields: findRelatedFields(target, fieldPath, itemPath),
+      styleScopes,
     };
     post(clickPayload);
     post({ ...clickPayload, type: LEGACY_CLICK_MESSAGE });

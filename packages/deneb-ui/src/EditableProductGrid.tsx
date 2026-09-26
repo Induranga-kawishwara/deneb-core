@@ -138,6 +138,9 @@ export interface EditableProductGridProps extends React.HTMLAttributes<HTMLEleme
    */
   totalProducts?: number;
 
+  currency?: string;
+  whatsappNumber?: string;
+  whatsappPhone?: string;
   className?: string;
 }
 
@@ -150,6 +153,9 @@ export interface EditableProductGridProps extends React.HTMLAttributes<HTMLEleme
  * Created by Chamika Gayashan & Induranga Kawishwara
  */
 export function EditableProductGrid({
+  currency = 'LKR',
+  whatsappNumber,
+  whatsappPhone,
   sectionPath = 'home',
   listPath = 'products',
   title = 'Featured Collection',
@@ -394,7 +400,10 @@ export function EditableProductGrid({
 
   return (
     <section
+      id={props.id || "products"}
       ref={sectionRef}
+      data-design-section={(props as any)["data-design-section"] || "products"}
+      data-section-id={(props as any)["data-section-id"] || "products"}
       data-preview-page-key={sectionPath}
       className={`editable-product-grid max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 ${className}`.trim()}
       style={style}
@@ -530,6 +539,8 @@ export function EditableProductGrid({
                   itemPath={itemPath}
                   product={product}
                   cardVariant={cardVariant}
+                  currency={currency}
+                  whatsappPhone={whatsappPhone || whatsappNumber}
                   className="h-full"
                 />
 

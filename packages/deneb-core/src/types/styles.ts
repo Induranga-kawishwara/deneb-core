@@ -74,6 +74,9 @@ export interface SectionStyleProperties {
   backgroundImage?: string;
   backgroundOverlayColor?: string;
   backgroundOverlayOpacity?: number;
+  textAlign?: "left" | "center" | "right";
+  display?: string;
+  order?: number | string;
 }
 
 export type StyleKind = 'text' | 'card' | 'button' | 'grid' | 'section';

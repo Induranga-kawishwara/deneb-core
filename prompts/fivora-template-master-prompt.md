@@ -151,6 +151,92 @@ COMPONENT REPLACEMENT RULES — FOLLOW WITHOUT EXCEPTION
 10. Add <StickyMobileBar /> to every template targeting mobile commerce.
 11. Add <FloatingContactWidget /> to every service, restaurant, or hospitality template.
 12. Wrap entire app in <SiteDataProvider> in root layout. Add <ThemeStyles /> immediately inside it.
+13. MODULAR SECTION ARCHITECTURE (<section> & <Section> / <EditableSection>):
+    Every top-level page module MUST be wrapped in a semantic <section> tag or Deneb <Section name="..."> / <EditableSection name="...">:
+    - MUST include data-design-section="<section-id>" and data-section-id="<section-id>".
+    - MUST include id="<section-id>".
+    - Inner content should be wrapped in a centered container (container={true} or <div className="container mx-auto px-4">).
+    - HOW TO USE IN TSX:
+      ```tsx
+      import { EditableSection, EditableText } from "@deneb-ui/ui";
+
+      export function HeroSection() {
+        return (
+          <EditableSection
+            name="hero"
+            align="center"
+            container={true}
+            className="py-20 px-6 bg-gradient-to-b from-gray-50 to-white"
+          >
+            <EditableText as="h1" id="hero.title" className="text-4xl sm:text-5xl font-bold">
+              Artisan Handcrafted Silhouettes
+            </EditableText>
+            <EditableText as="p" id="hero.subtitle" className="text-lg text-gray-600 mt-3">
+              Ethically sourced fabrics designed for enduring comfort.
+            </EditableText>
+          </EditableSection>
+        );
+      }
+      ```
+    - WHY: Enables shop owners and website agents in Fivora Visual Editor and Developer Portal Lab to:
+      a) Delete or hide entire unwanted sections (e.g. Testimonials, FAQ, Promos) with 1 click (sets display: none via section blueprint) without breaking document flow.
+      b) Center or align section headings and content instantly (center={true} or align="center" maps to text-align and CSS variables).
+      c) Apply section-wide background color, gradients, and custom vertical padding.
+      d) Reorder sections with 1-click Move Up (⬆️) and Move Down (⬇️) buttons. The parent page container MUST declare Flexbox column layout:
+         ```css
+         body > main, main, [data-preview-page-key] {
+           display: flex;
+           flex-direction: column;
+         }
+         ```
+         Changing CSS `order` (order: 1, order: 2, or --deneb-section-order) moves sections up or down (e.g. moving Contact section below Products and Services) instantly and safely without mutating the DOM tree or causing React hydration mismatches.
+
+14. DUAL PRODUCT PRICING (Fixed Price vs. Price Range) & APPAREL VARIANTS:
+    - Products support both SINGLE FIXED PRICE (price: 3500, compareAtPrice: 4500) and DYNAMIC PRICE RANGES (minPrice: 2500, maxPrice: 4500, or priceRange: "LKR 2,500 – LKR 4,500", isPriceRange: true).
+    - When isPriceRange or minPrice is present, display "LKR min – LKR max" initially, until a customer selects a specific size/color variant.
+    - Clothing/apparel items support color swatches that swap product images on click and interactive size chips:
+      ```tsx
+      import { EditableProductCard } from "@deneb-ui/ui";
+
+      <EditableProductCard
+        itemPath="products[0]"
+        product={{
+          id: "prod-resort-shirt",
+          name: "Linen Resort Shirt",
+          minPrice: 2800,
+          maxPrice: 4800,
+          priceRange: "LKR 2,800 – LKR 4,800",
+          isPriceRange: true,
+          currency: "LKR",
+          imageUrl: "/images/shirt-navy.jpg",
+          colors: [
+            { name: "Navy", hex: "#0f2942", imageUrl: "/images/shirt-navy.jpg" },
+            { name: "Olive", hex: "#4d6840", imageUrl: "/images/shirt-olive.jpg" },
+            { name: "Terracotta", hex: "#c26d4f", imageUrl: "/images/shirt-terracotta.jpg" },
+          ],
+          sizes: ["S", "M", "L", "XL"],
+          variants: [
+            { color: "Navy", size: "S", price: 2800 },
+            { color: "Navy", size: "XL", price: 3500 },
+            { color: "Olive", size: "L", price: 4800 },
+          ],
+        }}
+        whatsappPhone="+94771234567"
+      />
+      ```
+    - Interactive Color Swatches: Clicking a color swatch immediately swaps the card or product detail hero image to that color variant image.
+    - Both "Add to Cart" and "Order via WhatsApp" automatically format messages and cart items with selected variant attributes [Color: Navy, Size: XL].
+
+15. TESTING IN DEVELOPER PORTAL LOCAL TEST LAB:
+    - Run `npm run lab` (or `deneb lab .`) inside your template folder.
+    - Connect at Fivora Developer Portal -> "Local Test Lab".
+    - Click "Test" in the toolbar to run the full automated preflight contract suite:
+      * Validates manifest v2 and editor schema
+      * Validates semantic <section> tags and data-design-section / data-section-id attributes
+      * Validates live visual editing field and item markers (data-preview-field-path, data-preview-item-path)
+      * Validates pricing contracts: single price vs dynamic price range formatting and clothing swatch bindings
+      * Validates clean static export readiness (Next.js out/ directory)
+    - Test interactive section centering, hiding, and product variant photo-swapping in the live frame before packaging.
 
 STATIC BUILD
 1. Configure output: 'export', trailingSlash, images.unoptimized: true, and basePath/assetPrefix from the manifest environment variable.

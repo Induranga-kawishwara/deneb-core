@@ -18,6 +18,7 @@ export interface EditableCustomerReviewsProps extends React.HTMLAttributes<HTMLE
    * Field path prefix for live Fivora Visual Editing synchronization (e.g. "home").
    */
   sectionPath?: string;
+  listPath?: string;
 
   /**
    * Title of the reviews section.
@@ -89,6 +90,7 @@ const DEFAULT_REVIEWS: CustomerReviewItem[] = [
  */
 export function EditableCustomerReviews({
   sectionPath = 'home',
+  listPath = 'reviews',
   title,
   subtitle,
   averageRating,
@@ -144,6 +146,9 @@ export function EditableCustomerReviews({
 
   return (
     <section
+      id={props.id || "customer-reviews"}
+      data-design-section="customer-reviews"
+      data-section-id="customer-reviews"
       data-preview-page-key={sectionPath}
       className={`editable-customer-reviews max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 ${className}`.trim()}
       style={style}

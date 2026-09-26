@@ -125,6 +125,9 @@ export function TrustBadges({
 
   return (
     <section
+      id="trust-badges"
+      data-design-section="trust-badges"
+      data-section-id="trust-badges"
       className={`w-full py-8 my-4 ${className}`}
       data-preview-field-path={fieldPath}
       style={style}

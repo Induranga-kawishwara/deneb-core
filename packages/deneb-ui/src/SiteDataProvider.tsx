@@ -876,11 +876,14 @@ export function normalizeProductItem(p: unknown): ProductItem {
               : p.rate;
   let numPrice: number | string | undefined = rawPrice as any;
   if (typeof rawPrice === "string" && rawPrice.trim()) {
-    const match = rawPrice.match(/-?\d+(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?/);
-    if (match) {
-      const parsed = parseFloat(match[0].replace(/,/g, ""));
-      if (!isNaN(parsed) && Number.isFinite(parsed)) {
-        numPrice = parsed;
+    const isRangeStr = rawPrice.includes("-") || rawPrice.includes("–") || rawPrice.includes("—") || /\bto\b/i.test(rawPrice);
+    if (!isRangeStr) {
+      const match = rawPrice.match(/-?\d+(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?/);
+      if (match) {
+        const parsed = parseFloat(match[0].replace(/,/g, ""));
+        if (!isNaN(parsed) && Number.isFinite(parsed)) {
+          numPrice = parsed;
+        }
       }
     }
   }
@@ -921,6 +924,11 @@ export function normalizeProductItem(p: unknown): ProductItem {
   const badgeCandidate = p.badge ?? p.tag ?? p.label ?? p.badgeText ?? p.chip;
   const descCandidate = p.description ?? p.desc ?? p.details ?? p.shortDescription ?? p.subtitle;
 
+  const explicitMin = p.minPrice ?? customData.minPrice;
+  const explicitMax = p.maxPrice ?? customData.maxPrice;
+  const explicitRange = p.priceRange ?? customData.priceRange;
+  const isRange = Boolean(p.isPriceRange || customData.isPriceRange || (explicitMax && explicitMin));
+
   return {
     ...customData,
     ...p,
@@ -928,6 +936,10 @@ export function normalizeProductItem(p: unknown): ProductItem {
     title: titleCandidate as string | undefined,
     productName: (titleCandidate ?? nameCandidate) as string | undefined,
     itemTitle: (titleCandidate ?? nameCandidate) as string | undefined,
+    minPrice: explicitMin !== undefined ? explicitMin : undefined,
+    maxPrice: explicitMax !== undefined ? explicitMax : undefined,
+    priceRange: explicitRange !== undefined ? explicitRange : undefined,
+    isPriceRange: isRange,
     ...(numPrice !== undefined
       ? {
           price: numPrice,

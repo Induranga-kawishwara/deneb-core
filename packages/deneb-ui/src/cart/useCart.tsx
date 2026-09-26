@@ -38,24 +38,44 @@ export function formatCurrency(amount: number, currency = 'LKR'): string {
 }
 
 export function getProductWhatsAppUrl(
-  product: { name?: string; title?: string; brand?: string; price?: string | number; [key: string]: unknown },
+  product: {
+    name?: string;
+    title?: string;
+    brand?: string;
+    price?: string | number;
+    size?: string | number;
+    color?: string;
+    option?: string | number;
+    [key: string]: unknown;
+  },
   whatsappNumber: string,
   options?: { storeName?: string; currency?: string }
 ): string {
-  const cleanNumber = (whatsappNumber || '').replace(/\D/g, '');
-  const title = product.name || product.title || 'Product';
-  const brand = product.brand ? ` (Brand: ${product.brand})` : '';
-  const priceNum = typeof product.price === 'number' ? product.price : parseFloat(String(product.price || '').replace(/[^0-9.]/g, '')) || 0;
-  const priceStr = priceNum > 0 ? `\nPrice: ${formatCurrency(priceNum, options?.currency || 'LKR')}` : '';
-  const store = options?.storeName ? ` at ${options.storeName}` : '';
+  const cleanNumber = (whatsappNumber || "").replace(/\D/g, "");
+  const title = product.name || product.title || "Product";
+  const brand = product.brand ? ` (Brand: ${product.brand})` : "";
+
+  const variantParts: string[] = [];
+  if (product.size) variantParts.push(`Size: ${product.size}`);
+  if (product.color && product.color !== "Standard") variantParts.push(`Color: ${product.color}`);
+  if (product.option && product.option !== product.size) variantParts.push(`Option: ${product.option}`);
+  const variantStr = variantParts.length > 0 ? ` [${variantParts.join(", ")}]` : "";
+
+  const rawPriceStr = typeof product.price === "string" && product.price.trim() ? product.price.trim() : "";
+  const priceNum = typeof product.price === "number" ? product.price : parseNumericPrice(product.price);
+  const priceStr = rawPriceStr
+    ? `\nPrice: ${rawPriceStr}`
+    : (priceNum > 0 ? `\nPrice: ${formatCurrency(priceNum, options?.currency || "LKR")}` : "");
+
+  const store = options?.storeName ? ` at ${options.storeName}` : "";
 
   const message = [
     `Hello${store}! 👋`,
     `I am interested in this product:`,
-    `*${title}*${brand}${priceStr}`,
-    '',
+    `*${title}*${brand}${variantStr}${priceStr}`,
+    "",
     `Could you please share more details, availability, and ordering instructions? Thank you!`,
-  ].join('\n');
+  ].join("\n");
 
   return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
 }

@@ -68,7 +68,9 @@ export function EditableHeroCentered({
 
   return (
     <section
+      id={props.id || "hero"}
       data-design-section="hero"
+      data-section-id="hero"
       style={{
         padding: '5rem 1.5rem',
         textAlign: 'center',
@@ -272,7 +274,9 @@ export function EditableHeroSplit({
 
   return (
     <section
+      id={props.id || "hero"}
       data-design-section="hero"
+      data-section-id="hero"
       style={{
         padding: '5rem 1.5rem',
         display: 'grid',

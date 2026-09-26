@@ -76,6 +76,13 @@ export function DenebComponentStyles() {
       max-width: var(--deneb-section-max-w, inherit);
       background-color: var(--deneb-section-bg, inherit);
       background-image: var(--deneb-section-bg-image, none);
+      text-align: var(--deneb-section-align, inherit);
+      display: var(--deneb-section-display, block);
+      order: var(--deneb-section-order, 0);
+    }
+    body > main, main, [data-preview-page-key] {
+      display: flex;
+      flex-direction: column;
     }
   `;
 
