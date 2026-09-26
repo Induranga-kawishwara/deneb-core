@@ -637,6 +637,11 @@ export function PromoSection() {
 
 DENEB UI commerce components natively support both **Single Fixed Prices** and **Dynamic Price Ranges**, as well as apparel clothing options (color swatches with image swapping and size chips).
 
+Keep `price`, `compareAtPrice`, `minPrice`, `maxPrice`, and variant prices as
+JSON numbers. Keep `currency` or a currency symbol as separate text. A formatted
+`priceRange` string is display-only; numeric filters and sorting must use the
+numeric amount fields.
+
 #### 1. Single Fixed Price
 ```tsx
 import { ProductCard } from "@deneb-ui/ui";

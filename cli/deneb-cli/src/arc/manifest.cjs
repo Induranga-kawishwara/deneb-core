@@ -370,7 +370,12 @@ const PLATFORM_CONTROLLED_PATHS = new Set(
 );
 
 function slimListItems(items, itemFields) {
-  const keys = (itemFields || []).map((field) => field.key).filter(Boolean);
+  const fieldsByKey = new Map(
+    (itemFields || [])
+      .filter((field) => field?.key)
+      .map((field) => [field.key, field]),
+  );
+  const keys = [...fieldsByKey.keys()];
   if (!keys.length || !Array.isArray(items)) return items || [];
   return items.map((item) => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
@@ -378,7 +383,14 @@ function slimListItems(items, itemFields) {
     for (const key of keys) {
       if (!(key in item)) continue;
       if (Array.isArray(item[key])) continue;
-      out[key] = item[key];
+      const field = fieldsByKey.get(key);
+      const value = item[key];
+      out[key] =
+        field?.type === 'number' &&
+        typeof value === 'string' &&
+        /^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(value.trim())
+          ? Number(value)
+          : value;
     }
     return Object.keys(out).length ? out : item;
   });

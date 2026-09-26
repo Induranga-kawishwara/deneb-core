@@ -60,10 +60,19 @@ npm install -D @deneb-ui/cli
 | `deneb zip` | Create upload-ready `fivora-template.zip` |
 | `deneb doctor` | Environment, dependency, and export diagnostics |
 | `deneb add <component>` | Copy DENEB UI components into your project |
-| `deneb lab` | Launch local visual editing preview lab |
+| `deneb lab` | Launch the local visual editor, preview changes, and save them to the declared `siteDataFile` |
 | `deneb update` | Update `@deneb-ui/*` packages and synced components |
 
 Full reference: [deneb.fivora.site/docs/cli](https://deneb.fivora.site/docs/cli)
+
+### Local preview before upload
+
+Run `deneb lab .` in a template project, then paste the printed controller URL
+and token into **Developer Portal → Local Test Lab**. Content and style edits are
+applied to the preview immediately. Use **Save local** to persist the current
+editor state to the `siteDataFile` declared in `fivora-template.json`; the write
+stays on your machine and no template files are uploaded. Run **Test** after
+saving to perform the same local preflight checks used before packaging.
 
 ---
 

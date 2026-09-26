@@ -33,6 +33,7 @@ const { resolveImportSpecifier } = require('./scanner.cjs');
 const { resolvePublicAssetUrl } = require('./ir-builder.cjs');
 const { analyzeElementFragments } = require('./text-fragment-analyzer.cjs');
 const { BROAD_CONTENT_CONTAINERS } = require('./fivora-contract.cjs');
+const { classifyFieldType } = require('./field-paths.cjs');
 
 const TECHNICAL_TEXT_RE = /^(true|false|null|undefined|px|rem|em|auto|hidden|flex|grid|sr-only)$/i;
 const ARIA_ONLY_RE = /^(aria-|data-state|data-slot|data-orientation)/;
@@ -1105,6 +1106,21 @@ function analyzeFile(optionsOrFile, codeArg, profileArg) {
         const stringItems = arr.items.every((item) => item.type === 'string');
         const rootTagName = getJsxName(mapInfo.rootElement);
         const isChildCustomComponent = /^[A-Z]/.test(rootTagName);
+        const sampleItem = objectItems
+          ? arr.items.find((item) => item?.value && typeof item.value === 'object')?.value
+          : null;
+
+        // JSX text positions alone look like generic text, but commerce values
+        // such as a bare numeric `price` must remain numeric for catalog range
+        // filters, sorting, totals, and database persistence. Formatted values
+        // such as "$249" intentionally remain text for legacy templates.
+        if (sampleItem) {
+          for (const [key, role] of itemUsage) {
+            if (role !== 'text') continue;
+            const inferredRole = classifyFieldType('text', sampleItem[key], key);
+            if (inferredRole !== 'text') itemUsage.set(key, inferredRole);
+          }
+        }
 
         // If the map returns a custom child component (e.g. <ProductCard product={item} />),
         // derive item fields from the sample object items if direct JSX member usage was empty
@@ -1112,13 +1128,7 @@ function analyzeFile(optionsOrFile, codeArg, profileArg) {
           const sampleObj = arr.items[0].value;
           for (const key of Object.keys(sampleObj)) {
             if (/^(id|_id|key|slug)$/i.test(key)) continue;
-            const role = /image|photo|avatar|icon|thumb|img/i.test(key)
-              ? 'image'
-              : /price|cost|amount|count|rating|stars/i.test(key)
-                ? 'number'
-                : /url|link|href/i.test(key)
-                  ? 'url'
-                  : 'text';
+            const role = classifyFieldType('text', sampleObj[key], key);
             itemUsage.set(key, role);
           }
         }
@@ -1207,4 +1217,3 @@ module.exports = {
   isStaticSkipText,
   resolveChildText,
 };
-

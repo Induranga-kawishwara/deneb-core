@@ -9,6 +9,7 @@ const { spawn } = require('node:child_process');
 const DEFAULT_API_PORT = 4174;
 const DEFAULT_PREVIEW_PORT = 4173;
 const MAX_LOG_LENGTH = 96 * 1024;
+const MAX_SITE_DATA_BYTES = 10 * 1024 * 1024;
 const LOOPBACK_HOST = '127.0.0.1';
 const LOCAL_PREVIEW_ROUTE = '/__fivora_local_preview';
 const FALLBACK_LOCAL_VISUAL_BRIDGE_SCRIPT = String.raw`
@@ -562,6 +563,71 @@ function readSiteData() {
   }
 }
 
+function readJsonRequest(request, maxBytes = MAX_SITE_DATA_BYTES) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    let settled = false;
+
+    request.on('data', (chunk) => {
+      if (settled) return;
+      size += chunk.length;
+      if (size > maxBytes) {
+        settled = true;
+        reject(
+          new Error(
+            `Request body is too large. Local site data must be ${Math.floor(maxBytes / 1024 / 1024)} MB or less.`,
+          ),
+        );
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on('end', () => {
+      if (settled) return;
+      try {
+        const text = Buffer.concat(chunks).toString('utf8');
+        resolve(JSON.parse(text));
+      } catch {
+        reject(new Error('Request body must be valid JSON.'));
+      }
+    });
+    request.on('error', (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    });
+  });
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function writeSiteData(siteData) {
+  const temporaryPath = `${siteDataPath}.${process.pid}.${Date.now()}.tmp`;
+  const mode = fs.existsSync(siteDataPath)
+    ? fs.statSync(siteDataPath).mode
+    : 0o644;
+  try {
+    fs.writeFileSync(
+      temporaryPath,
+      `${JSON.stringify(siteData, null, 2)}\n`,
+      { encoding: 'utf8', flag: 'wx', mode },
+    );
+    fs.renameSync(temporaryPath, siteDataPath);
+  } catch (error) {
+    if (fs.existsSync(temporaryPath)) {
+      try {
+        fs.unlinkSync(temporaryPath);
+      } catch {
+        // Keep the original write error; a stale temporary file is harmless.
+      }
+    }
+    throw error;
+  }
+}
+
 function startValidation() {
   if (validationProcess) return false;
 
@@ -904,7 +970,7 @@ function proxyPreviewRequest(request, response) {
   request.pipe(upstream);
 }
 
-const server = http.createServer((request, response) => {
+const server = http.createServer(async (request, response) => {
   const url = new URL(request.url || '/', apiUrl);
   if (request.method === 'GET' && url.pathname === LOCAL_PREVIEW_ROUTE) {
     const html = previewShellHtml();
@@ -954,6 +1020,33 @@ const server = http.createServer((request, response) => {
     } catch (error) {
       sendJson(response, 500, {
         message: error instanceof Error ? error.message : 'Unable to read site data.',
+      });
+    }
+    return;
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/site-data') {
+    try {
+      const payload = await readJsonRequest(request);
+      const siteData = isPlainObject(payload) ? payload.siteData : null;
+      if (!isPlainObject(siteData) || !isPlainObject(siteData.content)) {
+        sendJson(response, 400, {
+          message: 'siteData must be a JSON object with a content object.',
+        });
+        return;
+      }
+      writeSiteData(siteData);
+      sendJson(response, 200, {
+        saved: true,
+        siteData,
+        siteDataFile: manifest.siteDataFile,
+      });
+    } catch (error) {
+      sendJson(response, 400, {
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Unable to save local site data.',
       });
     }
     return;
@@ -1073,6 +1166,7 @@ server.listen(options.apiPort, LOOPBACK_HOST, () => {
       `Preview URL: ${previewUrl}`,
       '',
       'Paste the controller URL and connection token into Developer Portal > Local Test Lab.',
+      'Use Save local in the portal to write edits to the template site-data file.',
       'Press Ctrl+C to stop. No template files are uploaded by this process.',
       '',
     ].join('\n'),
