@@ -12,7 +12,13 @@ const { scanProject, buildDependencyGraph } = require('../scanner.cjs');
 const { analyzeFile } = require('../semantic.cjs');
 const { planTransformations } = require('../planner.cjs');
 const { applyFilePlan } = require('../transformer.cjs');
-const { buildFieldPath, inferFieldName, isListActionCtaKey } = require('../field-paths.cjs');
+const {
+  buildFieldPath,
+  classifyFieldType,
+  inferFieldName,
+  isListActionCtaKey,
+} = require('../field-paths.cjs');
+const { normalizeFieldType } = require('../fivora-schema-authority.cjs');
 const { enrichSchemasFromContent } = require('../manifest.cjs');
 const { runDenebArc } = require('../index.cjs');
 const { parseSource } = require('../ast.cjs');
@@ -65,6 +71,16 @@ test('field-paths recognizes list action CTA keys', () => {
   assert.equal(isListActionCtaKey('preOrderCta'), true);
   assert.equal(isListActionCtaKey('addToTrayCta'), true);
   assert.equal(isListActionCtaKey('features'), false);
+});
+
+test('price fields use numeric data while currency and formatted prices stay text', () => {
+  assert.equal(normalizeFieldType('price', 'price'), 'number');
+  assert.equal(normalizeFieldType('currency', 'currency'), 'text');
+  assert.equal(classifyFieldType('text', 1000, 'price'), 'number');
+  assert.equal(classifyFieldType('text', '1000', 'price'), 'number');
+  assert.equal(classifyFieldType('text', '1000.50', 'amount'), 'number');
+  assert.equal(classifyFieldType('text', 'Rs. 1,000', 'price'), 'text');
+  assert.equal(classifyFieldType('text', 'LKR 1000', 'price'), 'text');
 });
 
 test('manifest enrichSchemasFromContent registers list CTA and paired directions fields', () => {
@@ -447,8 +463,28 @@ test('static-array collections become list contracts without changing render log
   const products = home.fields.find((f) => f.key === 'products');
   assert.equal(products.type, 'list');
   assert.deepEqual(products.fields.map((f) => f.key).sort(), ['description', 'image', 'price', 'title']);
+  assert.equal(products.fields.find((field) => field.key === 'price').type, 'text');
   assert.equal(siteData.content.home.products.length, 3);
   assert.equal(siteData.content.home.products[0].title, 'Minimalist Smart Watch');
+});
+
+test('numeric catalog prices stay numbers in generated site data and editor schema', () => {
+  const dir = copyOf(STOREFRONT_FIXTURE);
+  const gridPath = path.join(dir, 'src', 'components', 'ProductGrid.tsx');
+  const grid = fs
+    .readFileSync(gridPath, 'utf8')
+    .replace(/price: '\$(\d+)\.00'/g, 'price: $1');
+  fs.writeFileSync(gridPath, grid, 'utf8');
+
+  silence(() => runDenebArc(dir, 'numeric-price-store', { telemetry: 'off' }));
+  const { manifest, siteData } = auditFivora(dir);
+  const home = manifest.editorSchema.sections.find((section) => section.id === 'home');
+  const products = home.fields.find((field) => field.key === 'products');
+  const price = products.fields.find((field) => field.key === 'price');
+
+  assert.equal(price.type, 'number');
+  assert.equal(siteData.content.home.products[0].price, 249);
+  assert.equal(typeof siteData.content.home.products[0].price, 'number');
 });
 
 test('collections holding component references still bind primitive item fields', () => {
@@ -3916,7 +3952,6 @@ test('ARC v3 Phase 18: formatBlockedExplanationTerminal renders actionable remed
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
-
 
 
 

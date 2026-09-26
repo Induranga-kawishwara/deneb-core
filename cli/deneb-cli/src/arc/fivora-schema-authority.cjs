@@ -25,8 +25,8 @@ const PLATFORM_ALLOWED_TYPES = new Set([
 ]);
 
 const TYPE_COERCION_MAP = {
-  currency: 'text', // In Fivora storefronts, prices with symbols (e.g. '$249' or 'LKR 5,000') must be text or number
-  price: 'text',
+  currency: 'text',
+  price: 'number',
   richtext: 'textarea',
   phone: 'tel',
   link: 'url',

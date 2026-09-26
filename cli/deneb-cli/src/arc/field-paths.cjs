@@ -181,7 +181,14 @@ function classifyFieldType(kind, value, fieldName = '') {
     /price|amount|rating|count|score|stars|qty|quantity|discount|fee|cost/i.test(name)
   ) {
     if (typeof value === 'string' && /\$|lkr|usd|rs\.?\s*\d/i.test(value)) return 'text';
-    return typeof value === 'number' ? 'number' : 'text';
+    if (typeof value === 'number') return 'number';
+    if (
+      typeof value === 'string' &&
+      /^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(value.trim())
+    ) {
+      return 'number';
+    }
+    return 'text';
   }
   if (typeof value === 'boolean' || /enabled|visible|show|active/i.test(name)) return 'boolean';
   if (kind === 'textarea' || (typeof value === 'string' && (value.length > 70 || value.includes('\n')))) return 'textarea';
