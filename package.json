@@ -1,6 +1,6 @@
 {
   "name": "deneb-ui-framework-monorepo",
-  "version": "2.0.94",
+  "version": "2.0.95",
   "private": true,
   "description": "DENEB UI Framework Monorepo — Created by Chamika Gayashan & Induranga Kawishwara",
   "workspaces": [
