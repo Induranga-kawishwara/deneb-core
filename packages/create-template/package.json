@@ -1,6 +1,6 @@
 {
   "name": "@deneb-ui/create-template",
-  "version": "2.0.95",
+  "version": "2.0.96",
   "description": "Scaffold production-ready DENEB UI storefront templates for Next.js in seconds.",
   "bin": {
     "create-deneb-template": "bin/index.js",
