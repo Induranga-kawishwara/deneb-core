@@ -1,7 +1,7 @@
 'use client';
 
 import { contentList, contentObject, contentText, useServices, useSiteData } from '@/lib/siteDataContext';
-import { EditableSection, EditableCard, EditableImage, EditableText } from '@deneb-ui/ui';
+import { EditableCard, EditableImage, EditableText } from '@deneb-ui/ui';
 
 export default function ServicesPage() {
   const siteData = useSiteData();
@@ -10,14 +10,8 @@ export default function ServicesPage() {
   const services = useServices();
 
   return (
-    <div data-preview-page-key="services" style={{ display: 'flex', flexDirection: 'column' }}>
-      <EditableSection
-        name="services-heading"
-        order={siteData?.styles?.['services-heading.section']?.order ?? 1}
-        centered={siteData?.styles?.['services-heading.section']?.centered ?? false}
-        hidden={siteData?.styles?.['services-heading.section']?.hidden ?? false}
-        className="page-section page-heading"
-      >
+    <div data-preview-page-key="services">
+      <section className="page-section page-heading" data-design-section="services-heading">
         <EditableText
           as="h1"
           variant="h1"
@@ -34,14 +28,8 @@ export default function ServicesPage() {
           data-preview-field-path="servicesPage.intro"
           defaultValue={contentText(page.intro)}
         />
-      </EditableSection>
-      <EditableSection
-        name="services-list"
-        order={siteData?.styles?.['services-list.section']?.order ?? 2}
-        centered={siteData?.styles?.['services-list.section']?.centered ?? false}
-        hidden={siteData?.styles?.['services-list.section']?.hidden ?? false}
-        className="page-section alt"
-      >
+      </section>
+      <section className="page-section alt" data-design-section="services-list">
         <div className="card-grid" data-preview-list-path="services">
           {services.map((rawService, index) => {
             const service = contentObject(rawService);
@@ -109,7 +97,7 @@ export default function ServicesPage() {
             );
           })}
         </div>
-      </EditableSection>
+      </section>
     </div>
   );
 }
