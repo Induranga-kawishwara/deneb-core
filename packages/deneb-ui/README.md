@@ -600,6 +600,125 @@ The engine automatically:
 
 ---
 
+### Modular Section Architecture (`<section>` & `<Section>`)
+
+DENEB UI introduces a modular `<section>` architecture designed specifically for visual website builders, enabling 1-click section deletion, full layout centering, and background styling.
+
+#### Key Features
+* **100% Contract Compliant**: Automatically sets `data-design-section`, `data-section-id`, and `id`.
+* **1-Click Delete / Hide**: Supports `hidden={true}` or visual editor hide toggle (`display: none`).
+* **Instant Centering**: One-prop horizontal and text centering with `center={true}` or `align="center"`.
+* **Responsive Container**: `container={true}` wraps children in a responsive, max-width contained inner wrapper (`1280px`).
+
+```tsx
+import { Section, EditableSection, Heading, Paragraph, Button } from "@deneb-ui/ui";
+
+export function PromoSection() {
+  return (
+    // Clean shorthand alias
+    <Section 
+      name="special-promo" 
+      center={true} 
+      container={true}
+      bg="#f8fafc"
+      padding="xl"
+    >
+      <Heading level={2} id="promo.title" defaultValue="Limited Time Offer" />
+      <Paragraph id="promo.subtitle" defaultValue="Get 20% off all handcrafted items." />
+      <Button id="promo.cta" defaultValue="Shop the Sale" />
+    </Section>
+  );
+}
+```
+
+---
+
+### Dual Product Pricing & Apparel Variants
+
+DENEB UI commerce components natively support both **Single Fixed Prices** and **Dynamic Price Ranges**, as well as apparel clothing options (color swatches with image swapping and size chips).
+
+#### 1. Single Fixed Price
+```tsx
+import { ProductCard } from "@deneb-ui/ui";
+
+<ProductCard
+  item={{
+    id: "prod-1",
+    name: "Classic Silk Shirt",
+    price: 3500,
+    compareAtPrice: 4500,
+    currency: "LKR",
+    imageUrl: "/images/shirt.jpg"
+  }}
+  itemPath="products[0]"
+/>
+```
+
+#### 2. Dynamic Price Range & Apparel Color Swatches
+```tsx
+import { ProductCard } from "@deneb-ui/ui";
+
+<ProductCard
+  item={{
+    id: "prod-2",
+    name: "Linen Summer Tunic",
+    minPrice: 2500,
+    maxPrice: 4500,
+    priceRange: "LKR 2,500 – LKR 4,500",
+    isPriceRange: true,
+    currency: "LKR",
+    imageUrl: "/images/tunic-navy.jpg",
+    colors: [
+      { name: "Navy Blue", hex: "#1e3a8a", imageUrl: "/images/tunic-navy.jpg" },
+      { name: "Olive Green", hex: "#3f6212", imageUrl: "/images/tunic-olive.jpg" },
+      { name: "Cream White", hex: "#f8fafc", imageUrl: "/images/tunic-white.jpg" }
+    ],
+    sizes: ["S", "M", "L", "XL"],
+    variants: [
+      { color: "Navy Blue", size: "S", price: 2500 },
+      { color: "Navy Blue", size: "XL", price: 3200 },
+      { color: "Olive Green", size: "L", price: 4500 }
+    ]
+  }}
+  itemPath="products[1]"
+  whatsappPhone="+94771234567"
+/>
+```
+* **Interactive Color Swatches**: Clicking a color automatically swaps the card's active product photo to that color's image.
+* **Variant Price Resolution**: Displays the range (`LKR 2,500 – LKR 4,500`) initially, then resolves to the exact variant price when a size/color is selected.
+* **Smart WhatsApp & Cart**: Automatically compiles `[Color: Navy Blue, Size: XL]` into the customer's WhatsApp order message and cart drawer line items.
+
+---
+
+## Reference Examples
+
+DENEB UI includes full, ready-to-run reference examples demonstrating modular layouts, dual pricing, and complete storefront architecture:
+
+```tsx
+import {
+  SectionLayoutExample,
+  ProductPricingExample,
+  CompleteStorefrontExample
+} from "@deneb-ui/ui";
+
+// 1. Modular section centering & hiding controls
+export function SectionDemo() {
+  return <SectionLayoutExample />;
+}
+
+// 2. Single price, price ranges, and apparel swatches with photo switching
+export function CommerceDemo() {
+  return <ProductPricingExample />;
+}
+
+// 3. Full production-ready Next.js storefront page
+export function FullStorefrontDemo() {
+  return <CompleteStorefrontExample />;
+}
+```
+
+---
+
 ## Related Packages
 
 | Package | Purpose |

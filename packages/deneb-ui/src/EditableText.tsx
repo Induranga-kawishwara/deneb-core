@@ -194,6 +194,11 @@ export interface EditableTextProps extends React.HTMLAttributes<HTMLElement> {
   id?: string;
 
   /**
+   * Field path alias (e.g. "hero.title").
+   */
+  fieldPath?: string;
+
+  /**
    * Explicit fivora visual editing attribute for strict static analysis.
    */
   'data-preview-field-path'?: string;
@@ -263,6 +268,7 @@ export interface EditableTextProps extends React.HTMLAttributes<HTMLElement> {
 export function EditableText({
   id,
   'data-preview-field-path': previewFieldPath,
+  fieldPath,
   defaultValue,
   placeholder,
   children,
@@ -280,7 +286,7 @@ export function EditableText({
   className = '',
   ...props
 }: EditableTextProps) {
-  const path = previewFieldPath || id;
+  const path = previewFieldPath || fieldPath || id;
   const rawContent = children !== undefined ? children : defaultValue;
   const isContentEmpty =
     rawContent === undefined ||

@@ -157,3 +157,6 @@ export type {
   VisualCustomizationElementStyle,
   TemplateThemeShape,
 } from '@deneb-ui/core';
+
+// Export reference examples
+export * from './examples';

@@ -144,6 +144,9 @@ export function sectionStyleToCssVariables(
   if (style.backgroundOverlayOpacity !== undefined) {
     vars['--deneb-section-overlay-opacity'] = String(style.backgroundOverlayOpacity);
   }
+  if (style.textAlign) vars['--deneb-section-align'] = style.textAlign;
+  if (style.display) vars['--deneb-section-display'] = style.display;
+  if (style.order !== undefined && style.order !== '') vars['--deneb-section-order'] = String(style.order);
   return vars;
 }
 

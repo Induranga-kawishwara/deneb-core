@@ -123,18 +123,22 @@ export function EditableFAQItem({
 
 export interface EditableFAQAccordionProps extends React.HTMLAttributes<HTMLDivElement> {
   listPath?: string;
-  items: FAQItem[];
+  items?: FAQItem[];
+  faqs?: FAQItem[];
   defaultOpenIndex?: number;
 }
 
 export function EditableFAQAccordion({
   listPath = 'home.faq',
-  items = [],
+  items: itemsProp,
+  faqs,
+
   defaultOpenIndex = 0,
   className = '',
   style,
   ...props
 }: EditableFAQAccordionProps) {
+  const items = faqs || itemsProp || [];
   return (
     <div
       data-preview-list-path={listPath}

@@ -243,6 +243,8 @@ export function EditableTestimonialSection({
 
   return (
     <section
+      id={props.id || basePath || "testimonials"}
+      data-section-id={(props as any)["data-section-id"] || basePath || "testimonials"}
       data-preview-page-key={basePath}
       data-design-section={basePath}
       className={`editable-testimonial-section w-full ${defaultPadding} px-3 sm:px-6 lg:px-8 ${className}`.trim()}

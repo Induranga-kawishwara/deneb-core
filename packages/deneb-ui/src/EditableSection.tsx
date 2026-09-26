@@ -1,7 +1,7 @@
-import React from 'react';
-import { BoxSpacing } from './EditableBox';
-import { useComponentStyle } from './hooks/useComponentStyle';
-import { RESPONSIVE_SECTION_PADDING } from './utils/responsive';
+import React from "react";
+import { BoxSpacing } from "./EditableBox";
+import { useComponentStyle } from "./hooks/useComponentStyle";
+import { RESPONSIVE_SECTION_PADDING } from "./utils/responsive";
 
 const SECTION_PADDING_MAP: Record<string, string> = RESPONSIVE_SECTION_PADDING;
 
@@ -9,13 +9,13 @@ export interface EditableSectionProps extends React.HTMLAttributes<HTMLElement> 
   as?: React.ElementType;
 
   /**
-   * Required fivora design section identifier (e.g. 'home-hero', 'home-introduction', 'home-features').
-   * Automatically sets `data-design-section` to satisfy strict Fivora validator rules.
+   * Required fivora design section identifier (e.g. "home-hero", "home-features", "products", "testimonials").
+   * Automatically sets `data-design-section`, `data-section-id`, and `id` for full editor targeting.
    */
   name: string;
 
   /**
-   * Vertical section padding ('none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' or custom CSS).
+   * Vertical section padding ("none" | "xs" | "sm" | "md" | "lg" | "xl" | "2xl" or custom CSS).
    */
   padding?: BoxSpacing;
 
@@ -38,22 +38,60 @@ export interface EditableSectionProps extends React.HTMLAttributes<HTMLElement> 
    * Section border style.
    */
   border?: string | boolean;
+
+  /**
+   * Content alignment: "left" | "center" | "right".
+   */
+  align?: "left" | "center" | "right";
+
+  /**
+   * Quick toggle to center all content and text horizontally.
+   */
+  center?: boolean;
+
+  /**
+   * Whether this section is hidden or deleted.
+   */
+  hidden?: boolean;
+
+  /**
+   * Visual flexbox order for section reordering (e.g. 1, 2, 3).
+   */
+  order?: number | string;
+
+  /**
+   * Whether to wrap children in a responsive inner container.
+   */
+  container?: boolean;
+
+  /**
+   * Class name for the inner container if container=true.
+   */
+  containerClassName?: string;
 }
 
 /**
  * EditableSection standardizes section spacing and automatically applies the required
- * `data-design-section` marker for 100% fivora contract compliance.
+ * `data-design-section` and `data-section-id` markers for 100% fivora contract compliance,
+ * with first-class support for section deletion/hiding and instant centering.
  */
 export function EditableSection({
-  as: Component = 'section',
+  as: Component = "section",
   name,
-  padding = 'lg',
+  padding = "lg",
   bg,
   color,
   maxWidth,
   border,
-  className = '',
+  align,
+  center,
+  hidden,
+  order,
+  container,
+  containerClassName = "",
+  className = "",
   style,
+  id,
   children,
   ...props
 }: EditableSectionProps) {
@@ -62,34 +100,60 @@ export function EditableSection({
 
   const resolvedBorder =
     border === true
-      ? '1px solid var(--border-color, rgba(226, 232, 240, 0.8))'
-      : typeof border === 'string'
+      ? "1px solid var(--border-color, rgba(226, 232, 240, 0.8))"
+      : typeof border === "string"
       ? border
       : undefined;
 
   const stylePath = `${name}.section`;
-  const { cssVars: styleVars } = useComponentStyle(stylePath, 'section');
+  const { cssVars: styleVars } = useComponentStyle(stylePath, "section");
+
+  const resolvedAlign = align || (center ? "center" : undefined);
 
   const sectionStyle: React.CSSProperties = {
     ...(resolvedPadding ? { padding: resolvedPadding } : {}),
     ...(bg ? { background: bg } : {}),
     ...(color ? { color } : {}),
-    ...(maxWidth !== undefined ? { maxWidth, marginLeft: 'auto', marginRight: 'auto' } : {}),
+    ...(maxWidth !== undefined && !container ? { maxWidth, marginLeft: "auto", marginRight: "auto" } : {}),
     ...(resolvedBorder ? { borderBottom: resolvedBorder } : {}),
+    ...(resolvedAlign ? { textAlign: resolvedAlign } : {}),
+    ...(hidden ? { display: "none" } : {}),
+    ...(order !== undefined && order !== "" ? { order: Number(order) } : {}),
     ...styleVars,
     ...style,
   };
 
+  const content = container ? (
+    <div
+      className={`deneb-section-container ${containerClassName}`.trim()}
+      style={{
+        maxWidth: maxWidth !== undefined ? maxWidth : "1280px",
+        marginLeft: "auto",
+        marginRight: "auto",
+        paddingLeft: "1rem",
+        paddingRight: "1rem",
+        ...(resolvedAlign === "center" ? { display: "flex", flexDirection: "column", alignItems: "center" } : {}),
+      }}
+    >
+      {children}
+    </div>
+  ) : (
+    children
+  );
+
   return (
     <Component
+      id={id || name}
       data-design-section={name}
+      data-section-id={name}
+      data-section-visible={hidden ? "false" : "true"}
       data-preview-style-target={stylePath}
       data-preview-style-type="section"
       className={`deneb-section editable-section ${className}`.trim()}
       style={sectionStyle}
       {...(props as any)}
     >
-      {children}
+      {content}
     </Component>
   );
 }

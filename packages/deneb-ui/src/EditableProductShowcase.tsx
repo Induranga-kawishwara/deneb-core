@@ -299,7 +299,9 @@ export function EditableProductShowcase({
 
   return (
     <section
-      id="shop"
+      id={props.id || "featured-products"}
+      data-design-section="featured-products"
+      data-section-id="featured-products"
       className={`relative py-20 sm:py-28 overflow-clip bg-white ${className}`}
       {...props}
     >

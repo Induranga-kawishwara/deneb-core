@@ -313,6 +313,9 @@ export function EditableGoogleFeedback({
 
   return (
     <section
+      id={props.id || "google-feedback"}
+      data-design-section="google-feedback"
+      data-section-id="google-feedback"
       data-preview-page-key={basePath}
       className={`editable-google-feedback w-full ${defaultPadding} ${className}`.trim()}
       style={style}

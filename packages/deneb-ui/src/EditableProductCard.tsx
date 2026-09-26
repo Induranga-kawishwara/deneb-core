@@ -107,7 +107,8 @@ export type ProductCardVariant = 'modern-glass' | 'classic' | 'minimal' | 'horiz
 
 export interface EditableProductCardProps extends React.HTMLAttributes<HTMLElement> {
   itemPath: string;
-  product: ProductItem;
+  product?: ProductItem;
+  item?: ProductItem;
   cardVariant?: ProductCardVariant;
   imageFallback?: string;
   as?: React.ElementType;
@@ -117,7 +118,10 @@ export interface EditableProductCardProps extends React.HTMLAttributes<HTMLEleme
   showDescription?: boolean;
   showCategory?: boolean;
   whatsappNumber?: string;
+  whatsappPhone?: string;
   storeName?: string;
+  showOptions?: boolean;
+  allowInteractiveSwatches?: boolean;
   showWhatsAppButton?: boolean;
   showAddToCartButton?: boolean;
   whatsappActionLabel?: string;
@@ -169,7 +173,8 @@ function CartIcon({ className = '', style = {} }: { className?: string; style?: 
 
 export function EditableProductCard({
   itemPath,
-  product,
+  product: productProp,
+  item: itemProp,
   cardVariant = 'modern-glass',
   imageFallback,
   as: Component = 'article',
@@ -178,7 +183,10 @@ export function EditableProductCard({
   showPrice = true,
   showDescription = true,
   showCategory = true,
-  whatsappNumber = '94770000000',
+  whatsappNumber: whatsappNumberProp,
+  whatsappPhone: whatsappPhoneProp,
+  showOptions,
+  allowInteractiveSwatches,
   storeName,
   showWhatsAppButton = true,
   showAddToCartButton = true,
@@ -193,6 +201,8 @@ export function EditableProductCard({
   style,
   ...props
 }: EditableProductCardProps) {
+  const product = (productProp || itemProp || {}) as ProductItem;
+  const whatsappNumber = whatsappPhoneProp || whatsappNumberProp || '94770000000';
   const cart = useOptionalCart();
 
   // Dynamic Options, Measurements & Colors resolution
