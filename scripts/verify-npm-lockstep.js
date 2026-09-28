@@ -9,7 +9,7 @@ if (!version) {
 }
 
 const names = ['@deneb-ui/core', '@deneb-ui/ui', '@deneb-ui/cli', '@deneb-ui/create-template'];
-const attempts = Number(process.env.NPM_LOCKSTEP_ATTEMPTS || 20);
+const attempts = Number(process.env.NPM_LOCKSTEP_ATTEMPTS || 32);
 const delayMs = Number(process.env.NPM_LOCKSTEP_DELAY_MS || 15000);
 
 function sleep(ms) {
