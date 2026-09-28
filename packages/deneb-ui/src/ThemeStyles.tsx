@@ -259,11 +259,6 @@ export interface ThemeStylesProps {
  */
 export function ThemeStyles({
   theme,
-  defaultPrimary = '#2563eb',
-  defaultSecondary = '#0f172a',
-  defaultAccent = '#14b8a6',
-  defaultBg = '#ffffff',
-  defaultText = '#0f172a',
   enableDualMode = true,
 }: ThemeStylesProps) {
   const styleProps = getThemeCssProperties(theme);

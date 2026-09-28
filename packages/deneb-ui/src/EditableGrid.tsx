@@ -99,6 +99,7 @@ export function EditableGrid({
   return (
     <Component
       data-preview-list-path={listPath}
+      data-preview-static={previewStatic}
       data-preview-style-target={stylePath}
       data-preview-style-type="grid"
       className={`deneb-grid editable-grid ${className}`.trim()}

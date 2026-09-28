@@ -104,7 +104,7 @@ export function EditableCustomerReviews({
   const liveReviews = useReviews();
   const siteData = useSiteData();
   const contentRecord = (siteData?.content && typeof siteData.content === 'object' ? siteData.content : {}) as Record<string, Record<string, unknown>>;
-  const siteReviews = contentRecord[sectionPath]?.reviews || contentRecord.reviews || (contentRecord.home && typeof contentRecord.home === 'object' ? (contentRecord.home as Record<string, unknown>).reviews : undefined);
+  const siteReviews = contentRecord[sectionPath]?.[listPath] || contentRecord[listPath] || contentRecord[sectionPath]?.reviews || contentRecord.reviews || (contentRecord.home && typeof contentRecord.home === 'object' ? (contentRecord.home as Record<string, unknown>).reviews : undefined);
 
   const rawReviews = (reviews && reviews.length > 0)
     ? reviews

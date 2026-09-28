@@ -189,23 +189,22 @@ export function EditableProductCard({
   showCategory = true,
   whatsappNumber: whatsappNumberProp,
   whatsappPhone: whatsappPhoneProp,
-  showOptions,
-  allowInteractiveSwatches,
   storeName,
   showWhatsAppButton = true,
   showAddToCartButton = true,
   whatsappActionLabel = 'Inquire on WhatsApp',
   addToCartLabel = 'Add to Cart',
   actionSlot,
-  actionLabel,
-  actionLabelPath,
   onAddToCart,
   onWhatsAppClick,
   className = '',
   style,
   ...props
 }: EditableProductCardProps) {
-  const product = (productProp || itemProp || {}) as ProductItem;
+  const product = useMemo(
+    () => (productProp || itemProp || {}) as ProductItem,
+    [productProp, itemProp]
+  );
   const whatsappNumber = whatsappPhoneProp || whatsappNumberProp || '94770000000';
   const cart = useOptionalCart();
 
@@ -225,13 +224,13 @@ export function EditableProductCard({
       setSelectedColor('');
       setColorImage('');
     }
-  }, [product, resolvedOptions.colors]);
+  }, [product, resolvedOptions.colors, selectedColor]);
 
   useEffect(() => {
     if (selectedOption && !resolvedOptions.options.some((o) => o.toLowerCase() === selectedOption.toLowerCase())) {
       setSelectedOption('');
     }
-  }, [product, resolvedOptions.options]);
+  }, [product, resolvedOptions.options, selectedOption]);
 
   // Variant & Dynamic Price Resolution
   const resolvedPrice = useMemo(

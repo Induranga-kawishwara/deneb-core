@@ -8,26 +8,11 @@ import {
 import {
   getFieldStyle,
   isRecord,
-  parseFieldPath,
   useSiteData,
   type GenericRecord,
 } from '../SiteDataProvider';
 
-function getNestedValue(root: unknown, dottedPath: string): unknown {
-  if (!root || !dottedPath) return undefined;
-  const parts = parseFieldPath(dottedPath);
-  let current: unknown = root;
-  for (const part of parts) {
-    if (typeof part === 'number') {
-      if (!Array.isArray(current)) return undefined;
-      current = current[part];
-    } else {
-      if (!isRecord(current)) return undefined;
-      current = current[part];
-    }
-  }
-  return current;
-}
+
 
 export function resolveComponentStyle(
   siteData: GenericRecord,

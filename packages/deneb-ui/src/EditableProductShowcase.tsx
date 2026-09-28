@@ -556,7 +556,10 @@ export function EditableProductShowcase({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (onQuickView) onQuickView(phone, idx);
-                        else if (typeof window !== 'undefined') window.location.href = detailUrl;
+                        else if (typeof window !== 'undefined') {
+                          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                          window.location.href = detailUrl;
+                        }
                       }}
                       className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-black/[0.02] text-zinc-600 hover:text-cyan-600 hover:border-cyan-400/50 hover:bg-cyan-50/50 transition-all cursor-pointer"
                       title="Quick View"
