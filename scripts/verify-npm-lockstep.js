@@ -45,6 +45,7 @@ async function checkPublished(name, ver) {
 }
 
 async function main() {
+  let lastMissing = [];
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const missing = [];
     for (const name of names) {
@@ -56,6 +57,7 @@ async function main() {
       }
     }
 
+    lastMissing = missing;
     if (!missing.length) {
       console.log(`\nAll four packages published and verified at v${version}`);
       process.exit(0);
@@ -70,10 +72,7 @@ async function main() {
   }
 
   console.error(
-    `npm lockstep failed after ${attempts} attempts. Not visible on the registry yet:\n- ${names
-      .filter((name) => !checkPublished(name, version))
-      .map((name) => `${name}@${version}`)
-      .join('\n- ')}`,
+    `npm lockstep failed after ${attempts} attempts. Not visible on the registry yet:\n- ${lastMissing.join('\n- ')}`,
   );
   process.exit(1);
 }
