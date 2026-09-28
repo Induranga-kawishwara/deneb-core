@@ -280,6 +280,12 @@ export function EditableFilterSidebar({
 
         {/* In Stock Toggle */}
         <div className="border-t border-neutral-800/80 pt-6">
+          <h4
+            className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-400"
+            data-preview-field-path={fieldPath('availabilityTitle')}
+          >
+            {availabilityTitle}
+          </h4>
           <label
             className="flex items-center justify-between cursor-pointer group"
             data-preview-static="filter-instock-toggle"

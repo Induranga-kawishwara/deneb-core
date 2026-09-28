@@ -177,15 +177,7 @@ export const FONT_FAMILY_MAP: Record<string, string> = {
   body: 'var(--body-font, Inter, sans-serif)',
 };
 
-function toCssUnit(value: unknown): string | undefined {
-  if (value === undefined || value === null || value === '') return undefined;
-  const str = String(value).trim();
-  if (!str) return undefined;
-  if (/^-?\d+(\.\d+)?$/.test(str)) {
-    return `${str}px`;
-  }
-  return str;
-}
+
 
 export interface EditableTextProps extends React.HTMLAttributes<HTMLElement> {
   /**

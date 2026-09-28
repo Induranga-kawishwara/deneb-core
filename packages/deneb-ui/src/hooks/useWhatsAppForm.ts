@@ -235,7 +235,7 @@ export function useWhatsAppForm(options: UseWhatsAppFormOptions = {}): UseWhatsA
 
       return `https://wa.me/?text=${encodeURIComponent(message)}`;
     },
-    [resolvedUrl, options.formatMessage, options.formName, resolvedBusinessName]
+    [resolvedUrl, options, resolvedBusinessName]
   );
 
   const dispatchUrl = useCallback(

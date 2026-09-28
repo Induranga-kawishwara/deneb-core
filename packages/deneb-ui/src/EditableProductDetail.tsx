@@ -121,14 +121,18 @@ export function EditableProductDetail({
   ...props
 }: EditableProductDetailProps) {
   // 1. Resolve Images: Support gallery, images array, and single image fields
+  const productRecord = (product || {}) as Record<string, unknown>;
+  const productPhoto = productRecord.photo as string | undefined;
+  const productThumbnail = productRecord.thumbnail as string | undefined;
+
   const validImages = useMemo(() => {
     const rawList = (product.gallery && product.gallery.length > 0)
       ? product.gallery
       : (product.images && product.images.length > 0)
         ? product.images
-        : [product.featuredImage || product.imageUrl || product.image || (product as any).photo || (product as any).thumbnail || '/products/vanta-aero-x.jpg'];
+        : [product.featuredImage || product.imageUrl || product.image || productPhoto || productThumbnail || '/products/vanta-aero-x.jpg'];
     return (rawList as string[]).filter(Boolean);
-  }, [product.gallery, product.images, product.featuredImage, product.imageUrl, product.image, (product as any).photo, (product as any).thumbnail]);
+  }, [product.gallery, product.images, product.featuredImage, product.imageUrl, product.image, productPhoto, productThumbnail]);
 
   // 2. Resolve Options (Sizes, Volumes, Weights, Counts)
   const resolved = resolveProductOptions(product);
@@ -221,7 +225,7 @@ export function EditableProductDetail({
     if (resolvedPrice.variantImage && resolvedPrice.variantImage !== activeImage) {
       setActiveImage(resolvedPrice.variantImage);
     }
-  }, [resolvedPrice.variantImage]);
+  }, [resolvedPrice.variantImage, activeImage]);
 
   const handleSelectColor = (c: { name: string; hex?: string; image?: string }) => {
     setSelectedColor(c.name);

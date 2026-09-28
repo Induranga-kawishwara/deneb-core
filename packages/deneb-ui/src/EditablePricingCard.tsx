@@ -213,6 +213,7 @@ export function EditablePricingCard({
               onClick={() => {
                 if (typeof window !== 'undefined') {
                   const basePath = (process.env.NEXT_PUBLIC_SITE_BASE_PATH ?? '').replace(/\/$/, '');
+                  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                   window.location.href = `${basePath}/${ctaTarget}`;
                 }
               }}

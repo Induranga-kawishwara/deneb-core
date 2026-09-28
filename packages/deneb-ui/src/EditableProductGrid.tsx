@@ -305,7 +305,7 @@ export function EditableProductGrid({
     setInternalPage(1);
     setLoadedCount(activePageSize);
     onPageChange?.(1);
-  }, [searchQuery, activeCategory, activePageSize]);
+  }, [searchQuery, activeCategory, activePageSize, onPageChange]);
 
   const filteredProducts = useMemo(() => {
     let result = products;
