@@ -1296,3 +1296,55 @@ export function useContact(fallback: GenericRecord = {}): GenericRecord {
     googleMapLink,
   };
 }
+
+
+export interface SyncedBranding {
+  logoUrl: string;
+  websiteTitle: string;
+  brandSubtext: string;
+  slogan: string;
+  faviconUrl: string;
+}
+
+/**
+ * Universal Synced Branding Hook:
+ * Guarantees real-time live synchronization for brand identity across visual editor preview,
+ * merchant DB profile, and template defaults.
+ * Hierarchy: Visual Editor Edits (content.common) -> Live Merchant Shop Profile -> Template Fallback.
+ */
+export function useSyncedBranding(fallback: Partial<SyncedBranding> = {}): SyncedBranding {
+  const siteData = useSiteData();
+  const content = isRecord(siteData?.content) ? siteData.content : null;
+  const common = isRecord(content?.common) ? content.common : {};
+  const shop = useShop();
+
+  const websiteTitle =
+    (typeof common.websiteTitle === 'string' && common.websiteTitle.trim()) ||
+    (typeof common.siteName === 'string' && common.siteName.trim()) ||
+    (typeof shop.businessName === 'string' && shop.businessName.trim()) ||
+    (typeof shop.name === 'string' && shop.name.trim()) ||
+    (typeof fallback.websiteTitle === 'string' && fallback.websiteTitle.trim()) ||
+    'Storefront';
+
+  const logoUrl =
+    (typeof common.logoUrl === 'string' && common.logoUrl.trim()) ||
+    (typeof shop.logoUrl === 'string' && shop.logoUrl.trim()) ||
+    (typeof fallback.logoUrl === 'string' && fallback.logoUrl.trim()) ||
+    '';
+
+  const brandSubtext =
+    (typeof common.brandSubtext === 'string' && common.brandSubtext.trim()) ||
+    (typeof common.slogan === 'string' && common.slogan.trim()) ||
+    (typeof fallback.brandSubtext === 'string' && fallback.brandSubtext.trim()) ||
+    '';
+
+  const faviconUrl = logoUrl || fallback.faviconUrl || '';
+
+  return {
+    logoUrl,
+    websiteTitle,
+    brandSubtext,
+    slogan: brandSubtext,
+    faviconUrl,
+  };
+}
