@@ -9,7 +9,7 @@ if (!version) {
 }
 
 const names = ['@deneb-ui/core', '@deneb-ui/ui', '@deneb-ui/cli', '@deneb-ui/create-template'];
-const attempts = Number(process.env.NPM_LOCKSTEP_ATTEMPTS || 20);
+const attempts = Number(process.env.NPM_LOCKSTEP_ATTEMPTS || 32);
 const delayMs = Number(process.env.NPM_LOCKSTEP_DELAY_MS || 15000);
 
 function sleep(ms) {
@@ -45,6 +45,7 @@ async function checkPublished(name, ver) {
 }
 
 async function main() {
+  let lastMissing = [];
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const missing = [];
     for (const name of names) {
@@ -56,6 +57,7 @@ async function main() {
       }
     }
 
+    lastMissing = missing;
     if (!missing.length) {
       console.log(`\nAll four packages published and verified at v${version}`);
       process.exit(0);
@@ -70,10 +72,7 @@ async function main() {
   }
 
   console.error(
-    `npm lockstep failed after ${attempts} attempts. Not visible on the registry yet:\n- ${names
-      .filter((name) => !checkPublished(name, version))
-      .map((name) => `${name}@${version}`)
-      .join('\n- ')}`,
+    `npm lockstep failed after ${attempts} attempts. Not visible on the registry yet:\n- ${lastMissing.join('\n- ')}`,
   );
   process.exit(1);
 }
