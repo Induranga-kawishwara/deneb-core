@@ -51,12 +51,14 @@ export function StickyMobileBar({
   primaryActionHref = '#products',
   onPrimaryAction,
 }: StickyMobileBarProps) {
-  const { siteData } = useSiteData();
+  const siteData = useSiteData<any>();
 
   // Resolve merchant contacts from siteData if not explicitly provided
-  const merchant = (siteData as any)?.merchant || {};
-  const phone = propPhone || merchant.phone || merchant.supportPhone || '';
-  const whatsapp = propWhatsapp || merchant.whatsapp || merchant.phone || '';
+  const shop = siteData?.shop || siteData?.merchant || {};
+  const livePhone = shop?.contact?.phone || shop?.businessPhone || shop?.phone || shop?.supportPhone || '';
+  const liveWa = shop?.contact?.whatsapp || shop?.businessWhatsapp || shop?.whatsapp || shop?.phone || '';
+  const phone = propPhone || livePhone || '+94 11 234 5678';
+  const whatsapp = propWhatsapp || liveWa || '94771234567';
 
   // Default action buttons if custom actions array is not provided
   const resolvedActions: StickyMobileBarAction[] = actions || [
