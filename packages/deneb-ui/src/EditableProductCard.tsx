@@ -1,3 +1,4 @@
+import { useSiteData } from './SiteDataProvider';
 import React, { useState, useMemo, useEffect } from 'react';
 import { EditableText, EditableBadge } from './EditableText';
 import { EditableImage } from './EditableImage';
@@ -333,7 +334,20 @@ export function EditableProductCard({
         ? 'photo'
         : 'imageUrl');
 
-  const resolvedPhone = String(product?.whatsappNumber || whatsappNumber || '94770000000');
+  const siteDataCard = useSiteData<any>();
+  const liveShopCard = siteDataCard?.shop;
+  const liveWaCard =
+    liveShopCard?.contact?.whatsapp ||
+    liveShopCard?.businessWhatsapp ||
+    liveShopCard?.whatsappNumber ||
+    liveShopCard?.whatsapp;
+  const resolvedPhone = String(
+    product?.whatsappNumber ||
+    (whatsappPhoneProp || whatsappNumberProp ? whatsappNumber : null) ||
+    liveWaCard ||
+    whatsappNumber ||
+    '94771234567'
+  );
   const resolvedWhatsAppText = String(product?.whatsappButtonText || whatsappActionLabel);
   const resolvedAddToCartText = String(product?.addToCartButtonText || addToCartLabel);
 

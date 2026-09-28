@@ -330,14 +330,23 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
       return;
     }
 
+    const isLocalhost =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1');
+
     const endpoint =
       liveCatalogEndpoint ||
-      initialSiteData?.api?.catalogUrl ||
-      (candidateSlug && initialSiteData?.api?.baseUrl
-        ? `${initialSiteData.api.baseUrl.replace(/\/+$/, '')}/site-catalog/${candidateSlug}/live-data`
-        : candidateSlug
-          ? `/site-catalog/${candidateSlug}/live-data`
-          : null);
+      (isLocalhost &&
+      initialSiteData?.api?.catalogUrl &&
+      initialSiteData.api.catalogUrl.includes('api.fivora.site')
+        ? `http://localhost:3000/site-catalog/${candidateSlug}/live-data`
+        : initialSiteData?.api?.catalogUrl ||
+          (candidateSlug && initialSiteData?.api?.baseUrl
+            ? `${initialSiteData.api.baseUrl.replace(/\/+$/, '')}/site-catalog/${candidateSlug}/live-data`
+            : candidateSlug
+              ? `/site-catalog/${candidateSlug}/live-data`
+              : null));
 
     if (!endpoint) return;
 
@@ -375,41 +384,57 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
           const contact = isRecord(live.shop.contact) ? live.shop.contact : null;
           const address = isRecord(live.shop.address) ? live.shop.address : null;
 
-          if (contact) {
-            if (typeof contact.phone === 'string' && contact.phone.trim()) {
-              nextContact.phone = contact.phone;
-              nextContact.contactNumber = contact.phone;
-              nextCommon.contactNumber = contact.phone;
-              nextCommon.phone = contact.phone;
-            }
-            if (typeof contact.whatsapp === 'string' && contact.whatsapp.trim()) {
-              nextContact.whatsapp = contact.whatsapp;
-              nextCommon.whatsapp = contact.whatsapp;
-              const cleanWa = contact.whatsapp.replace(/\D/g, '');
-              if (cleanWa) {
-                nextContact.whatsappNumber = cleanWa;
-                nextCommon.whatsappNumber = cleanWa;
-                nextHome.whatsappNumber = cleanWa;
+          const phoneVal =
+            (contact && typeof contact.phone === 'string' && contact.phone.trim()) ||
+            (typeof live.shop.businessPhone === 'string' && live.shop.businessPhone.trim()) ||
+            null;
+          if (phoneVal) {
+            nextContact.phone = phoneVal;
+            nextContact.contactNumber = phoneVal;
+            nextCommon.contactNumber = phoneVal;
+            nextCommon.phone = phoneVal;
+          }
 
-                // Dynamically update any hardcoded or static wa.me URLs across home and common
-                const waRegex = /(https?:\/\/(?:wa\.me|api\.whatsapp\.com\/send\?phone=))\d+/gi;
-                for (const key of ['whatsappCtaUrl', 'whatsappOrderUrl', 'whatsappUrl']) {
-                  if (typeof nextHome[key] === 'string' && waRegex.test(nextHome[key])) {
-                    nextHome[key] = nextHome[key].replace(waRegex, `$1${cleanWa}`);
-                  }
-                  if (typeof nextCommon[key] === 'string' && waRegex.test(nextCommon[key])) {
-                    nextCommon[key] = nextCommon[key].replace(waRegex, `$1${cleanWa}`);
-                  }
+          const whatsappVal =
+            (contact && typeof contact.whatsapp === 'string' && contact.whatsapp.trim()) ||
+            (typeof live.shop.businessWhatsapp === 'string' && live.shop.businessWhatsapp.trim()) ||
+            null;
+          if (whatsappVal) {
+            nextContact.whatsapp = whatsappVal;
+            nextCommon.whatsapp = whatsappVal;
+            const cleanWa = whatsappVal.replace(/\D/g, '');
+            if (cleanWa) {
+              nextContact.whatsappNumber = cleanWa;
+              nextCommon.whatsappNumber = cleanWa;
+              nextHome.whatsappNumber = cleanWa;
+
+              // Dynamically update any hardcoded or static wa.me URLs across home and common
+              const waRegex = /(https?:\/\/(?:wa\.me|api\.whatsapp\.com\/send\?phone=))\d+/gi;
+              for (const key of ['whatsappCtaUrl', 'whatsappOrderUrl', 'whatsappUrl']) {
+                if (typeof nextHome[key] === 'string' && waRegex.test(nextHome[key])) {
+                  nextHome[key] = nextHome[key].replace(waRegex, `$1${cleanWa}`);
                 }
-                if (!nextCommon.whatsappUrl || waRegex.test(nextCommon.whatsappUrl)) {
-                  nextCommon.whatsappUrl = `https://wa.me/${cleanWa}`;
+                if (typeof nextCommon[key] === 'string' && waRegex.test(nextCommon[key])) {
+                  nextCommon[key] = nextCommon[key].replace(waRegex, `$1${cleanWa}`);
                 }
               }
+              if (!nextCommon.whatsappUrl || waRegex.test(nextCommon.whatsappUrl)) {
+                nextCommon.whatsappUrl = `https://wa.me/${cleanWa}`;
+              }
             }
-            if (typeof contact.email === 'string' && contact.email.trim()) {
-              nextContact.email = contact.email;
-              nextCommon.email = contact.email;
-            }
+          }
+
+          const emailVal =
+            (contact && typeof contact.email === 'string' && contact.email.trim()) ||
+            (typeof live.shop.businessEmail === 'string' && live.shop.businessEmail.trim()) ||
+            null;
+          if (emailVal) {
+            nextContact.email = emailVal;
+            nextCommon.email = emailVal;
+          }
+
+          if (typeof live.shop.businessName === 'string' && live.shop.businessName.trim()) {
+            nextCommon.websiteTitle = live.shop.businessName.trim();
           }
 
           if (address) {
@@ -1136,6 +1161,33 @@ export function useReviews(fallback: GenericRecord[] = []): GenericRecord[] {
  * with safe hierarchical fallbacks across content.common, shop profile, and user fallbacks.
  * Never throws ReferenceError or crashes on missing data.
  */
+
+export const DUMMY_PREVIEW_PHONE = '+94 11 234 5678';
+export const DUMMY_PREVIEW_WHATSAPP = '94771234567';
+export const DUMMY_PREVIEW_EMAIL = 'info@store.com';
+export const DUMMY_PREVIEW_ADDRESS = 'Flagship Studio: Galle Face Promenade, Colombo 03, Sri Lanka';
+export const DUMMY_PREVIEW_SHOP_NAME = 'Storefront';
+
+/**
+ * Checks whether the active storefront runtime is running in visual editor preview,
+ * template authoring frame, or automated template validation.
+ */
+export function isPreviewValidation(siteData?: any): boolean {
+  if (!siteData) return true;
+  const slug = siteData?.project?.slug || siteData?.siteInstance?.slug;
+  const id = siteData?.project?.id;
+  if (slug === 'template-validation' || id === 'template-validation' || slug === 'preview' || id === 'preview') {
+    return true;
+  }
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname || '';
+    if (path.includes('/template-validation') || path.includes('/template-preview') || path.includes('/preview/')) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function useCommon(fallback: GenericRecord = {}): GenericRecord {
   const siteData = useSiteData();
   const content = isRecord(siteData?.content) ? siteData.content : null;

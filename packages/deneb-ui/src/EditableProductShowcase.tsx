@@ -273,12 +273,19 @@ export function EditableProductShowcase({
   }, [normalizedProducts, selectedFilter]);
 
   // Resolve merchant WhatsApp target dynamically ([DNB-WHA-008])
+  const liveShopShowcase = (siteData as any)?.shop;
+  const liveWaShowcase =
+    liveShopShowcase?.contact?.whatsapp ||
+    liveShopShowcase?.businessWhatsapp ||
+    liveShopShowcase?.whatsappNumber ||
+    liveShopShowcase?.whatsapp;
   const rawWhatsAppTarget =
+    liveWaShowcase ||
     secContent.whatsappOrderUrl ||
     secContent.whatsappNumber ||
     (siteData?.content as any)?.common?.business?.whatsapp ||
     (siteData?.content as any)?.merchant?.whatsapp ||
-    'https://wa.me/15550192834';
+    'https://wa.me/94771234567';
 
   const handleWhatsAppOrder = (product: ProductShowcaseItem, colorName: string, e: React.MouseEvent) => {
     e.stopPropagation();

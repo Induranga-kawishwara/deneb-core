@@ -159,13 +159,28 @@ export function EditableFooter({
 
   // Direct message / WhatsApp action
   const directMessageLabel = String(contact?.directMessageText || common?.directMessageText || props.directMessageText || 'Send us a direct message');
-  const rawWhatsapp = String(contact?.whatsapp || contact?.whatsappUrl || common?.whatsapp || business?.whatsapp || props.whatsappUrl || phone || '');
+  const liveWhatsapp =
+    shopContact?.whatsapp ||
+    shop?.businessWhatsapp ||
+    shop?.whatsappNumber ||
+    shop?.whatsapp;
+  const rawWhatsapp = String(
+    liveWhatsapp ||
+    contact?.whatsapp ||
+    contact?.whatsappUrl ||
+    common?.whatsapp ||
+    common?.whatsappNumber ||
+    business?.whatsapp ||
+    props.whatsappUrl ||
+    phone ||
+    '94771234567'
+  );
   const cleanDigits = rawWhatsapp.replace(/[^\d]/g, '');
   const whatsappHref = rawWhatsapp.startsWith('http')
-    ? rawWhatsapp
+    ? (rawWhatsapp.includes('wa.me') && cleanDigits ? `https://wa.me/${cleanDigits}` : rawWhatsapp)
     : cleanDigits
       ? `https://wa.me/${cleanDigits}`
-      : 'https://wa.me/';
+      : 'https://wa.me/94771234567';
 
   // Route filtering
   const navigationItems = links || defaultLinks;
