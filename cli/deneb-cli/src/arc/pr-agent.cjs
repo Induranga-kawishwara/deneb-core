@@ -32,6 +32,11 @@ function getGithubConfig() {
  * @returns {{ ready: boolean, reason?: string }}
  */
 function checkGithubReady() {
+  // Automated branch/PR creation is permanently disabled by default.
+  // Set DENEB_ENABLE_PR=true only if you explicitly want to create GitHub branches.
+  if (process.env.DENEB_ENABLE_PR !== 'true') {
+    return { ready: false, reason: 'Automated GitHub branch creation is disabled.' };
+  }
   loadEnv();
   const config = getGithubConfig();
   if (!config.pat) {
@@ -204,10 +209,10 @@ async function createComponentPR(params) {
   let corePr = null;
   let uiPr = null;
 
-  if (dryRun) {
+  if (dryRun || process.env.DENEB_ENABLE_PR !== 'true') {
     return {
-      corePr: { number: 0, url: '(dry-run — PR not created)' },
-      uiPr: docsCode ? { number: 0, url: '(dry-run — PR not created)' } : null,
+      corePr: { number: 0, url: '(branch/PR creation disabled)' },
+      uiPr: docsCode ? { number: 0, url: '(branch/PR creation disabled)' } : null,
       errors: [],
     };
   }
