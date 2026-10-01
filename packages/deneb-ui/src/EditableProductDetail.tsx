@@ -35,6 +35,8 @@ export interface ProductDetailItem {
   whatsappNumber?: string;
   whatsappMessage?: string;
   isAvailable?: boolean;
+  showPrice?: boolean;
+  isPriceRange?: boolean;
 
   // Variants & Measurements System
   unit?: MeasurementUnit;
@@ -245,8 +247,38 @@ export function EditableProductDetail({
 
   const name = String(product.name || product.title || (product as any).productName || (product as any).itemTitle || 'Product Title');
   const rawPriceCandidate = product.price ?? (product as any).cost ?? (product as any).amount ?? (product as any).productPrice;
-  const basePrice = rawPriceCandidate !== undefined && rawPriceCandidate !== null ? String(rawPriceCandidate) : 'LKR 0';
+  const isRange = Boolean(
+    product.isPriceRange ||
+    (product.minPrice !== undefined && product.maxPrice !== undefined) ||
+    product.priceRange
+  );
+
+  let rangePriceString = '';
+  if (isRange) {
+    if (product.priceRange) {
+      rangePriceString = String(product.priceRange);
+    } else {
+      const minNum = typeof product.minPrice === 'number' ? product.minPrice : parseFloat(String(product.minPrice || '').replace(/[^0-9.]/g, '')) || 0;
+      const maxNum = typeof product.maxPrice === 'number' ? product.maxPrice : parseFloat(String(product.maxPrice || '').replace(/[^0-9.]/g, '')) || 0;
+      rangePriceString = `LKR ${minNum.toLocaleString()} – LKR ${maxNum.toLocaleString()}`;
+    }
+  }
+
+  const basePrice =
+    rangePriceString ||
+    (rawPriceCandidate !== undefined && rawPriceCandidate !== null
+      ? typeof rawPriceCandidate === 'number'
+        ? `LKR ${rawPriceCandidate.toLocaleString()}`
+        : String(rawPriceCandidate)
+      : 'LKR 0');
   const originalPrice = product.originalPrice ?? product.compareAtPrice;
+
+  const itemShowPrice =
+    (product as any)?.showPrice !== undefined
+      ? Boolean((product as any).showPrice)
+      : ((product as any)?.customData?.showPrice !== undefined
+        ? Boolean((product as any).customData.showPrice)
+        : true);
 
   const displayPrice = resolvedPrice.formattedPrice || basePrice;
   const displayOriginalPrice = resolvedPrice.formattedOriginalPrice || (originalPrice ? String(originalPrice) : undefined);
@@ -273,7 +305,7 @@ export function EditableProductDetail({
     product.whatsappNumber
       ? createWhatsAppUrl(
           product.whatsappNumber,
-          product.whatsappMessage || `Hi, I would like to order ${name}${orderSnippet ? ` ${orderSnippet}` : ''} - ${displayPrice}`
+          product.whatsappMessage || `Hi, I would like to order ${name}${orderSnippet ? ` ${orderSnippet}` : ''}${itemShowPrice ? ` - ${displayPrice}` : ' (Price on Request)'}`
         )
       : ''
   );
@@ -372,19 +404,27 @@ export function EditableProductDetail({
             </span>
 
             {/* Price (Fixed or Range or Dynamic Variant Price) */}
-            <div className="mt-4 flex items-baseline gap-3">
-              <span
-                data-preview-field-path={`${sectionPath}.price`}
-                className="text-3xl font-black text-lime-400 tracking-tight"
-              >
-                {displayPrice}
-              </span>
-              {displayOriginalPrice ? (
-                <span className="text-lg font-medium text-slate-500 line-through">
-                  {String(displayOriginalPrice)}
+            {itemShowPrice ? (
+              <div className="mt-4 flex items-baseline gap-3">
+                <span
+                  data-preview-field-path={`${sectionPath}.price`}
+                  className="text-3xl font-black text-lime-400 tracking-tight"
+                >
+                  {displayPrice}
                 </span>
-              ) : null}
-            </div>
+                {displayOriginalPrice && !isRange ? (
+                  <span className="text-lg font-medium text-slate-500 line-through">
+                    {String(displayOriginalPrice)}
+                  </span>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-4 flex items-center gap-3">
+                <span className="inline-flex items-center px-3.5 py-1.5 rounded-xl text-sm font-bold bg-slate-800/80 text-slate-300 border border-slate-700/60">
+                  Price on Request
+                </span>
+              </div>
+            )}
 
             {/* Description */}
             {description && (

@@ -281,8 +281,15 @@ export function EditableProductCard({
         : formatCurrency(basePriceNum, currency)
       : '');
 
+  const itemShowPrice =
+    (product as any)?.showPrice !== undefined
+      ? Boolean((product as any).showPrice)
+      : ((product as any)?.customData?.showPrice !== undefined
+        ? Boolean((product as any).customData.showPrice)
+        : true);
+  const effectiveShowPrice = showPrice && itemShowPrice;
   const displayPrice = resolvedPrice.formattedPrice || baseFormattedPrice;
-  const hasPrice = showPrice && Boolean(displayPrice && displayPrice.trim() !== '');
+  const hasPrice = effectiveShowPrice && Boolean(displayPrice && displayPrice.trim() !== '');
 
   const priceKey =
     'cost' in (product || {}) && !('price' in (product || {}) && (product as any).price !== undefined)
@@ -730,7 +737,7 @@ export function EditableProductCard({
                   letterSpacing: '-0.02em',
                 }}
               />
-              {displayOriginalPrice ? (
+              {displayOriginalPrice && !isRange ? (
                 <EditableText
                   as="span"
                   id={`${itemPath}.${originalPriceKey}`}
@@ -756,6 +763,25 @@ export function EditableProductCard({
                   }}
                 />
               ) : null}
+            </div>
+          ) : !effectiveShowPrice ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  color: 'var(--muted-text, #94a3b8)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  letterSpacing: '0.01em',
+                }}
+              >
+                Price on Request
+              </span>
             </div>
           ) : null}
 
