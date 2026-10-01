@@ -93,6 +93,72 @@ export default function ServicesPage() {
                     ))}
                   </ul>
                 )}
+                {(() => {
+                  const itemShowPrice =
+                    (service as any)?.showPrice !== undefined
+                      ? Boolean((service as any).showPrice)
+                      : ((service as any)?.customData?.showPrice !== undefined
+                        ? Boolean((service as any).customData.showPrice)
+                        : true);
+                  const price = (service as any).price;
+                  const priceLabel = contentText((service as any).priceLabel);
+                  const hasNumericPrice = price !== undefined && price !== null && String(price).trim() !== '';
+                  const formattedPrice = hasNumericPrice
+                    ? typeof price === 'number'
+                      ? `LKR ${price.toLocaleString()}`
+                      : String(price).includes('LKR')
+                        ? String(price)
+                        : `LKR ${price}`
+                    : '';
+
+                  if (itemShowPrice && (hasNumericPrice || priceLabel)) {
+                    return (
+                      <div style={{ marginTop: 'auto', paddingTop: '0.75rem', display: 'flex', alignItems: 'baseline', gap: '0.375rem', flexWrap: 'wrap' }}>
+                        {hasNumericPrice && (
+                          <EditableText
+                            as="span"
+                            weight="bold"
+                            size="lg"
+                            color="primary"
+                            data-preview-field-path={`services[${index}].price`}
+                            defaultValue={formattedPrice}
+                          />
+                        )}
+                        {priceLabel && (
+                          <EditableText
+                            as="span"
+                            color="muted"
+                            data-preview-field-path={`services[${index}].priceLabel`}
+                            defaultValue={priceLabel}
+                            style={{ fontSize: '0.8125rem' }}
+                          />
+                        )}
+                      </div>
+                    );
+                  }
+                  if (!itemShowPrice) {
+                    return (
+                      <div style={{ marginTop: 'auto', paddingTop: '0.75rem' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                            color: 'var(--muted-text, #94a3b8)',
+                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                          }}
+                        >
+                          Quote on Request
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </EditableCard>
             );
           })}

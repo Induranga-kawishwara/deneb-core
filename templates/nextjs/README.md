@@ -162,6 +162,24 @@ Edit `src/data/site-data.json` under `template.structure.theme`:
    ```
 3. Add the page content to `src/data/site-data.json`.
 
+### One-page section navigation
+
+Use route links such as `/about` only when that route is exported. For a
+one-page design, link to a stable section ID instead:
+
+```tsx
+<a href="#about">About</a>
+<section id="about" data-section-id="about" data-design-section="about">
+  {/* About content */}
+</section>
+```
+
+Every visible navigation item must resolve to exactly one visible section in
+the exported Home document. Keep labels such as Home, About, Services, Gallery,
+and Contact as neutral template UI copy rather than AI-generated marketing
+text. Test direct `/#about` loading and sticky-header scrolling before
+packaging.
+
 ---
 
 ## Packaging for Fivora

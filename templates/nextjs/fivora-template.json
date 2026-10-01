@@ -347,6 +347,21 @@
               "type": "text",
               "label": "Feature"
             }
+          },
+          {
+            "key": "price",
+            "type": "number",
+            "label": "Price"
+          },
+          {
+            "key": "priceLabel",
+            "type": "text",
+            "label": "Price Label (e.g. Starting from, per hour)"
+          },
+          {
+            "key": "showPrice",
+            "type": "boolean",
+            "label": "Show Price on Storefront"
           }
         ]
       },
@@ -442,8 +457,7 @@
           {
             "key": "price",
             "type": "number",
-            "label": "Price",
-            "required": true
+            "label": "Price"
           },
           {
             "key": "compareAtPrice",
@@ -469,6 +483,31 @@
             "key": "badge",
             "type": "text",
             "label": "Badge"
+          },
+          {
+            "key": "showPrice",
+            "type": "boolean",
+            "label": "Show Price on Storefront"
+          },
+          {
+            "key": "isPriceRange",
+            "type": "boolean",
+            "label": "Enable Price Range"
+          },
+          {
+            "key": "minPrice",
+            "type": "number",
+            "label": "Minimum Price"
+          },
+          {
+            "key": "maxPrice",
+            "type": "number",
+            "label": "Maximum Price"
+          },
+          {
+            "key": "priceRange",
+            "type": "text",
+            "label": "Price Range Display"
           }
         ]
       }

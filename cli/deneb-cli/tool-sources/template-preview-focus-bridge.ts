@@ -4,10 +4,11 @@ import {
   UNIVERSAL_TEMPLATE_THEME_STYLE_ID,
 } from './universal-template-theme';
 import { enforceSelectedTemplatePages } from './universal-page-selection';
+import { installUniversalSectionNavigation } from './universal-section-navigation';
 
 export const TEMPLATE_PREVIEW_FOCUS_BRIDGE_FILE =
   '__fivora-preview-focus-bridge.js';
-export const TEMPLATE_PREVIEW_FOCUS_BRIDGE_VERSION = '46';
+export const TEMPLATE_PREVIEW_FOCUS_BRIDGE_VERSION = '47';
 
 const PREVIOUS_PREVIEW_BRIDGE_ATTRIBUTE = `data-${['market', 'place'].join('')}-preview-focus-bridge`;
 
@@ -80,6 +81,7 @@ function fivoraPreviewFocusBridge(
   replaceColorLiterals: typeof replaceTemplateColorLiterals,
   universalThemeStyleId: string,
   enforceSelectedPages: typeof enforceSelectedTemplatePages,
+  installSectionNavigation: typeof installUniversalSectionNavigation,
 ) {
   const PREVIOUS_PREVIEW_PREFIX = `${['MARKET', 'PLACE'].join('')}_PREVIEW_`;
   const previousPreviewMessage = (suffix: string) =>
@@ -3531,6 +3533,8 @@ function clearResolvedEditableTargets() {
   // to fetch missing RSC `.txt` payloads (404 spam) and glitches the preview.
   // Force same-site internal links to full document loads; cached site data
   // prevents demo-content flash on remount.
+  installSectionNavigation();
+
   function resolvePreviewRootPrefix() {
     const match = window.location.pathname.match(
       /^(\/uploads\/generated-sites\/(?:template-preview|[^/]+)\/[^/]+)/,
@@ -3592,5 +3596,5 @@ export const TEMPLATE_PREVIEW_FOCUS_BRIDGE_SCRIPT =
   `${buildUniversalTemplateThemeCss.toString()},` +
   `${replaceTemplateColorLiterals.toString()},` +
   `${JSON.stringify(UNIVERSAL_TEMPLATE_THEME_STYLE_ID)},` +
-  `${enforceSelectedTemplatePages.toString()});`;
-
+  `${enforceSelectedTemplatePages.toString()},` +
+  `${installUniversalSectionNavigation.toString()});`;
