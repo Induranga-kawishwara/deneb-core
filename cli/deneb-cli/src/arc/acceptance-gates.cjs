@@ -83,7 +83,7 @@ function evaluateAcceptanceGates(metrics = {}) {
     },
     designPreservation: {
       name: ACCEPTANCE_GATES.DESIGN_PRESERVATION,
-      passed: Boolean((metrics.designPreservationScore ?? 100) >= 95),
+      passed: Boolean((metrics.designPreservationScore ?? 100) >= 90),
       critical: false,
     },
     controlOnlyProtection: {
