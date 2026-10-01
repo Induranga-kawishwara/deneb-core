@@ -43,6 +43,7 @@ export function getProductWhatsAppUrl(
     title?: string;
     brand?: string;
     price?: string | number;
+    showPrice?: boolean;
     size?: string | number;
     color?: string;
     option?: string | number;
@@ -61,20 +62,26 @@ export function getProductWhatsAppUrl(
   if (product.option && product.option !== product.size) variantParts.push(`Option: ${product.option}`);
   const variantStr = variantParts.length > 0 ? ` [${variantParts.join(", ")}]` : "";
 
+  const isPriceVisible = product.showPrice !== false && product.price !== undefined && product.price !== null && String(product.price).trim() !== '';
+
   const rawPriceStr = typeof product.price === "string" && product.price.trim() ? product.price.trim() : "";
   const priceNum = typeof product.price === "number" ? product.price : parseNumericPrice(product.price);
-  const priceStr = rawPriceStr
-    ? `\nPrice: ${rawPriceStr}`
-    : (priceNum > 0 ? `\nPrice: ${formatCurrency(priceNum, options?.currency || "LKR")}` : "");
+  const priceStr = isPriceVisible
+    ? (rawPriceStr ? `\nPrice: ${rawPriceStr}` : (priceNum > 0 ? `\nPrice: ${formatCurrency(priceNum, options?.currency || "LKR")}` : ""))
+    : "";
 
   const store = options?.storeName ? ` at ${options.storeName}` : "";
+
+  const closingPrompt = isPriceVisible
+    ? `Could you please share more details, availability, and ordering instructions? Thank you!`
+    : `Could you please share the pricing, availability, and ordering instructions? Thank you!`;
 
   const message = [
     `Hello${store}! 👋`,
     `I am interested in this product:`,
     `*${title}*${brand}${variantStr}${priceStr}`,
     "",
-    `Could you please share more details, availability, and ordering instructions? Thank you!`,
+    closingPrompt,
   ].join("\n");
 
   return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;

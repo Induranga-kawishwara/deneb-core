@@ -305,7 +305,11 @@ export function EditableProductDetail({
     product.whatsappNumber
       ? createWhatsAppUrl(
           product.whatsappNumber,
-          product.whatsappMessage || `Hi, I would like to order ${name}${orderSnippet ? ` ${orderSnippet}` : ''}${itemShowPrice ? ` - ${displayPrice}` : ' (Price on Request)'}`
+          product.whatsappMessage || (
+            itemShowPrice
+              ? `Hi, I would like to order ${name}${orderSnippet ? ` ${orderSnippet}` : ''} - ${displayPrice}`
+              : `Hi, I am interested in ${name}${orderSnippet ? ` ${orderSnippet}` : ''}. Could you please share the pricing, availability, and details?`
+          )
         )
       : ''
   );
