@@ -415,7 +415,7 @@ function callbackRootElement(callback) {
  */
 function collectItemFieldUsage(callback, itemParam) {
   const usage = new Map();
-  if (!callback || !itemParam) return usage;
+  if (!callback || !itemParam) return { usage, usesItemAsComponent: false, usesDirectItem: false };
 
   function record(property, role) {
     if (!property || usage.has(property)) return;
