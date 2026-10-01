@@ -615,16 +615,26 @@ function findUncoveredVisibleTextRegex(code, filePath) {
 function auditEmptyStateSource(code, filePath) {
   const errors = [];
   const source = String(code);
+  const isInteractiveOrPageToggle = (condition) => {
+    return /(?:open|active|selected|modal|dialog|lightbox|drawer|popup|sheet|portal|loading|pending|tab|filter|step|enabled|ispageenabled|haspage|pagestatus|pageenabled)/i.test(
+      String(condition || '')
+    );
+  };
+
   const andPattern =
     /\{([^{}]{0,120}?)\s*&&\s*\(?\s*<\s*([a-zA-Z][\w.:-]*)([^>]*data-preview-(?:field-path|list-path|item-path)[^>]*)>/g;
   for (const match of source.matchAll(andPattern)) {
+    const condition = String(match[1]).trim();
+    if (isInteractiveOrPageToggle(condition)) continue;
     errors.push(
-      `${filePath}:${lineNumberAt(source, match.index ?? 0)} editable marker is gated behind "${String(match[1]).trim()} &&". Keep the target mounted when its value is empty, false, or zero.`
+      `${filePath}:${lineNumberAt(source, match.index ?? 0)} editable marker is gated behind "${condition} &&". Keep the target mounted when its value is empty, false, or zero.`
     );
   }
   const ternaryPattern =
     /\{([^{}]{0,80}?)\s*\?\s*<\s*([a-zA-Z][\w.:-]*)([^>]*data-preview-(?:field-path|list-path|item-path)[^>]*)>[\s\S]{0,200}?\?\s*(?:null|false|undefined)/g;
   for (const match of source.matchAll(ternaryPattern)) {
+    const condition = String(match[1]).trim();
+    if (isInteractiveOrPageToggle(condition)) continue;
     errors.push(
       `${filePath}:${lineNumberAt(source, match.index ?? 0)} editable marker unmounts on a falsy ternary. Keep the target mounted when its value is empty.`
     );

@@ -180,7 +180,31 @@ function upsertSchemaList(sections, listPath, itemFields, items) {
   }
 
   const key = rest[rest.length - 1];
-  if (fields.some((f) => f.key === key)) return;
+  const existingList = fields.find((f) => f.key === key);
+  if (existingList) {
+    existingList.fields = existingList.fields || [];
+    for (const field of itemFields || []) {
+      if (!existingList.fields.some((ef) => ef.key === field.key)) {
+        existingList.fields.push({
+          key: field.key,
+          type:
+            field.type === 'url'
+              ? 'url'
+              : field.type === 'image'
+                ? 'image'
+                : field.type === 'textarea'
+                  ? 'textarea'
+                  : field.type === 'tel' || field.type === 'phone'
+                    ? 'tel'
+                    : field.type === 'email'
+                      ? 'email'
+                      : field.type || 'text',
+          label: humanLabel(field.key),
+        });
+      }
+    }
+    return;
+  }
 
   const isPrimitiveList = (itemFields || []).length === 0;
   fields.push({
@@ -255,6 +279,9 @@ function enrichSchemasFromContent(content, sections) {
         if (Object.prototype.hasOwnProperty.call(node, labelKey)) {
           upsertSchemaField(sections, `${prefix}.${labelKey}`, 'text', humanLabel(labelKey));
         }
+      } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        const fieldType = classifyFieldType('text', value, key);
+        upsertSchemaField(sections, nextPath, fieldType, humanLabel(key));
       } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
         walk(value, nextPath);
       }
@@ -627,6 +654,35 @@ function buildSiteDataAndManifest({
     }
   }
 
+  // Ensure all bound field paths (e.g., from existing template code) are registered in editorSchema and content
+  for (const bPath of boundFieldPaths || []) {
+    if (!bPath || typeof bPath !== 'string') continue;
+    const listMatch = bPath.match(/^(.*?)\[(?:\d+|\*|[a-zA-Z0-9_]+)\]\.(.*)$/);
+    if (listMatch) {
+      const listPath = listMatch[1];
+      const itemKey = listMatch[2];
+      const listVal = getDeep(content, listPath) || [];
+      const sample = Array.isArray(listVal) && listVal[0] ? listVal[0] : {};
+      const itemVal = getDeep(sample, itemKey);
+      const itemType = classifyFieldType('text', itemVal, itemKey);
+      upsertSchemaList(editorSections, listPath, [{ key: itemKey, type: itemType }], listVal);
+      continue;
+    }
+    if (!isBound(bPath) && !isAllowedControlOnly(bPath)) continue;
+    let val = getDeep(content, bPath);
+    if (val === undefined && existingSiteData?.content) {
+      val = getDeep(existingSiteData.content, bPath);
+      if (val !== undefined) setDeep(content, bPath, val);
+    }
+    if (val === undefined) {
+      setDeep(content, bPath, '');
+      val = '';
+    }
+    const leafKey = bPath.split('.').pop();
+    const type = classifyFieldType('text', val, leafKey);
+    upsertSchemaField(editorSections, bPath, type, humanLabel(leafKey));
+  }
+
   pruneUnboundLeaves(content, isBound);
 
   const siteData = {
@@ -747,6 +803,7 @@ module.exports = {
   collectFieldsFromPlan,
   computeControlOnlyPaths,
   assignSectionPageKeys,
+  upsertSchemaField,
   upsertSchemaList,
   enrichSchemasFromContent,
   isListActionCtaKey,

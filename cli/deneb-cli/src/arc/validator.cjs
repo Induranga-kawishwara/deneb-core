@@ -48,7 +48,7 @@ function validateContracts(projectDir, siteData, manifest) {
       if (siteData?.content && getDeep(siteData.content, fieldPath) === undefined) {
         orphans.push({ fieldPath, file: relative });
       }
-      if (manifest && !isFieldInEditorSchema(manifest, fieldPath)) {
+      if (manifest && !isFieldInEditorSchema(manifest, fieldPath) && !isControlOnly(fieldPath, manifest.visualEditing?.controlOnlyPaths)) {
         missingSchema.push({ fieldPath, file: relative });
       }
     }
@@ -82,24 +82,49 @@ function validateContracts(projectDir, siteData, manifest) {
 }
 
 function isFieldInEditorSchema(manifest, fieldPath) {
-  const parts = String(fieldPath).split('.');
-  const sectionId = parts[0];
-  const fieldKey = parts.slice(1).join('.');
-  const section = (manifest.editorSchema?.sections || []).find((s) => s.id === sectionId || s.path === sectionId);
-  if (!section) return false;
+  if (!manifest?.editorSchema?.sections) return false;
+  const cleanPath = String(fieldPath)
+    .replace(/\[(?:\d+|\*|[a-zA-Z0-9_]+)\]/g, '.[*]')
+    .replace(/\.\.+/g, '.');
+  const parts = cleanPath.split('.').filter(Boolean);
+  const rawSectionId = parts[0];
+  const sectionId = rawSectionId ? rawSectionId.replace(/\[\*\]/g, '') : '';
 
-  function checkFields(fields, targetKey) {
-    if (!Array.isArray(fields)) return false;
+  const section = (manifest.editorSchema?.sections || []).find(
+    (s) => s.id === sectionId || s.path === sectionId || s.id === rawSectionId
+  );
+  if (!section) return false;
+  const fieldParts = parts.slice(1);
+  if (fieldParts.length === 0) return true;
+
+  function check(fields, remainingParts) {
+    if (!Array.isArray(fields) || remainingParts.length === 0) return false;
+    const current = remainingParts[0];
+    const rest = remainingParts.slice(1);
+
+    if (current === '[*]') {
+      if (rest.length === 0) return true;
+      return check(fields, rest);
+    }
+
     for (const f of fields) {
-      if (f.key === targetKey) return true;
-      if (f.fields && targetKey.startsWith(f.key + '.')) {
-        const subKey = targetKey.substring(f.key.length + 1);
-        if (checkFields(f.fields, subKey)) return true;
+      if (f.key === current) {
+        if (rest.length === 0) return true;
+        const subFields = f.fields || f.itemFields;
+        if (subFields) {
+          if (rest[0] === '[*]') {
+            if (rest.length === 1) return true;
+            if (check(subFields, rest.slice(1))) return true;
+          }
+          if (check(subFields, rest)) return true;
+        }
       }
+      if (f.key === remainingParts.join('.')) return true;
     }
     return false;
   }
-  return checkFields(section.fields, fieldKey);
+
+  return check(section.fields || section.itemFields, fieldParts);
 }
 
 function designPreservationScore(filePlans, afterFiles) {

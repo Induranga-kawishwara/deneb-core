@@ -595,6 +595,21 @@ function analyzeFile(optionsOrFile, codeArg, profileArg) {
         return;
       }
 
+      if (hasStaticMarker(node)) {
+        candidates.push({
+          loc,
+          tag: name,
+          kind: 'static',
+          confidence: 1,
+          skip: true,
+          reason: 'already-static-marker',
+          file: relativeFile,
+          ownerScope,
+        });
+        this.traverse(pathNode);
+        return;
+      }
+
       if (isElementOrParentHidden(pathNode)) {
         candidates.push({
           loc,
