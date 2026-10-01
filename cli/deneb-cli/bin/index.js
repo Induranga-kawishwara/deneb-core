@@ -929,7 +929,13 @@ async function initProject(targetInput, options = {}) {
       conversionRes = pipelineRes.result || pipelineRes;
       if (pipelineRes.rolledBack) {
         console.log('\n\x1b[31m✖ DENEB CONVERSION BLOCKED — Original project files preserved intact.\x1b[0m');
-        console.log(`\x1b[33m  Reason:\x1b[0m ${pipelineRes.reasons?.[0] || '100% Fivora Contract / Acceptance Gate validation failed'}`);
+        const primaryReason = pipelineRes.reasons?.[0] || pipelineRes.error || '100% Fivora Contract / Acceptance Gate validation failed';
+        console.log(`\x1b[33m  Reason:\x1b[0m ${primaryReason}`);
+        if (pipelineRes.reasons && pipelineRes.reasons.length > 1) {
+          for (let i = 1; i < pipelineRes.reasons.length; i++) {
+            console.log(`\x1b[90m    - ${pipelineRes.reasons[i]}\x1b[0m`);
+          }
+        }
         console.log(`\n  Run \x1b[36m\x1b[1mnpx @deneb-ui/cli explain --blocked\x1b[0m for exact file locations, line numbers, and fixes.\n`);
         process.exit(1);
       }

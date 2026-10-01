@@ -31,47 +31,23 @@ function isUnsafeToStripCondition(leftExpr, rightExpr, pathNode) {
 
   if (leftIdentifiers.size === 0) return true;
 
-  // 2. State & modal variable keywords (e.g., selectedDish, lightboxIndex, isOpen, activeTab)
-  const stateKeywordRegex = /(?:open|active|selected|current|expanded|visible|show|modal|dialog|lightbox|drawer|loading|tab|filter|step|index)/i;
+  // 2. Interactive state & modal variable keywords (e.g. lightboxIndex, selectedDish, isOpen, activeTab, isModalOpen)
+  const interactiveStateKeywordRegex = /(?:modal|dialog|lightbox|drawer|popup|sheet|portal|isopen|activetab|selecteditem|selecteddish|lightboxindex|expanded|loading|pending)/i;
   for (const id of leftIdentifiers) {
-    if (stateKeywordRegex.test(id)) {
-      return true; // NEVER strip modal/state/selection guards
+    if (interactiveStateKeywordRegex.test(id)) {
+      return true; // NEVER strip modal/interactive state guards
     }
   }
 
-  // 3. Null / undefined / equality / comparison checks
-  let hasComparisonOrNullCheck = false;
-  recast.types.visit(leftExpr, {
-    visitBinaryExpression(bPath) {
-      const op = bPath.node.operator;
-      if (['!==', '!=', '===', '==', '>', '<', '>=', '<='].includes(op)) {
-        hasComparisonOrNullCheck = true;
-      }
-      this.traverse(bPath);
-    },
-    visitUnaryExpression(uPath) {
-      if (uPath.node.operator === '!') {
-        hasComparisonOrNullCheck = true;
-      }
-      this.traverse(uPath);
-    },
-  });
-  if (hasComparisonOrNullCheck) return true;
+  // 3. Page & feature toggles (e.g. inventoryEnabled, contactEnabled, isPageEnabled)
+  const pageToggleRegex = /(?:enabled|ispageenabled|haspage|pagestatus|pageenabled)/i;
+  for (const id of leftIdentifiers) {
+    if (pageToggleRegex.test(id)) {
+      return true; // NEVER strip page/route enablement guards
+    }
+  }
 
-  // 4. Check if ANY identifier in leftExpr is referenced inside rightExpr
-  let rightReferencesLeftId = false;
-  recast.types.visit(rightExpr, {
-    visitIdentifier(idPath) {
-      if (leftIdentifiers.has(idPath.node.name)) {
-        rightReferencesLeftId = true;
-        return false;
-      }
-      this.traverse(idPath);
-    },
-  });
-  if (rightReferencesLeftId) return true;
-
-  // 5. Check if rightExpr or any of its ancestors is an interactive modal / dialog / overlay / AnimatePresence
+  // 4. Check if rightExpr or any of its ancestors is an interactive modal / dialog / overlay / AnimatePresence
   let curr = pathNode;
   while (curr && curr.parent) {
     const parentNode = curr.parent.node;
@@ -111,11 +87,6 @@ function isUnsafeToStripCondition(leftExpr, rightExpr, pathNode) {
   });
   if (isModalOrOverlay) return true;
 
-  // 6. Only allow stripping if leftExpr is purely a direct siteData content member chain
-  const leftCode = recast.print(leftExpr).code;
-  const isDirectContentCheck = /siteData(?:\?\.|\.)content(?:\?\.|\.)/i.test(leftCode);
-  if (!isDirectContentCheck) return true;
-
   return false;
 }
 
@@ -140,6 +111,15 @@ function healEmptyStateConditionals(ast) {
         hasJsxAttribute(node, 'data-preview-item-path')
       ) {
         return true;
+      }
+      const attrs = node.openingElement?.attributes || [];
+      for (const a of attrs) {
+        if (a.type === 'JSXSpreadAttribute') {
+          const code = recast.print(a).code;
+          if (/data-preview-(?:field-path|list-path|item-path)/.test(code)) {
+            return true;
+          }
+        }
       }
       return (node.children || []).some((child) => jsxHasPreviewMarker(child));
     }
