@@ -246,9 +246,15 @@ export function EditableCartDrawer({
                         </p>
                       )}
 
-                      <p className="mt-1 text-sm font-semibold text-emerald-400">
-                        {formatCurrency(item.price * item.quantity, currency)}
-                      </p>
+                      {item.showPrice === false ? (
+                        <p className="mt-1 text-xs font-semibold text-neutral-400">
+                          Price on Request
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-sm font-semibold text-emerald-400">
+                          {formatCurrency(item.price * item.quantity, currency)}
+                        </p>
+                      )}
                     </div>
 
                     {/* Stepper */}
@@ -295,7 +301,9 @@ export function EditableCartDrawer({
                 {subtotalLabel}
               </span>
               <span className="text-xl font-bold text-white">
-                {formatCurrency(subtotal, currency)}
+                {items.length > 0 && items.every((i) => i.showPrice === false)
+                  ? "Price on Request"
+                  : formatCurrency(subtotal, currency)}
               </span>
             </div>
 

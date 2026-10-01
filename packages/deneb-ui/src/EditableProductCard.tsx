@@ -432,6 +432,7 @@ export function EditableProductCard({
       size: selectedOption || undefined,
       color: selectedColor || undefined,
       option: selectedOption || undefined,
+      showPrice: effectiveShowPrice,
     };
 
     if (cart) {

@@ -510,7 +510,7 @@ export function EditableProductDetail({
               <button
                 type="button"
                 disabled={!isAvailable}
-                onClick={() => onAddToSelection?.({ ...product, price: resolvedPrice.numericPrice || product.price }, selectedSize || undefined, selectedColor || undefined)}
+                onClick={() => onAddToSelection?.({ ...product, price: resolvedPrice.numericPrice || product.price, showPrice: itemShowPrice }, selectedSize || undefined, selectedColor || undefined)}
                 className="w-full py-4 px-6 rounded-2xl font-black text-sm uppercase tracking-wider bg-lime-400 text-slate-950 hover:bg-lime-300 active:scale-98 transition-all duration-150 shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 disabled:shadow-none"
               >
                 <span data-preview-field-path={`${sectionPath}.addToSelectionLabel`}>

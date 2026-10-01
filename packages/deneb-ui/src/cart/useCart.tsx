@@ -14,6 +14,7 @@ export interface CartItem {
   quantity: number;
   sku?: string;
   metadata?: Record<string, unknown>;
+  showPrice?: boolean;
 }
 
 
@@ -207,7 +208,7 @@ export function CartProvider({
   );
 
   const subtotal = useMemo(
-    () => items.reduce((acc, item) => acc + item.price * item.quantity, 0),
+    () => items.reduce((acc, item) => (item.showPrice !== false ? acc + item.price * item.quantity : acc), 0),
     [items],
   );
 
@@ -234,14 +235,27 @@ export function CartProvider({
         lines.push(
           `${index + 1}. *${item.name}*${brandStr}${variantStr}`,
         );
-        lines.push(
-          `   Qty: ${item.quantity} x ${formatCurrency(item.price, currency)} = *${formatCurrency(item.price * item.quantity, currency)}*`,
-        );
+        if (item.showPrice === false) {
+          lines.push(`   Qty: ${item.quantity} x *Price on Request*`);
+        } else {
+          lines.push(
+            `   Qty: ${item.quantity} x ${formatCurrency(item.price, currency)} = *${formatCurrency(item.price * item.quantity, currency)}*`,
+          );
+        }
       });
+
+      const hasHiddenItems = items.some((item) => item.showPrice === false);
+      const allHidden = items.length > 0 && items.every((item) => item.showPrice === false);
 
       lines.push('');
       lines.push('──────────────────────────────');
-      lines.push(`💰 *Grand Total: ${formatCurrency(subtotal, currency)}*`);
+      if (allHidden) {
+        lines.push(`💰 *Grand Total: Price on Request*`);
+      } else if (hasHiddenItems) {
+        lines.push(`💰 *Grand Total: ${formatCurrency(subtotal, currency)}* _(Excluding Price on Request items)_`);
+      } else {
+        lines.push(`💰 *Grand Total: ${formatCurrency(subtotal, currency)}*`);
+      }
       lines.push(`📊 Total Items: ${totalCount}`);
       lines.push('');
       lines.push('Please confirm availability and delivery details. Thank you! 🙏');
