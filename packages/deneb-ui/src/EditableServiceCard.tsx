@@ -9,6 +9,7 @@ export interface ServiceItem {
   price?: string | number;
   priceLabel?: string;
   showPrice?: boolean;
+  customData?: Record<string, unknown>;
   description?: string;
   imageUrl?: string;
   image?: string;
@@ -63,10 +64,10 @@ export function EditableServiceCard({
   const name = String(service?.name || service?.title || '');
   const description = String(service?.description || '');
   const itemShowPrice =
-    (service as any)?.showPrice !== undefined
-      ? Boolean((service as any).showPrice)
-      : ((service as any)?.customData?.showPrice !== undefined
-        ? Boolean((service as any).customData.showPrice)
+    service.showPrice !== undefined
+      ? Boolean(service.showPrice)
+      : (service.customData?.showPrice !== undefined
+        ? Boolean(service.customData.showPrice)
         : true);
   const effectiveShowPrice = showPrice && itemShowPrice;
 
