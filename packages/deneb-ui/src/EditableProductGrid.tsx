@@ -141,6 +141,9 @@ export interface EditableProductGridProps extends React.HTMLAttributes<HTMLEleme
   currency?: string;
   whatsappNumber?: string;
   whatsappPhone?: string;
+  showDetailLink?: boolean;
+  showDetailButton?: boolean;
+  detailActionLabel?: string;
   className?: string;
 }
 
@@ -181,6 +184,9 @@ export function EditableProductGrid({
   onPageChange,
   scrollToTopOnPageChange = true,
   totalProducts,
+  showDetailLink = true,
+  showDetailButton,
+  detailActionLabel,
   className = '',
   style,
   ...props
@@ -541,6 +547,9 @@ export function EditableProductGrid({
                   cardVariant={cardVariant}
                   currency={currency}
                   whatsappPhone={whatsappPhone || whatsappNumber}
+                  showDetailLink={showDetailLink}
+                  showDetailButton={showDetailButton}
+                  actionLabel={detailActionLabel}
                   className="h-full"
                 />
 

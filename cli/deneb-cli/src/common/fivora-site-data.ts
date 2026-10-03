@@ -52,10 +52,10 @@ export function applyLinkedProjectMedia(
   for (const item of ordered) {
     if (item.linkedContentPath?.trim()) {
       const linkedPath = item.linkedContentPath.trim();
-      // A saved value, including an explicit empty string, is authoritative.
-      // Media linkage is only a compatibility fallback for older projects
-      // whose content object never stored the linked field at all.
-      if (readContentPath(originalContent, linkedPath) !== undefined) {
+      const existing = readContentPath(originalContent, linkedPath);
+      // An explicit empty string (cleared by user) is authoritative.
+      // But undefined or null (uninitialized DB/template default) must be backfilled.
+      if (existing !== undefined && existing !== null) {
         continue;
       }
       result = setContentPath(result, linkedPath, item.fileUrl);
@@ -70,27 +70,110 @@ export function applyLinkedProjectMedia(
           : null;
     if (!collection || !item.entityId) continue;
 
-    const entries = result[collection];
-    if (!Array.isArray(entries)) continue;
-    const index = entries.findIndex(
-      (entry) =>
-        isRecord(entry) &&
-        (entry.id === item.entityId ||
-          entry.productId === item.entityId ||
-          entry.serviceId === item.entityId),
-    );
-    if (index >= 0) {
-      result = setContentPath(
-        result,
-        `${collection}[${index}].imageUrl`,
-        item.fileUrl,
+    const candidateCollections: Array<{ key: string; entries: unknown[] }> = [];
+    if (Array.isArray(result[collection])) {
+      candidateCollections.push({
+        key: collection,
+        entries: result[collection] as unknown[],
+      });
+    }
+    const shop = isRecord(result.shop)
+      ? (result.shop as Record<string, unknown>)
+      : null;
+    if (collection === 'products' && shop && Array.isArray(shop.products)) {
+      candidateCollections.push({
+        key: 'shop.products',
+        entries: shop.products,
+      });
+    }
+    const home = isRecord(result.home)
+      ? (result.home as Record<string, unknown>)
+      : null;
+    if (home) {
+      if (collection === 'products') {
+        if (Array.isArray(home.products)) {
+          candidateCollections.push({
+            key: 'home.products',
+            entries: home.products,
+          });
+        }
+        if (Array.isArray(home.featuredProducts)) {
+          candidateCollections.push({
+            key: 'home.featuredProducts',
+            entries: home.featuredProducts,
+          });
+        }
+      } else if (collection === 'services') {
+        if (Array.isArray(home.services)) {
+          candidateCollections.push({
+            key: 'home.services',
+            entries: home.services,
+          });
+        }
+        if (Array.isArray(home.featuredServices)) {
+          candidateCollections.push({
+            key: 'home.featuredServices',
+            entries: home.featuredServices,
+          });
+        }
+      }
+    }
+
+    // Discover any collection dynamically anywhere in result containing this entity
+    const foundKeys = new Set(candidateCollections.map((c) => c.key));
+    const findCollectionsWithEntity = (obj: unknown, prefix: string) => {
+      if (!isRecord(obj)) return;
+      for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+        const path = prefix ? `${prefix}.${k}` : k;
+        if (Array.isArray(v)) {
+          if (!foundKeys.has(path)) {
+            const hasMatch = v.some(
+              (entry) =>
+                isRecord(entry) &&
+                (entry.id === item.entityId ||
+                  entry.productId === item.entityId ||
+                  entry.serviceId === item.entityId),
+            );
+            if (hasMatch) {
+              candidateCollections.push({ key: path, entries: v });
+              foundKeys.add(path);
+            }
+          }
+        } else if (isRecord(v) && prefix.split('.').length < 3) {
+          findCollectionsWithEntity(v, path);
+        }
+      }
+    };
+    findCollectionsWithEntity(result, '');
+
+    for (const { key, entries } of candidateCollections) {
+      const index = entries.findIndex(
+        (entry) =>
+          isRecord(entry) &&
+          (entry.id === item.entityId ||
+            entry.productId === item.entityId ||
+            entry.serviceId === item.entityId),
       );
+      if (index >= 0) {
+        result = setContentPath(
+          result,
+          `${key}[${index}].imageUrl`,
+          item.fileUrl,
+        );
+        if (isRecord(entries[index]) && 'image' in entries[index]) {
+          result = setContentPath(
+            result,
+            `${key}[${index}].image`,
+            item.fileUrl,
+          );
+        }
+      }
     }
   }
   return result;
 }
 
-/** Backfills linked content-image media only when an older record lacks the field. */
+/** Backfills linked content-image media only when an older record lacks the field or is null. */
 export function applyLinkedContentImages(
   content: Record<string, unknown> | null,
   items: ProjectMediaItem[],
@@ -107,7 +190,7 @@ export function applyLinkedContentImages(
   for (const item of ordered) {
     const linkedPath = item.linkedContentPath!.trim();
     const existing = readContentPath(originalContent, linkedPath);
-    if (existing !== undefined) {
+    if (existing !== undefined && existing !== null) {
       continue;
     }
     result = setContentPath(result, linkedPath, item.fileUrl);
@@ -174,7 +257,6 @@ export function buildTemplateValidationSiteData(
       structure: null,
     },
     requirements: {
-      websiteType: '',
       mainPurpose: '',
       targetCustomers: '',
       preferredLanguage: '',
