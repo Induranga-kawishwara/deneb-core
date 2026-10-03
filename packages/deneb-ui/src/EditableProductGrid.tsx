@@ -291,17 +291,29 @@ export function EditableProductGrid({
   }, [searchQuery, enableBackendSearch, siteApi, siteData]);
 
   const resolvedCategories = useMemo(() => {
+    const rawList: string[] = [];
     if (categories && categories.length > 1) {
-      return categories;
+      rawList.push(...categories);
+    } else {
+      for (const p of products) {
+        if (typeof p.category === "string" && p.category.trim().length > 0) {
+          rawList.push(p.category);
+        }
+      }
     }
-    const distinct = Array.from(
-      new Set(
-        products
-          .map((p) => p.category)
-          .filter((cat): cat is string => typeof cat === 'string' && cat.trim().length > 0)
-      )
-    );
-    return distinct.length > 0 ? ['All', ...distinct] : categories;
+
+    const map = new Map<string, string>();
+    for (const item of rawList) {
+      if (typeof item !== "string") continue;
+      const trimmed = item.trim();
+      if (!trimmed || trimmed.toLowerCase() === "all") continue;
+      const lower = trimmed.toLowerCase();
+      if (!map.has(lower)) {
+        map.set(lower, trimmed);
+      }
+    }
+    const distinct = Array.from(map.values());
+    return distinct.length > 1 ? ["All", ...distinct] : [];
   }, [categories, products]);
 
   const [activeCategory, setActiveCategory] = useState<string>(categories[0] || 'All');
@@ -317,10 +329,10 @@ export function EditableProductGrid({
     let result = products;
 
     // Filter by category
-    if (activeCategory && activeCategory.toLowerCase() !== 'all') {
+    if (activeCategory && activeCategory.trim().toLowerCase() !== "all") {
       result = result.filter((p) => {
-        const cat = String(p.category || '').toLowerCase();
-        return cat === activeCategory.toLowerCase();
+        const cat = String(p.category || "").trim().toLowerCase();
+        return cat === activeCategory.trim().toLowerCase();
       });
     }
 
@@ -438,7 +450,7 @@ export function EditableProductGrid({
         {resolvedCategories.length > 1 && (
           <div className="flex flex-wrap items-center gap-2">
             {resolvedCategories.map((cat) => {
-              const isActive = activeCategory.toLowerCase() === cat.toLowerCase();
+              const isActive = activeCategory.trim().toLowerCase() === cat.trim().toLowerCase();
               return (
                 <button
                   key={cat}
