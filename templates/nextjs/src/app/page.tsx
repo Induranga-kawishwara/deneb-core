@@ -288,7 +288,11 @@ export default function HomePage() {
                 radius="xl"
                 style={{ display: 'flex', flexDirection: 'column' }}
               >
-                <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '12px', marginBottom: '0.75rem' }}>
+                <a
+                  href={platformProductDetailHref(productId)}
+                  data-preview-static="Open the stable live product detail page"
+                  style={{ position: 'relative', overflow: 'hidden', borderRadius: '12px', marginBottom: '0.75rem', display: 'block' }}
+                >
                   <EditableImage
                     src={contentText(product.imageUrl) || '/placeholder.svg'}
                     alt={contentText(product.name)}
@@ -306,7 +310,7 @@ export default function HomePage() {
                       {badge}
                     </span>
                   )}
-                </div>
+                </a>
 
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '0.5rem' }}>
                   {category && (
@@ -318,14 +322,20 @@ export default function HomePage() {
                       {category}
                     </span>
                   )}
-                  <EditableText
-                    variant="h3"
-                    size="lg"
-                    weight="bold"
-                    color="heading"
-                    data-preview-field-path={`products[${index}].name`}
-                    defaultValue={contentText(product.name)}
-                  />
+                  <a
+                    href={platformProductDetailHref(productId)}
+                    data-preview-static="Open the stable live product detail page"
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <EditableText
+                      variant="h3"
+                      size="lg"
+                      weight="bold"
+                      color="heading"
+                      data-preview-field-path={`products[${index}].name`}
+                      defaultValue={contentText(product.name)}
+                    />
+                  </a>
                   <EditableText
                     variant="p"
                     color="muted"

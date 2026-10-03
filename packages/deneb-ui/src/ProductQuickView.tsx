@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { withBasePath } from './utils';
+import { platformProductDetailHref } from './PlatformProductDetail';
 
 export interface ProductQuickViewItem {
   id: string;
@@ -15,6 +16,8 @@ export interface ProductQuickViewItem {
   isAvailable?: boolean;
   rating?: number;
   reviewCount?: number;
+  href?: string;
+  detailHref?: string;
   [key: string]: unknown;
 }
 
@@ -30,6 +33,8 @@ export interface ProductQuickViewProps {
    */
   itemPath?: string;
   addToCartLabel?: string;
+  showDetailLink?: boolean;
+  detailLinkText?: string;
 }
 
 /**
@@ -49,6 +54,8 @@ export function ProductQuickView({
   className = '',
   itemPath,
   addToCartLabel = 'Add to Selection',
+  showDetailLink = true,
+  detailLinkText = 'View full product details',
 }: ProductQuickViewProps) {
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState<string>('');
@@ -249,6 +256,19 @@ export function ProductQuickView({
                 {isAvailable ? addToCartLabel : 'Out of Stock'}
               </span>
             </button>
+
+            {showDetailLink && (
+              <div className="mt-3 text-center">
+                <a
+                  href={(product as any).href || (product as any).detailHref || platformProductDetailHref(product.id)}
+                  data-preview-static="Open the stable live product detail page"
+                  className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors inline-flex items-center gap-1"
+                >
+                  <span>{detailLinkText}</span>
+                  <span aria-hidden="true">&rarr;</span>
+                </a>
+              </div>
+            )}
           </div>
         </div>
       </div>
