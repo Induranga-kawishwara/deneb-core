@@ -1,6 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { EditableProductCard, ProductItem, ProductCardVariant } from './EditableProductCard';
-import { useProducts, useSiteApi, useSiteData, isRecord } from './SiteDataProvider';
+import { useProducts, useSiteApi, useSiteData, isRecord, isPreviewValidation } from './SiteDataProvider';
+import { EditableFilterSidebar, EditableFilterSidebarProps, FilterState } from './EditableFilterSidebar';
+
+export interface ProductFilters {
+  categories?: string[];
+  priceRange?: [number, number];
+  maxPrice?: number;
+  sizes?: string[];
+  inStockOnly?: boolean;
+}
 
 export interface EditableProductGridProps extends React.HTMLAttributes<HTMLElement> {
   /**
@@ -138,6 +147,31 @@ export interface EditableProductGridProps extends React.HTMLAttributes<HTMLEleme
    */
   totalProducts?: number;
 
+  /**
+   * Controlled or external filters (typically from EditableFilterSidebar).
+   */
+  filters?: ProductFilters;
+
+  /**
+   * Initial filters when using internal filter state.
+   */
+  initialFilters?: ProductFilters;
+
+  /**
+   * Callback fired whenever filter state changes.
+   */
+  onFilterChange?: (filters: FilterState) => void;
+
+  /**
+   * Whether to display the integrated EditableFilterSidebar alongside the product grid (default: false).
+   */
+  showFilterSidebar?: boolean;
+
+  /**
+   * Customization props passed directly to the embedded EditableFilterSidebar.
+   */
+  filterSidebarProps?: Partial<EditableFilterSidebarProps>;
+
   currency?: string;
   whatsappNumber?: string;
   whatsappPhone?: string;
@@ -155,6 +189,17 @@ export interface EditableProductGridProps extends React.HTMLAttributes<HTMLEleme
  *
  * Created by Chamika Gayashan & Induranga Kawishwara
  */
+function parseProductNumericPrice(p: ProductItem): number | null {
+  if (typeof p.minPrice === "number" && !isNaN(p.minPrice)) return p.minPrice;
+  if (typeof p.price === "number" && !isNaN(p.price)) return p.price;
+  const raw = String(p.minPrice || p.price || p.amount || p.cost || "");
+  if (!raw) return null;
+  const cleaned = raw.replace(/,/g, "").match(/\d+(?:\.\d+)?/);
+  if (!cleaned) return null;
+  const val = parseFloat(cleaned[0]);
+  return isNaN(val) ? null : val;
+}
+
 export function EditableProductGrid({
   currency = 'LKR',
   whatsappNumber,
@@ -184,6 +229,11 @@ export function EditableProductGrid({
   onPageChange,
   scrollToTopOnPageChange = true,
   totalProducts,
+  filters: controlledFilters,
+  initialFilters,
+  onFilterChange: onFilterChangeProp,
+  showFilterSidebar = false,
+  filterSidebarProps,
   showDetailLink = true,
   showDetailButton,
   detailActionLabel,
@@ -196,6 +246,56 @@ export function EditableProductGrid({
   const siteApi = useSiteApi();
   const liveProducts = useProducts();
   const baseProducts = userProducts && userProducts.length > 0 ? userProducts : liveProducts;
+  const computedMaxPrice = useMemo(() => {
+    let highest = 100;
+    for (const p of baseProducts) {
+      const num = parseProductNumericPrice(p);
+      if (num !== null && num > highest) {
+        highest = Math.ceil(num);
+      }
+    }
+    if (highest > 1000) return Math.ceil(highest / 500) * 500;
+    if (highest > 100) return Math.ceil(highest / 50) * 50;
+    return Math.ceil(highest / 10) * 10;
+  }, [baseProducts]);
+
+  const effectiveMaxPrice = filterSidebarProps?.maxPrice ?? computedMaxPrice;
+
+  const [internalFilters, setInternalFilters] = useState<FilterState>(() => ({
+    selectedCategories: initialFilters?.categories || [],
+    priceRange: [initialFilters?.priceRange ? initialFilters.priceRange[0] : 0, initialFilters?.maxPrice ?? (initialFilters?.priceRange ? initialFilters.priceRange[1] : effectiveMaxPrice)],
+    selectedSizes: initialFilters?.sizes || [],
+    inStockOnly: Boolean(initialFilters?.inStockOnly),
+  }));
+
+  const activeFilters = useMemo(() => {
+    return {
+      selectedCategories:
+        controlledFilters?.categories !== undefined
+          ? controlledFilters.categories
+          : internalFilters.selectedCategories,
+      maxPrice:
+        controlledFilters?.maxPrice !== undefined
+          ? controlledFilters.maxPrice
+          : controlledFilters?.priceRange !== undefined
+          ? controlledFilters.priceRange[1]
+          : internalFilters.priceRange[1],
+      selectedSizes:
+        controlledFilters?.sizes !== undefined
+          ? controlledFilters.sizes
+          : internalFilters.selectedSizes,
+      inStockOnly:
+        controlledFilters?.inStockOnly !== undefined
+          ? Boolean(controlledFilters.inStockOnly)
+          : Boolean(internalFilters.inStockOnly),
+    };
+  }, [controlledFilters, internalFilters]);
+
+  const handleFilterChange = (nextFilters: FilterState) => {
+    setInternalFilters(nextFilters);
+    onFilterChangeProp?.(nextFilters);
+  };
+
 
   const resolvedListPath = useMemo(() => {
     if (listPath && listPath !== 'products') {
@@ -220,6 +320,7 @@ export function EditableProductGrid({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchingBackend, setIsSearchingBackend] = useState(false);
   const [backendProducts, setBackendProducts] = useState<ProductItem[] | null>(null);
+  const [backendTotalProducts, setBackendTotalProducts] = useState<number | null>(null);
 
   // Pagination internal state
   const [internalPage, setInternalPage] = useState(initialPage);
@@ -235,32 +336,94 @@ export function EditableProductGrid({
   }, [pageSize]);
 
   // Use backend search results if available, else fallback to baseProducts
-  const products = backendProducts && backendProducts.length > 0 ? backendProducts : baseProducts;
+  const products = backendProducts !== null ? backendProducts : baseProducts;
 
-  // Live backend catalog search when query changes
+  // Live backend catalog search & filter when query or filters change
   useEffect(() => {
-    if (!enableBackendSearch || !searchQuery.trim()) {
+    if (!enableBackendSearch) {
       setBackendProducts(null);
+      setBackendTotalProducts(null);
       return;
     }
 
+    const candidateSlug =
+      siteData?.siteInstance?.slug ||
+      siteData?.project?.slug ||
+      siteData?.project?.id;
+
     const catalogUrl =
       siteApi?.catalogUrl ||
-      (siteData?.siteInstance?.slug ? `/site-catalog/${siteData.siteInstance.slug}` : null);
+      (candidateSlug && siteApi?.baseUrl
+        ? `${siteApi.baseUrl.replace(/\/+$/, '')}/site-catalog/${candidateSlug}/live-data`
+        : candidateSlug
+          ? `/site-catalog/${candidateSlug}/live-data`
+          : null);
 
-    const slug = siteData?.siteInstance?.slug;
+    const slug = siteData?.siteInstance?.slug || siteData?.project?.slug;
     const isPreviewMode =
-      typeof window !== 'undefined' &&
-      (window.location.pathname.includes('/template-preview/') ||
-        window.location.pathname.includes('/preview/'));
+      isPreviewValidation(siteData) ||
+      (typeof window !== 'undefined' &&
+        (window.parent !== window ||
+          window.location.pathname.includes('/template-preview') ||
+          window.location.pathname.includes('/preview')));
 
     if (
       !catalogUrl ||
       isPreviewMode ||
       slug === 'template-validation' ||
-      catalogUrl.includes('/template-validation/')
+      catalogUrl.includes('/template-validation')
     ) {
+      // In Visual Editor preview or template validation, NEVER query remote backend.
+      // All search, category filters, price sliders, sizes, and in-stock toggles
+      // operate directly in-memory on data.json / visual editor siteData without errors!
+      setBackendProducts(null);
+      setBackendTotalProducts(null);
       return;
+    }
+
+    const hasSearch = Boolean(searchQuery.trim());
+    const hasCategories = Boolean(
+      activeFilters.selectedCategories && activeFilters.selectedCategories.length > 0,
+    );
+    const hasMaxPrice = Boolean(
+      activeFilters.maxPrice !== undefined &&
+        activeFilters.maxPrice < effectiveMaxPrice,
+    );
+    const hasSizes = Boolean(
+      activeFilters.selectedSizes && activeFilters.selectedSizes.length > 0,
+    );
+    const hasInStock = Boolean(activeFilters.inStockOnly);
+
+    const hasAnyFilterOrSearch =
+      hasSearch ||
+      hasCategories ||
+      hasMaxPrice ||
+      hasSizes ||
+      hasInStock;
+
+    if (!hasAnyFilterOrSearch) {
+      setBackendProducts(null);
+      setBackendTotalProducts(null);
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (hasSearch) params.set('q', searchQuery.trim());
+    if (hasCategories && activeFilters.selectedCategories) {
+      params.set('category', activeFilters.selectedCategories.join(','));
+    }
+    if (hasMaxPrice && activeFilters.maxPrice !== undefined) {
+      params.set('maxPrice', String(activeFilters.maxPrice));
+    }
+    if (hasSizes && activeFilters.selectedSizes) {
+      params.set('sizes', activeFilters.selectedSizes.join(','));
+    }
+    if (hasInStock) {
+      params.set('inStockOnly', 'true');
+    }
+    if (enablePagination) {
+      params.set('page', String(activePage));
+      params.set('limit', String(activePageSize));
     }
 
     let active = true;
@@ -268,13 +431,22 @@ export function EditableProductGrid({
       try {
         setIsSearchingBackend(true);
         const sep = catalogUrl.includes('?') ? '&' : '?';
-        const url = `${catalogUrl}${sep}q=${encodeURIComponent(searchQuery.trim())}`;
+        const url = `${catalogUrl}${sep}${params.toString()}`;
         const res = await fetch(url, { headers: { Accept: 'application/json' } });
         if (res.ok) {
           const data = await res.json();
           const items = Array.isArray(data) ? data : (data.products || data.items || []);
-          if (active && Array.isArray(items) && items.length > 0) {
+          if (active && Array.isArray(items)) {
             setBackendProducts(items);
+            const totalCount =
+              typeof data.totalProducts === 'number'
+                ? data.totalProducts
+                : typeof data.pagination?.total === 'number'
+                  ? data.pagination.total
+                  : null;
+            if (totalCount !== null) {
+              setBackendTotalProducts(totalCount);
+            }
           }
         }
       } catch {
@@ -288,43 +460,109 @@ export function EditableProductGrid({
       active = false;
       clearTimeout(timer);
     };
-  }, [searchQuery, enableBackendSearch, siteApi, siteData]);
+  }, [searchQuery, activeFilters, effectiveMaxPrice, enableBackendSearch, activePage, activePageSize, enablePagination, siteApi, siteData]);
 
   const resolvedCategories = useMemo(() => {
+    const rawList: string[] = [];
     if (categories && categories.length > 1) {
-      return categories;
+      rawList.push(...categories);
+    } else {
+      const siteCatList = (siteData as any)?.categories || (siteData as any)?.content?.categories;
+      if (Array.isArray(siteCatList) && siteCatList.length > 0) {
+        rawList.push(...siteCatList);
+      }
+      for (const p of products) {
+        if (typeof p.category === "string" && p.category.trim().length > 0) {
+          rawList.push(p.category);
+        }
+      }
     }
-    const distinct = Array.from(
-      new Set(
-        products
-          .map((p) => p.category)
-          .filter((cat): cat is string => typeof cat === 'string' && cat.trim().length > 0)
-      )
-    );
-    return distinct.length > 0 ? ['All', ...distinct] : categories;
+
+    const map = new Map<string, string>();
+    for (const item of rawList) {
+      if (typeof item !== "string") continue;
+      const trimmed = item.trim();
+      if (!trimmed || trimmed.toLowerCase() === "all") continue;
+      const lower = trimmed.toLowerCase();
+      if (!map.has(lower)) {
+        map.set(lower, trimmed);
+      }
+    }
+    const distinct = Array.from(map.values());
+    return distinct.length > 1 ? ["All", ...distinct] : [];
   }, [categories, products]);
 
   const [activeCategory, setActiveCategory] = useState<string>(categories[0] || 'All');
 
-  // Reset to page 1 whenever category or search query changes
+  // Reset to page 1 whenever category, filters, or search query changes
   useEffect(() => {
     setInternalPage(1);
     setLoadedCount(activePageSize);
     onPageChange?.(1);
-  }, [searchQuery, activeCategory, activePageSize, onPageChange]);
+  }, [searchQuery, activeCategory, activeFilters, activePageSize, onPageChange]);
 
   const filteredProducts = useMemo(() => {
     let result = products;
 
-    // Filter by category
-    if (activeCategory && activeCategory.toLowerCase() !== 'all') {
+    // 1. Filter by top category tab (if not "All")
+    if (activeCategory && activeCategory.trim().toLowerCase() !== "all") {
       result = result.filter((p) => {
-        const cat = String(p.category || '').toLowerCase();
-        return cat === activeCategory.toLowerCase();
+        const cat = String(p.category || "").trim().toLowerCase();
+        return cat === activeCategory.trim().toLowerCase();
       });
     }
 
-    // Filter by search query
+    // 2. Filter by sidebar selectedCategories (multi-select)
+    if (activeFilters.selectedCategories && activeFilters.selectedCategories.length > 0) {
+      result = result.filter((p) => {
+        const cat = String(p.category || "").trim().toLowerCase();
+        return activeFilters.selectedCategories.some(
+          (c) => c.trim().toLowerCase() === cat
+        );
+      });
+    }
+
+    // 3. Filter by maxPrice (matches numeric price against slider)
+    if (activeFilters.maxPrice !== undefined && activeFilters.maxPrice < effectiveMaxPrice) {
+      result = result.filter((p) => {
+        const num = parseProductNumericPrice(p);
+        if (num === null) return true;
+        return num <= activeFilters.maxPrice;
+      });
+    }
+
+    // 4. Filter by sizes / options
+    if (activeFilters.selectedSizes && activeFilters.selectedSizes.length > 0) {
+      result = result.filter((p) => {
+        const pSizes: string[] = [];
+        if (Array.isArray(p.sizes)) {
+          pSizes.push(...p.sizes.map((s) => String(s).trim().toLowerCase()));
+        } else if (typeof p.sizes === "string") {
+          pSizes.push(...p.sizes.split(",").map((s) => s.trim().toLowerCase()));
+        }
+        if (Array.isArray(p.options)) {
+          pSizes.push(...p.options.map((o) => String(o).trim().toLowerCase()));
+        } else if (typeof p.options === "string") {
+          pSizes.push(...p.options.split(",").map((o) => o.trim().toLowerCase()));
+        }
+        return activeFilters.selectedSizes.some((s) =>
+          pSizes.includes(s.trim().toLowerCase())
+        );
+      });
+    }
+
+    // 5. Filter by inStock availability
+    if (activeFilters.inStockOnly) {
+      result = result.filter((p) => {
+        return (
+          p.inStock !== false &&
+          p.isAvailable !== false &&
+          p.available !== false
+        );
+      });
+    }
+
+    // 6. Filter by search query
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       result = result.filter((p) => {
@@ -339,15 +577,45 @@ export function EditableProductGrid({
     }
 
     return result;
-  }, [products, activeCategory, searchQuery]);
+  }, [products, activeCategory, activeFilters, effectiveMaxPrice, searchQuery]);
 
-  // Total count calculation
-  const totalItems = totalProducts !== undefined ? totalProducts : filteredProducts.length;
+  const activeFiltersCount =
+    (activeCategory && activeCategory.trim().toLowerCase() !== "all" ? 1 : 0) +
+    activeFilters.selectedCategories.length +
+    (activeFilters.maxPrice < effectiveMaxPrice ? 1 : 0) +
+    activeFilters.selectedSizes.length +
+    (activeFilters.inStockOnly ? 1 : 0);
+
+  const handleClearAllFilters = () => {
+    setActiveCategory("All");
+    setSearchQuery("");
+    setInternalFilters({
+      selectedCategories: [],
+      priceRange: [0, effectiveMaxPrice],
+      selectedSizes: [],
+      inStockOnly: false,
+    });
+    onFilterChangeProp?.({
+      selectedCategories: [],
+      priceRange: [0, effectiveMaxPrice],
+      selectedSizes: [],
+      inStockOnly: false,
+    });
+  };
+
+  // Total count calculation: prefers explicit totalProducts prop, then remote backend total, else filtered list length
+  const totalItems = totalProducts !== undefined
+    ? totalProducts
+    : (backendTotalProducts !== null ? backendTotalProducts : filteredProducts.length);
   const totalPages = Math.max(1, Math.ceil(totalItems / activePageSize));
 
   // Products to render based on pagination mode
   const displayedProducts = useMemo(() => {
     if (!enablePagination) {
+      return filteredProducts;
+    }
+    // If backend already returned server-paginated items for this activePage, render directly
+    if (backendProducts !== null && backendTotalProducts !== null) {
       return filteredProducts;
     }
     if (paginationVariant === 'load-more') {
@@ -356,7 +624,7 @@ export function EditableProductGrid({
     const startIndex = (activePage - 1) * activePageSize;
     const endIndex = startIndex + activePageSize;
     return filteredProducts.slice(startIndex, endIndex);
-  }, [filteredProducts, enablePagination, paginationVariant, loadedCount, activePage, activePageSize]);
+  }, [filteredProducts, enablePagination, paginationVariant, loadedCount, activePage, activePageSize, backendProducts, backendTotalProducts]);
 
   // Smart page numbers calculation with ellipsis (e.g. 1 ... 4 5 6 ... 10)
   const visiblePages = useMemo((): Array<number | 'ellipsis'> => {
@@ -404,113 +672,8 @@ export function EditableProductGrid({
 
   const shouldShowPagination = enablePagination && !(hidePaginationOnSinglePage && totalPages <= 1);
 
-  return (
-    <section
-      id={props.id || "products"}
-      ref={sectionRef}
-      data-design-section={(props as any)["data-design-section"] || "products"}
-      data-section-id={(props as any)["data-section-id"] || "products"}
-      data-preview-page-key={sectionPath}
-      className={`editable-product-grid max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 ${className}`.trim()}
-      style={style}
-      {...(props as any)}
-    >
-      {/* Section Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
-        <div>
-          {subtitle && (
-            <span
-              data-preview-field-path={`${sectionPath}.gridSubtitle`}
-              className="text-xs font-black tracking-widest uppercase text-emerald-600 dark:text-lime-400 block mb-2"
-            >
-              {subtitle}
-            </span>
-          )}
-          <h2
-            data-preview-field-path={`${sectionPath}.gridTitle`}
-            className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight"
-          >
-            {title}
-          </h2>
-        </div>
-
-        {/* Category Pills Filter */}
-        {resolvedCategories.length > 1 && (
-          <div className="flex flex-wrap items-center gap-2">
-            {resolvedCategories.map((cat) => {
-              const isActive = activeCategory.toLowerCase() === cat.toLowerCase();
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setActiveCategory(cat)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
-                    isActive
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-md scale-102 font-extrabold'
-                      : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-200/70 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-white dark:border-slate-800/80 dark:hover:bg-slate-850'
-                  }`}
-                >
-                  {cat}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Interactive Live Search Bar */}
-      {showSearch && (
-        <div className="mb-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                onSearchChange?.(e.target.value);
-              }}
-              placeholder={searchPlaceholder}
-              className="w-full pl-10 pr-10 py-2.5 rounded-2xl text-sm bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-400 dark:focus:ring-lime-400 transition-all shadow-sm"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchQuery('');
-                  onSearchChange?.('');
-                }}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
-                title="Clear search"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* Results Counter & Live Indicator */}
-          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-            {isSearchingBackend && (
-              <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-lime-400 font-medium animate-pulse">
-                <span className="w-1.5 h-1.5 rounded-full bg-lime-400"></span>
-                Searching live catalog...
-              </span>
-            )}
-            <span className="font-semibold bg-slate-100 dark:bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800">
-              Showing <span className="text-slate-900 dark:text-white font-bold">{filteredProducts.length}</span> of {products.length} products
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Grid of Products — Keeps container with data-preview-list-path mounted in all states for strict Fivora visual editing contract! */}
-      <div
+  const productsGridContent = (
+    <div
         {...(resolvedListPath ? { 'data-preview-list-path': resolvedListPath } : {})}
         className={
           displayedProducts.length > 0
@@ -587,6 +750,8 @@ export function EditableProductGrid({
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
               {searchQuery
                 ? `No products matched "${searchQuery}"${activeCategory !== 'All' ? ` in category "${activeCategory}"` : ''}.`
+                : activeFiltersCount > 0
+                ? "No products matched your active filters."
                 : `No products available in category "${activeCategory}".`}
             </p>
             <div className="mt-5 flex items-center justify-center gap-3">
@@ -594,7 +759,7 @@ export function EditableProductGrid({
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-white hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-white hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                 >
                   Clear Search
                 </button>
@@ -603,18 +768,28 @@ export function EditableProductGrid({
                 <button
                   type="button"
                   onClick={() => setActiveCategory('All')}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-lime-400 text-slate-950 hover:bg-lime-300 transition-colors shadow-sm"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-lime-400 text-slate-950 hover:bg-lime-300 transition-colors shadow-sm cursor-pointer"
                 >
                   View All Products
+                </button>
+              )}
+              {activeFiltersCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllFilters}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white dark:bg-white dark:text-slate-950 hover:bg-slate-800 transition-colors shadow-sm cursor-pointer"
+                >
+                  Clear All Filters
                 </button>
               )}
             </div>
           </div>
         )}
       </div>
+  );
 
-      {/* Pagination Controls */}
-      {shouldShowPagination && (
+  /* Pagination Controls */
+  const paginationContent = shouldShowPagination ? (
         <>
           {paginationVariant === 'load-more' ? (
             /* Progressive "Load More" Variant */
@@ -757,8 +932,140 @@ export function EditableProductGrid({
             </nav>
           )}
         </>
+  ) : null;
+
+  return (
+    <section
+      id={props.id || "products"}
+      ref={sectionRef}
+      data-design-section={(props as any)["data-design-section"] || "products"}
+      data-section-id={(props as any)["data-section-id"] || "products"}
+      data-preview-page-key={sectionPath}
+      className={`editable-product-grid max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 ${className}`.trim()}
+      style={style}
+      {...(props as any)}
+    >
+      {/* Section Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
+        <div>
+          {subtitle && (
+            <span
+              data-preview-field-path={`${sectionPath}.gridSubtitle`}
+              className="text-xs font-black tracking-widest uppercase text-emerald-600 dark:text-lime-400 block mb-2"
+            >
+              {subtitle}
+            </span>
+          )}
+          <h2
+            data-preview-field-path={`${sectionPath}.gridTitle`}
+            className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight"
+          >
+            {title}
+          </h2>
+        </div>
+
+        {/* Category Pills Filter */}
+        {resolvedCategories.length > 1 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {resolvedCategories.map((cat) => {
+              const isActive = activeCategory.trim().toLowerCase() === cat.trim().toLowerCase();
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setActiveCategory(cat)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+                    isActive
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-md scale-102 font-extrabold'
+                      : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-200/70 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-white dark:border-slate-800/80 dark:hover:bg-slate-850'
+                  }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Interactive Live Search Bar */}
+      {showSearch && (
+        <div className="mb-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                onSearchChange?.(e.target.value);
+              }}
+              placeholder={searchPlaceholder}
+              className="w-full pl-10 pr-10 py-2.5 rounded-2xl text-sm bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-400 dark:focus:ring-lime-400 transition-all shadow-sm"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  onSearchChange?.('');
+                }}
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+                title="Clear search"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Results Counter & Live Indicator */}
+          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+            {isSearchingBackend && (
+              <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-lime-400 font-medium animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-lime-400"></span>
+                Searching live catalog...
+              </span>
+            )}
+            <span className="font-semibold bg-slate-100 dark:bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800">
+              Showing <span className="text-slate-900 dark:text-white font-bold">{filteredProducts.length}</span> of {products.length} products
+            </span>
+          </div>
+        </div>
       )}
-    </section>
+
+      {/* Grid of Products — Keeps container with data-preview-list-path mounted in all states for strict Fivora visual editing contract! */}
+
+      {showFilterSidebar ? (
+        <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
+          <aside className="w-full lg:w-72 shrink-0">
+            <EditableFilterSidebar
+              categories={categories.length > 1 ? categories : resolvedCategories.filter((c) => c !== "All")}
+              minPrice={filterSidebarProps?.minPrice ?? 0}
+              maxPrice={effectiveMaxPrice}
+              currency={currency}
+              initialFilters={activeFilters}
+              onFilterChange={handleFilterChange}
+              {...filterSidebarProps}
+            />
+          </aside>
+          <div className="flex-1 w-full min-w-0">
+            {productsGridContent}
+            {paginationContent}
+          </div>
+        </div>
+      ) : (
+        <>
+          {productsGridContent}
+          {paginationContent}
+        </>
+      )}
+      </section>
   );
 }
 
