@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { EditableProductCard, ProductItem, ProductCardVariant } from './EditableProductCard';
-import { useProducts, useSiteApi, useSiteData, isRecord } from './SiteDataProvider';
+import { useProducts, useSiteApi, useSiteData, isRecord, isPreviewValidation } from './SiteDataProvider';
 import { EditableFilterSidebar, EditableFilterSidebarProps, FilterState } from './EditableFilterSidebar';
 
 export interface ProductFilters {
@@ -361,16 +361,23 @@ export function EditableProductGrid({
 
     const slug = siteData?.siteInstance?.slug || siteData?.project?.slug;
     const isPreviewMode =
-      typeof window !== 'undefined' &&
-      (window.location.pathname.includes('/template-preview/') ||
-        window.location.pathname.includes('/preview/'));
+      isPreviewValidation(siteData) ||
+      (typeof window !== 'undefined' &&
+        (window.parent !== window ||
+          window.location.pathname.includes('/template-preview') ||
+          window.location.pathname.includes('/preview')));
 
     if (
       !catalogUrl ||
       isPreviewMode ||
       slug === 'template-validation' ||
-      catalogUrl.includes('/template-validation/')
+      catalogUrl.includes('/template-validation')
     ) {
+      // In Visual Editor preview or template validation, NEVER query remote backend.
+      // All search, category filters, price sliders, sizes, and in-stock toggles
+      // operate directly in-memory on data.json / visual editor siteData without errors!
+      setBackendProducts(null);
+      setBackendTotalProducts(null);
       return;
     }
 
