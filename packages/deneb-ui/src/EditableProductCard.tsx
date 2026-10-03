@@ -49,6 +49,7 @@ export interface ProductItem {
   title?: string;
 
   // Dual Pricing Engine (Fixed vs Price Range)
+  showPrice?: boolean;
   isPriceRange?: boolean;
   productName?: string;
   itemTitle?: string;
@@ -103,6 +104,7 @@ export interface ProductItem {
   priceMin?: string | number;
   priceMax?: string | number;
   priceRange?: [number | string, number | string] | string;
+  customData?: Record<string, unknown>;
 
   [key: string]: unknown;
 }
@@ -282,10 +284,10 @@ export function EditableProductCard({
       : '');
 
   const itemShowPrice =
-    (product as any)?.showPrice !== undefined
-      ? Boolean((product as any).showPrice)
-      : ((product as any)?.customData?.showPrice !== undefined
-        ? Boolean((product as any).customData.showPrice)
+    product?.showPrice !== undefined
+      ? Boolean(product.showPrice)
+      : (product?.customData?.showPrice !== undefined
+        ? Boolean(product.customData.showPrice)
         : true);
   const effectiveShowPrice = showPrice && itemShowPrice;
   const displayPrice = resolvedPrice.formattedPrice || baseFormattedPrice;

@@ -37,6 +37,7 @@ export interface ProductDetailItem {
   isAvailable?: boolean;
   showPrice?: boolean;
   isPriceRange?: boolean;
+  customData?: Record<string, unknown>;
 
   // Variants & Measurements System
   unit?: MeasurementUnit;
@@ -274,10 +275,10 @@ export function EditableProductDetail({
   const originalPrice = product.originalPrice ?? product.compareAtPrice;
 
   const itemShowPrice =
-    (product as any)?.showPrice !== undefined
-      ? Boolean((product as any).showPrice)
-      : ((product as any)?.customData?.showPrice !== undefined
-        ? Boolean((product as any).customData.showPrice)
+    product.showPrice !== undefined
+      ? Boolean(product.showPrice)
+      : (product.customData?.showPrice !== undefined
+        ? Boolean(product.customData.showPrice)
         : true);
 
   const displayPrice = resolvedPrice.formattedPrice || basePrice;
