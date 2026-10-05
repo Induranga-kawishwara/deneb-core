@@ -24,8 +24,8 @@ export interface EditableFilterSidebarProps {
 
 export function EditableFilterSidebar({
   basePath = 'filters',
-  categories = ['All', 'Running', 'Lifestyle', 'Basketball', 'Training', 'Outdoor'],
-  sizes = ['US 7', 'US 8', 'US 9', 'US 10', 'US 11', 'US 12'],
+  categories = [],
+  sizes = [],
   minPrice = 0,
   maxPrice = 300,
   currency = '$',
@@ -34,6 +34,55 @@ export function EditableFilterSidebar({
   className = '',
 }: EditableFilterSidebarProps) {
   const { siteData } = useSiteData();
+
+  const sanitizedCategories = React.useMemo(() => {
+    if (!categories || !Array.isArray(categories)) return [];
+    const map = new Map<string, string>();
+    for (const c of categories) {
+      if (typeof c !== "string") continue;
+      const trimmed = c.trim();
+      if (!trimmed || trimmed.toLowerCase() === "all") continue;
+      const lower = trimmed.toLowerCase();
+      if (!map.has(lower)) {
+        map.set(lower, trimmed);
+      }
+    }
+    return Array.from(map.values());
+  }, [categories]);
+
+  const sanitizedSizes = React.useMemo(() => {
+    const rawList: string[] = [];
+    if (sizes && Array.isArray(sizes) && sizes.length > 0) {
+      rawList.push(...sizes);
+    } else {
+      const rawProducts = (siteData as any)?.content?.products || (siteData as any)?.products;
+      if (Array.isArray(rawProducts)) {
+        for (const p of rawProducts) {
+          if (Array.isArray(p?.sizes)) {
+            for (const s of p.sizes) {
+              if (s != null) rawList.push(String(s));
+            }
+          } else if (Array.isArray(p?.options)) {
+            for (const o of p.options) {
+              if (o != null) rawList.push(String(o));
+            }
+          }
+        }
+      }
+    }
+
+    const map = new Map<string, string>();
+    for (const s of rawList) {
+      if (typeof s !== "string") continue;
+      const trimmed = s.trim();
+      if (!trimmed) continue;
+      const lower = trimmed.toLowerCase();
+      if (!map.has(lower)) {
+        map.set(lower, trimmed);
+      }
+    }
+    return Array.from(map.values());
+  }, [sizes, siteData]);
 
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     initialFilters?.selectedCategories || [],
@@ -73,17 +122,29 @@ export function EditableFilterSidebar({
   };
 
   const toggleCategory = (cat: string) => {
-    const next = selectedCategories.includes(cat)
-      ? selectedCategories.filter((c) => c !== cat)
-      : [...selectedCategories, cat];
+    const trimmedCat = cat.trim();
+    const exists = selectedCategories.some(
+      (c) => c.trim().toLowerCase() === trimmedCat.toLowerCase(),
+    );
+    const next = exists
+      ? selectedCategories.filter(
+          (c) => c.trim().toLowerCase() !== trimmedCat.toLowerCase(),
+        )
+      : [...selectedCategories, trimmedCat];
     setSelectedCategories(next);
     triggerChange(next, currentPrice, selectedSizes, inStockOnly);
   };
 
   const toggleSize = (size: string) => {
-    const next = selectedSizes.includes(size)
-      ? selectedSizes.filter((s) => s !== size)
-      : [...selectedSizes, size];
+    const trimmedSize = size.trim();
+    const exists = selectedSizes.some(
+      (s) => s.trim().toLowerCase() === trimmedSize.toLowerCase(),
+    );
+    const next = exists
+      ? selectedSizes.filter(
+          (s) => s.trim().toLowerCase() !== trimmedSize.toLowerCase(),
+        )
+      : [...selectedSizes, trimmedSize];
     setSelectedSizes(next);
     triggerChange(selectedCategories, currentPrice, next, inStockOnly);
   };
@@ -108,9 +169,8 @@ export function EditableFilterSidebar({
     triggerChange([], maxPrice, [], false);
   };
 
-  const activeFiltersCount =
-    selectedCategories.length +
-    selectedSizes.length +
+  const activeFiltersCount = (sanitizedCategories.length > 1 ? selectedCategories.length : 0) +
+    (sanitizedSizes.length > 1 ? selectedSizes.length : 0) +
     (currentPrice < maxPrice ? 1 : 0) +
     (inStockOnly ? 1 : 0);
 
@@ -183,34 +243,38 @@ export function EditableFilterSidebar({
 
       <div className="space-y-6">
         {/* Categories */}
-        <div>
-          <h4
-            className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3"
-            data-preview-field-path={fieldPath('categoryTitle')}
-          >
-            {categoryTitle}
-          </h4>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((cat) => {
-              const isSelected = selectedCategories.includes(cat);
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => toggleCategory(cat)}
-                  data-preview-static="filter-cat-btn"
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                    isSelected
-                      ? 'bg-white text-black shadow-md'
-                      : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white'
-                  }`}
-                >
-                  {cat}
-                </button>
-              );
-            })}
+        {sanitizedCategories.length > 1 && (
+          <div>
+            <h4
+              className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3"
+              data-preview-field-path={fieldPath("categoryTitle")}
+            >
+              {categoryTitle}
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {sanitizedCategories.map((cat) => {
+                const isSelected = selectedCategories.some(
+                  (c) => c.trim().toLowerCase() === cat.trim().toLowerCase(),
+                );
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => toggleCategory(cat)}
+                    data-preview-static="filter-cat-btn"
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                      isSelected
+                        ? "bg-white text-black shadow-md"
+                        : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Price Slider */}
         <div className="border-t border-neutral-800/80 pt-6">
@@ -247,17 +311,19 @@ export function EditableFilterSidebar({
         </div>
 
         {/* Sizes */}
-        {sizes.length > 0 && (
+        {sanitizedSizes.length > 1 && (
           <div className="border-t border-neutral-800/80 pt-6">
             <h4
               className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3"
-              data-preview-field-path={fieldPath('sizeTitle')}
+              data-preview-field-path={fieldPath("sizeTitle")}
             >
               {sizeTitle}
             </h4>
             <div className="deneb-filter-size-grid grid grid-cols-3 gap-2">
-              {sizes.map((size) => {
-                const isSelected = selectedSizes.includes(size);
+              {sanitizedSizes.map((size) => {
+                const isSelected = selectedSizes.some(
+                  (s) => s.trim().toLowerCase() === size.trim().toLowerCase(),
+                );
                 return (
                   <button
                     key={size}
@@ -266,8 +332,8 @@ export function EditableFilterSidebar({
                     data-preview-static="filter-size-btn"
                     className={`rounded-lg py-2 text-xs font-semibold transition-all border ${
                       isSelected
-                        ? 'border-white bg-white text-black'
-                        : 'border-neutral-800 bg-neutral-800/50 text-neutral-300 hover:border-neutral-700'
+                        ? "border-white bg-white text-black"
+                        : "border-neutral-800 bg-neutral-800/50 text-neutral-300 hover:border-neutral-700"
                     }`}
                   >
                     {size}

@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useSiteData } from './SiteDataProvider';
+import { platformProductDetailHref } from './PlatformProductDetail';
 
 export interface ProductShowcaseColor {
   name: string;
@@ -24,6 +25,8 @@ export interface ProductShowcaseItem {
   badge?: string;
   colors?: Array<ProductShowcaseColor | string>;
   isAvailable?: boolean;
+  href?: string;
+  detailHref?: string;
   [key: string]: unknown;
 }
 
@@ -387,7 +390,7 @@ export function EditableProductShowcase({
             const activeColorIdx = selectedColors[phoneId] ?? 0;
             const colorsList = (phone.colors as ProductShowcaseColor[]) || [];
             const activeColor = colorsList[activeColorIdx] || colorsList[0] || { name: 'Default', hex: '#9d9890' };
-            const detailUrl = `${productDetailRoutePrefix}/?id=${encodeURIComponent(phoneId)}`;
+            const detailUrl = (phone as any).href || (phone as any).detailHref || platformProductDetailHref(phoneId, productDetailRoutePrefix);
 
             return (
               <li
@@ -415,7 +418,7 @@ export function EditableProductShowcase({
                         data-preview-style-target={`${sectionPath}.${listPath}[${idx}].name`}
                         data-preview-style-type="text"
                       >
-                        <a href={detailUrl} className="hover:underline">
+                        <a href={detailUrl} className="hover:underline" data-preview-static="Open the stable live product detail page">
                           {phone.name}
                         </a>
                       </h3>
@@ -444,7 +447,7 @@ export function EditableProductShowcase({
                   </div>
 
                   {/* Center Product Image Container */}
-                  <div className="relative my-6 h-60 w-full overflow-clip rounded-2xl border border-black/[0.06] bg-slate-100 flex items-center justify-center">
+                  <a href={detailUrl} data-preview-static="Open the stable live product detail page" className="relative my-6 h-60 w-full overflow-clip rounded-2xl border border-black/[0.06] bg-slate-100 flex items-center justify-center block">
                     <img
                       src={phone.image}
                       alt={phone.name || 'Product Image'}
@@ -452,7 +455,7 @@ export function EditableProductShowcase({
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-108"
                     />
                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-30" />
-                  </div>
+                  </a>
 
                   {/* Interactive Color Circles & Condition ([DNB-COL-009]) */}
                   <div className="flex items-center justify-between pt-2 border-t border-black/[0.06]">
@@ -564,6 +567,7 @@ export function EditableProductShowcase({
                       className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-black/[0.02] text-zinc-600 hover:text-cyan-600 hover:border-cyan-400/50 hover:bg-cyan-50/50 transition-all cursor-pointer"
                       title="Quick View"
                       aria-label="Quick View Product"
+                      data-preview-static="Open the product quick view or detail page"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

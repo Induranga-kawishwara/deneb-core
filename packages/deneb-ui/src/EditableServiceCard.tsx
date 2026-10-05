@@ -7,6 +7,9 @@ export interface ServiceItem {
   name?: string;
   title?: string;
   price?: string | number;
+  priceLabel?: string;
+  showPrice?: boolean;
+  customData?: Record<string, unknown>;
   description?: string;
   imageUrl?: string;
   image?: string;
@@ -60,7 +63,27 @@ export function EditableServiceCard({
 }: EditableServiceCardProps) {
   const name = String(service?.name || service?.title || '');
   const description = String(service?.description || '');
-  const hasPrice = showPrice && service?.price !== undefined && service?.price !== null && String(service.price).trim() !== '';
+  const itemShowPrice =
+    service.showPrice !== undefined
+      ? Boolean(service.showPrice)
+      : (service.customData?.showPrice !== undefined
+        ? Boolean(service.customData.showPrice)
+        : true);
+  const effectiveShowPrice = showPrice && itemShowPrice;
+
+  const rawPriceCandidate = service?.price;
+  const hasRawPrice = rawPriceCandidate !== undefined && rawPriceCandidate !== null && String(rawPriceCandidate).trim() !== '';
+  const priceLabel = service?.priceLabel ? String(service.priceLabel) : '';
+  const hasPrice = effectiveShowPrice && (hasRawPrice || Boolean(priceLabel));
+
+  const formattedPrice = hasRawPrice
+    ? typeof rawPriceCandidate === 'number'
+      ? 'LKR ' + rawPriceCandidate.toLocaleString()
+      : String(rawPriceCandidate).includes('LKR')
+        ? String(rawPriceCandidate)
+        : 'LKR ' + String(rawPriceCandidate)
+    : '';
+
   const imageUrl = String(service?.imageUrl || service?.image || '');
   const features = Array.isArray(service?.features) ? service.features : [];
 
@@ -106,22 +129,56 @@ export function EditableServiceCard({
           className="service-card-description"
         />
 
-        {hasPrice && (
-          <div className="service-card-price-wrap" style={{ margin: '0.5rem 0' }}>
-            <EditableText
-              as="span"
-              id={`${itemPath}.price`}
-              data-preview-field-path={`${itemPath}.price`}
-              defaultValue={String(service.price)}
-              className="service-card-price"
-              style={{
-                fontSize: '1.125rem',
-                fontWeight: 700,
-                color: 'var(--brand-color, #2563eb)',
-              }}
-            />
+        {hasPrice ? (
+          <div className="service-card-price-wrap" style={{ margin: '0.5rem 0', display: 'flex', alignItems: 'baseline', gap: '0.375rem', flexWrap: 'wrap' }}>
+            {hasRawPrice && (
+              <EditableText
+                as="span"
+                id={`${itemPath}.price`}
+                data-preview-field-path={`${itemPath}.price`}
+                defaultValue={formattedPrice}
+                className="service-card-price"
+                style={{
+                  fontSize: '1.125rem',
+                  fontWeight: 700,
+                  color: 'var(--brand-color, #2563eb)',
+                }}
+              />
+            )}
+            {priceLabel && (
+              <EditableText
+                as="span"
+                id={`${itemPath}.priceLabel`}
+                data-preview-field-path={`${itemPath}.priceLabel`}
+                defaultValue={priceLabel}
+                className="service-card-price-label"
+                style={{
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  color: 'var(--muted-text, #94a3b8)',
+                }}
+              />
+            )}
           </div>
-        )}
+        ) : !effectiveShowPrice ? (
+          <div className="service-card-price-wrap" style={{ margin: '0.5rem 0' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '3px 8px',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                color: 'var(--muted-text, #94a3b8)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+              }}
+            >
+              Quote on Request
+            </span>
+          </div>
+        ) : null}
 
         {(features.length > 0 || Array.isArray(service?.features)) && (
           <ul

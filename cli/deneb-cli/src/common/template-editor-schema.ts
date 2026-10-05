@@ -76,6 +76,11 @@ export type TemplateEditorValidationIssue = {
   message: string;
 };
 
+export type CatalogSchemaListCandidate = {
+  path: string;
+  score: number;
+};
+
 export type DuplicateTemplateEditorPath = {
   path: string;
   firstKind: 'field' | 'list';
@@ -188,13 +193,65 @@ export function normalizeTemplateEditorSchema(
     return null;
   }
 
-  return {
+  return makeDatabaseProductListsUnbounded({
     version:
       typeof candidate.version === 'number' &&
       Number.isFinite(candidate.version)
         ? candidate.version
         : 1,
     sections,
+  });
+}
+
+/**
+ * Products are persisted in shop_products and are intentionally unbounded.
+ * Ignore maxItems from older stored manifests so existing projects do not keep
+ * an obsolete UI-only catalog cap after the template package is updated.
+ */
+export function makeDatabaseProductListsUnbounded(
+  schema: TemplateEditorSchema,
+): TemplateEditorSchema {
+  const isProductCollectionPath = (path: string) =>
+    /(^|\.)(products?|items?|catalog|menu|dishes?|goods|featuredproducts?|store|foods?|drinks?)$/i.test(
+      path.trim(),
+    );
+
+  const mapField = (
+    field: TemplateEditorField,
+    parentPath: string,
+  ): TemplateEditorField => {
+    const path = appendPath(parentPath, field.key);
+    if (field.type === 'object') {
+      return {
+        ...field,
+        fields: field.fields.map((child) => mapField(child, path)),
+      };
+    }
+    if (field.type === 'list') {
+      const mappedFields = field.fields?.map((child) =>
+        mapField(child, `${path}[*]`),
+      );
+      if (isProductCollectionPath(path)) {
+        const { maxItems: _obsoleteMaximum, ...unbounded } = field;
+        return { ...unbounded, fields: mappedFields };
+      }
+      return { ...field, fields: mappedFields };
+    }
+    return field;
+  };
+
+  return {
+    ...schema,
+    sections: schema.sections.map((section) => {
+      const mappedFields = section.fields?.map((field) =>
+        mapField(field, section.path),
+      );
+      if (section.type === 'list' && isProductCollectionPath(section.path)) {
+        const { maxItems: _obsoleteMaximum, ...unbounded } = section;
+        return { ...unbounded, fields: mappedFields };
+      }
+      return { ...section, fields: mappedFields };
+    }),
   };
 }
 
@@ -1724,7 +1781,7 @@ function mergePrimitiveItemFields(
   };
 }
 
-function findSchemaSectionAtPath(
+export function findSchemaSectionAtPath(
   schema: TemplateEditorSchema,
   targetPath: string,
 ): TemplateEditorSection | null {
@@ -1763,7 +1820,11 @@ function findSchemaSectionAtPath(
     if (field.type === 'list') {
       const itemPath = `${normalizeEditorPathPattern(path)}[*]`;
       for (const child of field.fields ?? []) {
-        const found = visitField(child, appendPath(itemPath, child.key), shopOwner);
+        const found = visitField(
+          child,
+          appendPath(itemPath, child.key),
+          shopOwner,
+        );
         if (found) return found;
       }
     }
@@ -1800,6 +1861,130 @@ function findSchemaSectionAtPath(
     }
   }
   return null;
+}
+
+function collectSchemaListCandidates(
+  schema: TemplateEditorSchema,
+): Array<{ path: string; node: TemplateEditorSection }> {
+  const candidates: Array<{ path: string; node: TemplateEditorSection }> = [];
+
+  const asSection = (
+    field: TemplateEditorField,
+    path: string,
+    owner: TemplateEditorSection,
+  ): TemplateEditorSection => {
+    const { key, ...node } = field;
+    void key;
+    return {
+      ...node,
+      id: owner.id,
+      path,
+      pageKey: owner.pageKey,
+    };
+  };
+
+  const visitObjectFields = (
+    fields: TemplateEditorField[],
+    parentPath: string,
+    owner: TemplateEditorSection,
+  ) => {
+    for (const field of fields) {
+      const path = appendPath(parentPath, field.key);
+      if (field.type === 'list') {
+        candidates.push({ path, node: asSection(field, path, owner) });
+        continue;
+      }
+      if (field.type === 'object') {
+        visitObjectFields(field.fields, path, owner);
+      }
+    }
+  };
+
+  for (const section of schema.sections) {
+    if (section.type === 'list') {
+      candidates.push({ path: section.path, node: section });
+    } else if (section.type === 'object') {
+      visitObjectFields(section.fields ?? [], section.path, section);
+    }
+  }
+
+  return candidates;
+}
+
+function catalogListScore(
+  path: string,
+  node: TemplateEditorSection,
+  kind: 'products' | 'services',
+) {
+  const segments = path
+    .replace(/\[\*\]/g, '')
+    .split('.')
+    .map((part) => part.toLowerCase())
+    .filter(Boolean);
+  const leaf = segments.at(-1) ?? '';
+  const parent = segments.at(-2) ?? '';
+  const fields = node.fields ?? [];
+  const hasPrice = fields.some((field) =>
+    /^(price|currentprice|amount|cost|rate|saleprice|unitprice|productprice)$/i.test(
+      field.key,
+    ),
+  );
+  const serviceLeaf =
+    /^(services?|treatments?|offerings?|packages?|plans?)$/.test(leaf);
+
+  if (kind === 'services') {
+    if (!serviceLeaf) return 0;
+    return /^(shop|catalog|menu|store|services?)$/.test(parent) ? 120 : 100;
+  }
+
+  // A priced service list is still a service list, never the product catalog.
+  if (serviceLeaf) return 0;
+
+  if (/^featuredproducts?$/.test(leaf)) return 90;
+  if (/^products?$/.test(leaf)) {
+    if (!parent) return 115;
+    if (/^(shop|catalog|menu|store)$/.test(parent)) return 120;
+    if (parent === 'home') return 100;
+    return 80;
+  }
+  if (/^(dishes?|goods|foods?|drinks?)$/.test(leaf)) {
+    return /^(shop|catalog|menu|store)$/.test(parent) ? 110 : 70;
+  }
+  if (/^items?$/.test(leaf)) {
+    if (!parent || /^(shop|catalog|menu|store)$/.test(parent)) return 100;
+    // Generic promotional lists such as seasonal.items are only a last-resort
+    // catalog candidate. They must not outrank an explicit shop.products list.
+    return hasPrice ? 10 : 0;
+  }
+  if (/^(catalog|menu|store)$/.test(leaf)) return 75;
+  return hasPrice ? 10 : 0;
+}
+
+/**
+ * Rank database-backed catalog collections declared by a template schema.
+ * Explicit catalog paths beat generic priced lists such as seasonal.items.
+ */
+export function getCatalogSchemaListCandidates(
+  schema: TemplateEditorSchema | null | undefined,
+  kind: 'products' | 'services',
+): CatalogSchemaListCandidate[] {
+  if (!schema) return [];
+  return collectSchemaListCandidates(schema)
+    .map(({ path, node }, order) => ({
+      path,
+      score: catalogListScore(path, node, kind),
+      order,
+    }))
+    .filter((candidate) => candidate.score > 0)
+    .sort((left, right) => right.score - left.score || left.order - right.order)
+    .map(({ path, score }) => ({ path, score }));
+}
+
+export function getPreferredCatalogSchemaListPath(
+  schema: TemplateEditorSchema | null | undefined,
+  kind: 'products' | 'services',
+) {
+  return getCatalogSchemaListCandidates(schema, kind)[0]?.path ?? null;
 }
 
 function isDescendantEditorPath(candidate: string, parent: string) {
@@ -2143,7 +2328,7 @@ function hasRequiredNodes(node: TemplateEditorSection | TemplateEditorField) {
   return false;
 }
 
-function getValueByPath(content: Record<string, unknown>, path: string) {
+export function getValueByPath(content: Record<string, unknown>, path: string) {
   const parts = path
     .split('.')
     .map((part) => part.trim())
@@ -2302,8 +2487,12 @@ export function coercePrimitiveValue(
       if (trimmed === '') {
         return defaultValue !== undefined ? defaultValue : null;
       }
-      const num = Number(trimmed);
-      if (!Number.isNaN(num)) {
+      const cleaned = trimmed.replace(/[^0-9.-]/g, '');
+      const num =
+        cleaned !== '' && cleaned !== '-' && cleaned !== '.'
+          ? Number(cleaned)
+          : Number.NaN;
+      if (!Number.isNaN(num) && Number.isFinite(num)) {
         return num;
       }
     }
@@ -2413,11 +2602,7 @@ function coerceNodeValue(
     });
   }
 
-  return coercePrimitiveValue(
-    value,
-    node.type as PrimitiveType,
-    defaultVal,
-  );
+  return coercePrimitiveValue(value, node.type as PrimitiveType, defaultVal);
 }
 
 function coerceAtDottedPath(
@@ -2535,4 +2720,96 @@ export function coerceContentTypes(
   }
 
   return result;
+}
+
+export function writeDottedPath(
+  target: Record<string, unknown>,
+  path: string,
+  value: unknown,
+): void {
+  const parts = path
+    .split('.')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return;
+  let cursor: Record<string, unknown> = target;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    if (
+      !cursor[part] ||
+      typeof cursor[part] !== 'object' ||
+      Array.isArray(cursor[part])
+    ) {
+      cursor[part] = {};
+    }
+    cursor = cursor[part] as Record<string, unknown>;
+  }
+  cursor[parts.at(-1)!] = value;
+}
+
+/**
+ * Universal schema-aware hydration: writes items into any section or list field
+ * declared in editorSchema that represents products or services, regardless of
+ * developer-chosen naming conventions (e.g. products, shop.products, home.products,
+ * menu.items, catalog.products, store.products).
+ */
+export function hydrateSchemaListField(
+  content: Record<string, unknown>,
+  schema: TemplateEditorSchema | null | undefined,
+  fieldKeys: string[],
+  items: Record<string, unknown>[],
+): void {
+  if (!schema || !Array.isArray(schema.sections)) return;
+
+  const keySet = new Set(fieldKeys.map((k) => k.toLowerCase()));
+  const isProductHydration = keySet.has('products');
+  const isServiceHydration = keySet.has('services');
+  const allowedPaths = new Set(
+    [
+      ...(isProductHydration
+        ? [getPreferredCatalogSchemaListPath(schema, 'products')]
+        : []),
+      ...(isServiceHydration
+        ? [getPreferredCatalogSchemaListPath(schema, 'services')]
+        : []),
+    ].filter((path): path is string => Boolean(path)),
+  );
+
+  for (const section of schema.sections) {
+    const sectionPath = section.path?.trim() || '';
+    if (!sectionPath) continue;
+
+    // 1. Top-level list section
+    if (section.type === 'list') {
+      if (allowedPaths.has(sectionPath)) {
+        const existing = getValueByPath(content, sectionPath);
+        if (
+          existing === undefined ||
+          existing === null ||
+          Array.isArray(existing)
+        ) {
+          writeDottedPath(content, sectionPath, items);
+        }
+      }
+    }
+
+    // 2. Object section with nested list fields
+    if (section.type === 'object' && Array.isArray(section.fields)) {
+      for (const field of section.fields) {
+        if (field.type !== 'list') continue;
+        const fieldKey = (field as { key: string }).key;
+        const fullPath = sectionPath ? `${sectionPath}.${fieldKey}` : fieldKey;
+        if (allowedPaths.has(fullPath)) {
+          const existing = getValueByPath(content, fullPath);
+          if (
+            existing === undefined ||
+            existing === null ||
+            Array.isArray(existing)
+          ) {
+            writeDottedPath(content, fullPath, items);
+          }
+        }
+      }
+    }
+  }
 }

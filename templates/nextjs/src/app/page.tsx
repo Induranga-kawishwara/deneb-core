@@ -255,6 +255,28 @@ export default function HomePage() {
             const badge = contentText(product.badge);
             const category = contentText(product.category);
 
+            const itemShowPrice =
+              (product as any)?.showPrice !== undefined
+                ? Boolean((product as any).showPrice)
+                : ((product as any)?.customData?.showPrice !== undefined
+                  ? Boolean((product as any).customData.showPrice)
+                  : true);
+            const isRange = Boolean(
+              (product as any)?.isPriceRange ||
+              ((product as any)?.minPrice !== undefined && (product as any)?.maxPrice !== undefined) ||
+              (product as any)?.priceRange
+            );
+            let displayPrice = `${currency} ${price}`;
+            if (isRange) {
+              if ((product as any).priceRange) {
+                displayPrice = String((product as any).priceRange);
+              } else {
+                const min = (product as any).minPrice !== undefined ? (product as any).minPrice : price;
+                const max = (product as any).maxPrice !== undefined ? (product as any).maxPrice : price;
+                displayPrice = `${currency} ${min} – ${currency} ${max}`;
+              }
+            }
+
             return (
               <EditableCard
                 key={productId ?? index}
@@ -266,7 +288,11 @@ export default function HomePage() {
                 radius="xl"
                 style={{ display: 'flex', flexDirection: 'column' }}
               >
-                <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '12px', marginBottom: '0.75rem' }}>
+                <a
+                  href={platformProductDetailHref(productId)}
+                  data-preview-static="Open the stable live product detail page"
+                  style={{ position: 'relative', overflow: 'hidden', borderRadius: '12px', marginBottom: '0.75rem', display: 'block' }}
+                >
                   <EditableImage
                     src={contentText(product.imageUrl) || '/placeholder.svg'}
                     alt={contentText(product.name)}
@@ -284,7 +310,7 @@ export default function HomePage() {
                       {badge}
                     </span>
                   )}
-                </div>
+                </a>
 
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '0.5rem' }}>
                   {category && (
@@ -296,14 +322,20 @@ export default function HomePage() {
                       {category}
                     </span>
                   )}
-                  <EditableText
-                    variant="h3"
-                    size="lg"
-                    weight="bold"
-                    color="heading"
-                    data-preview-field-path={`products[${index}].name`}
-                    defaultValue={contentText(product.name)}
-                  />
+                  <a
+                    href={platformProductDetailHref(productId)}
+                    data-preview-static="Open the stable live product detail page"
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <EditableText
+                      variant="h3"
+                      size="lg"
+                      weight="bold"
+                      color="heading"
+                      data-preview-field-path={`products[${index}].name`}
+                      defaultValue={contentText(product.name)}
+                    />
+                  </a>
                   <EditableText
                     variant="p"
                     color="muted"
@@ -311,25 +343,45 @@ export default function HomePage() {
                     defaultValue={contentText(product.description)}
                   />
 
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: 'auto', paddingTop: '0.75rem' }}>
-                    <EditableText
-                      as="span"
-                      weight="bold"
-                      size="xl"
-                      color="primary"
-                      data-preview-field-path={`products[${index}].price`}
-                      defaultValue={`${currency} ${price}`}
-                    />
-                    {compareAt > 0 && (
+                  {itemShowPrice ? (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: 'auto', paddingTop: '0.75rem', flexWrap: 'wrap' }}>
                       <EditableText
                         as="span"
-                        color="muted"
-                        style={{ textDecoration: 'line-through', fontSize: '0.875rem' }}
-                        data-preview-field-path={`products[${index}].compareAtPrice`}
-                        defaultValue={`${currency} ${compareAt}`}
+                        weight="bold"
+                        size="xl"
+                        color="primary"
+                        data-preview-field-path={`products[${index}].price`}
+                        defaultValue={displayPrice}
                       />
-                    )}
-                  </div>
+                      {compareAt > 0 && !isRange && (
+                        <EditableText
+                          as="span"
+                          color="muted"
+                          style={{ textDecoration: 'line-through', fontSize: '0.875rem' }}
+                          data-preview-field-path={`products[${index}].compareAtPrice`}
+                          defaultValue={`${currency} ${compareAt}`}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 'auto', paddingTop: '0.75rem' }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                          color: 'var(--muted-text, #94a3b8)',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                        }}
+                      >
+                        Price on Request
+                      </span>
+                    </div>
+                  )}
 
                   <div style={{ marginTop: '0.75rem' }}>
                     <a

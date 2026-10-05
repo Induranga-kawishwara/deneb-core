@@ -10,6 +10,7 @@ import {
   ProductVariant,
   ProductOptionInput,
 } from './utils/productOptions';
+import { platformProductDetailHref } from './PlatformProductDetail';
 
 const COLOR_HEX_MAP: Record<string, string> = {
   black: '#111827',
@@ -44,11 +45,14 @@ const COLOR_HEX_MAP: Record<string, string> = {
 };
 
 export interface ProductItem {
+  href?: string;
+  detailHref?: string;
   id?: string | number;
   name?: string;
   title?: string;
 
   // Dual Pricing Engine (Fixed vs Price Range)
+  showPrice?: boolean;
   isPriceRange?: boolean;
   productName?: string;
   itemTitle?: string;
@@ -103,6 +107,7 @@ export interface ProductItem {
   priceMin?: string | number;
   priceMax?: string | number;
   priceRange?: [number | string, number | string] | string;
+  customData?: Record<string, unknown>;
 
   [key: string]: unknown;
 }
@@ -133,6 +138,12 @@ export interface EditableProductCardProps extends React.HTMLAttributes<HTMLEleme
   actionSlot?: React.ReactNode;
   actionLabel?: string;
   actionLabelPath?: string;
+  href?: string;
+  detailHref?: string;
+  showDetailLink?: boolean;
+  showDetailButton?: boolean;
+  detailButtonText?: string;
+  onDetailClick?: (product: ProductItem, url: string) => void;
   onAddToCart?: (product: ProductItem) => void;
   onWhatsAppClick?: (product: ProductItem, url: string) => void;
 }
@@ -195,16 +206,61 @@ export function EditableProductCard({
   whatsappActionLabel = 'Inquire on WhatsApp',
   addToCartLabel = 'Add to Cart',
   actionSlot,
+  actionLabel,
+  actionLabelPath,
   onAddToCart,
   onWhatsAppClick,
+  href,
+  detailHref,
+  showDetailLink = true,
+  showDetailButton,
+  detailButtonText,
+  onDetailClick,
   className = '',
   style,
   ...props
 }: EditableProductCardProps) {
+  const anyProps = props as Record<string, unknown>;
   const product = useMemo(
-    () => (productProp || itemProp || {}) as ProductItem,
-    [productProp, itemProp]
+    () => {
+      const base = (productProp || itemProp || {}) as ProductItem;
+      return {
+        ...base,
+        id: base.id ?? anyProps.id,
+        name: base.name || anyProps.name,
+        title: base.title || anyProps.title,
+        productName: base.productName || anyProps.productName,
+        brand: base.brand || anyProps.brand,
+        price: base.price ?? anyProps.price,
+        originalPrice: base.originalPrice ?? anyProps.originalPrice ?? anyProps.compareAtPrice,
+        compareAtPrice: base.compareAtPrice ?? anyProps.compareAtPrice,
+        description: base.description || anyProps.description || anyProps.desc,
+        category: base.category || anyProps.category,
+        badge: base.badge || anyProps.badge || anyProps.tag,
+        imageUrl: base.imageUrl || anyProps.imageUrl || anyProps.image || anyProps.photo,
+        currency: base.currency || anyProps.currency,
+        measurement: base.measurement || anyProps.measurement,
+        unit: base.unit || anyProps.unit,
+        href: base.href || (anyProps.href as string),
+      } as ProductItem;
+    },
+    [productProp, itemProp, anyProps]
   );
+
+  const rawId = product?.id ?? (product as any)?.productId;
+  const resolvedDetailHref = useMemo(() => {
+    if (href && typeof href === 'string' && href.trim() !== '') return href.trim();
+    if (detailHref && typeof detailHref === 'string' && detailHref.trim() !== '') return detailHref.trim();
+    if (product?.href && typeof product.href === 'string' && product.href.trim() !== '') {
+      return product.href.trim();
+    }
+    if (rawId !== undefined && rawId !== null && String(rawId).trim() !== '') {
+      return platformProductDetailHref(rawId);
+    }
+    return undefined;
+  }, [href, detailHref, product?.href, rawId]);
+
+  const resolvedActionLabel = String(actionLabel || detailButtonText || 'View details');
   const whatsappNumber = whatsappPhoneProp || whatsappNumberProp || '94770000000';
   const cart = useOptionalCart();
 
@@ -281,8 +337,15 @@ export function EditableProductCard({
         : formatCurrency(basePriceNum, currency)
       : '');
 
+  const itemShowPrice =
+    product?.showPrice !== undefined
+      ? Boolean(product.showPrice)
+      : (product?.customData?.showPrice !== undefined
+        ? Boolean(product.customData.showPrice)
+        : true);
+  const effectiveShowPrice = showPrice && itemShowPrice;
   const displayPrice = resolvedPrice.formattedPrice || baseFormattedPrice;
-  const hasPrice = showPrice && Boolean(displayPrice && displayPrice.trim() !== '');
+  const hasPrice = effectiveShowPrice && Boolean(displayPrice && displayPrice.trim() !== '');
 
   const priceKey =
     'cost' in (product || {}) && !('price' in (product || {}) && (product as any).price !== undefined)
@@ -404,7 +467,8 @@ export function EditableProductCard({
         ...product,
         name,
         brand,
-        price: displayPrice,
+        price: effectiveShowPrice ? displayPrice : undefined,
+        showPrice: effectiveShowPrice,
         size: selectedOption || undefined,
         color: selectedColor || undefined,
         option: selectedOption || undefined,
@@ -436,6 +500,7 @@ export function EditableProductCard({
       size: selectedOption || undefined,
       color: selectedColor || undefined,
       option: selectedOption || undefined,
+      showPrice: effectiveShowPrice,
     };
 
     if (cart) {
@@ -508,17 +573,43 @@ export function EditableProductCard({
           flexShrink: 0,
         }}
       >
-        <EditableImage
-          id={`${itemPath}.${imageKey}`}
-          data-preview-field-path={`${itemPath}.${imageKey}`}
-          src={currentImage}
-          fallbackSrc={imageFallback}
-          alt={name}
-          aspectRatio={isHorizontal ? 'square' : '4/3'}
-          fit="cover"
-          hoverZoom
-          style={{ width: '100%', height: '100%', display: 'block' }}
-        />
+        {resolvedDetailHref && showDetailLink ? (
+          <a
+            href={resolvedDetailHref}
+            onClick={() => {
+              if (onDetailClick) {
+                onDetailClick(product, resolvedDetailHref);
+              }
+            }}
+            data-preview-static="Open the stable live product detail page"
+            style={{ display: 'block', width: '100%', height: '100%', textDecoration: 'none' }}
+            title={`View details for ${name}`}
+          >
+            <EditableImage
+              id={`${itemPath}.${imageKey}`}
+              data-preview-field-path={`${itemPath}.${imageKey}`}
+              src={currentImage}
+              fallbackSrc={imageFallback}
+              alt={name}
+              aspectRatio={isHorizontal ? 'square' : '4/3'}
+              fit="cover"
+              hoverZoom
+              style={{ width: '100%', height: '100%', display: 'block' }}
+            />
+          </a>
+        ) : (
+          <EditableImage
+            id={`${itemPath}.${imageKey}`}
+            data-preview-field-path={`${itemPath}.${imageKey}`}
+            src={currentImage}
+            fallbackSrc={imageFallback}
+            alt={name}
+            aspectRatio={isHorizontal ? 'square' : '4/3'}
+            fit="cover"
+            hoverZoom
+            style={{ width: '100%', height: '100%', display: 'block' }}
+          />
+        )}
 
         {/* Floating Sale / New Badge */}
         {hasBadgeField ? (
@@ -597,19 +688,51 @@ export function EditableProductCard({
           </div>
 
           {/* Product Title */}
-          <EditableText
-            as="h3"
-            id={`${itemPath}.${titleKey}`}
-            data-preview-field-path={`${itemPath}.${titleKey}`}
-            defaultValue={name}
-            style={{
-              fontSize: '1.125rem',
-              fontWeight: 700,
-              lineHeight: 1.35,
-              color: 'var(--heading-color, #ffffff)',
-              marginBottom: '0.375rem',
-            }}
-          />
+          {resolvedDetailHref && showDetailLink ? (
+            <a
+              href={resolvedDetailHref}
+              onClick={() => {
+                if (onDetailClick) {
+                  onDetailClick(product, resolvedDetailHref);
+                }
+              }}
+              data-preview-static="Open the stable live product detail page"
+              style={{
+                color: 'inherit',
+                textDecoration: 'none',
+                display: 'inline-block',
+              }}
+              className="hover:underline"
+            >
+              <EditableText
+                as="h3"
+                id={`${itemPath}.${titleKey}`}
+                data-preview-field-path={`${itemPath}.${titleKey}`}
+                defaultValue={name}
+                style={{
+                  fontSize: '1.125rem',
+                  fontWeight: 700,
+                  lineHeight: 1.35,
+                  color: 'var(--heading-color, #ffffff)',
+                  marginBottom: '0.375rem',
+                }}
+              />
+            </a>
+          ) : (
+            <EditableText
+              as="h3"
+              id={`${itemPath}.${titleKey}`}
+              data-preview-field-path={`${itemPath}.${titleKey}`}
+              defaultValue={name}
+              style={{
+                fontSize: '1.125rem',
+                fontWeight: 700,
+                lineHeight: 1.35,
+                color: 'var(--heading-color, #ffffff)',
+                marginBottom: '0.375rem',
+              }}
+            />
+          )}
 
           {/* Description */}
           {showDescription && (description || hasDescriptionField) ? (
@@ -756,7 +879,7 @@ export function EditableProductCard({
                   letterSpacing: '-0.02em',
                 }}
               />
-              {displayOriginalPrice ? (
+              {displayOriginalPrice && !isRange ? (
                 <EditableText
                   as="span"
                   id={`${itemPath}.${originalPriceKey}`}
@@ -783,20 +906,41 @@ export function EditableProductCard({
                 />
               ) : null}
             </div>
+          ) : !effectiveShowPrice ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  color: 'var(--muted-text, #94a3b8)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  letterSpacing: '0.01em',
+                }}
+              >
+                Price on Request
+              </span>
+            </div>
           ) : null}
 
-          {/* Actions: Custom Action Slot OR Dual Buttons */}
+          {/* Actions: Custom Action Slot OR Dual Buttons & View Details */}
           {actionSlot ? (
             <div>{actionSlot}</div>
           ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: showWhatsAppButton && showAddToCartButton ? '1fr 1fr' : '1fr',
-                gap: '0.5rem',
-                width: '100%',
-              }}
-            >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
+              {(showWhatsAppButton || showAddToCartButton) && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: showWhatsAppButton && showAddToCartButton ? '1fr 1fr' : '1fr',
+                    gap: '0.5rem',
+                    width: '100%',
+                  }}
+                >
               {/* Button 1: WhatsApp Inquiry Button */}
               {showWhatsAppButton && (
                 <button
@@ -865,6 +1009,49 @@ export function EditableProductCard({
                     style={{ color: 'var(--button-text, #ffffff)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                   />
                 </button>
+              )}
+                </div>
+              )}
+
+              {/* View Details Action Button */}
+              {resolvedDetailHref && (showDetailButton || Boolean(actionLabel || actionLabelPath)) && (
+                <a
+                  href={resolvedDetailHref}
+                  onClick={() => {
+                    if (onDetailClick) {
+                      onDetailClick(product, resolvedDetailHref);
+                    }
+                  }}
+                  data-preview-static="Open the stable live product detail page"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    textAlign: 'center',
+                    padding: '0.55rem 0.75rem',
+                    borderRadius: '10px',
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                    backgroundColor: 'var(--button-secondary-bg, rgba(255, 255, 255, 0.08))',
+                    color: 'var(--button-secondary-text, var(--muted-text, #e2e8f0))',
+                    border: '1px solid var(--card-border, rgba(226, 232, 240, 0.25))',
+                    textDecoration: 'none',
+                    transition: 'all 0.2s ease',
+                  }}
+                  className="hover:brightness-110 active:scale-95"
+                >
+                  {actionLabelPath ? (
+                    <EditableText
+                      as="span"
+                      id={actionLabelPath}
+                      data-preview-field-path={actionLabelPath}
+                      defaultValue={resolvedActionLabel}
+                    />
+                  ) : (
+                    <span>{resolvedActionLabel}</span>
+                  )}
+                </a>
               )}
             </div>
           )}

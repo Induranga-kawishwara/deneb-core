@@ -1180,8 +1180,12 @@ export function isPreviewValidation(siteData?: any): boolean {
     return true;
   }
   if (typeof window !== 'undefined') {
+    // If running in an iframe (Visual Editor preview in Shop Owner / Website Agent panel)
+    if (window.parent !== window) {
+      return true;
+    }
     const path = window.location.pathname || '';
-    if (path.includes('/template-validation') || path.includes('/template-preview') || path.includes('/preview/')) {
+    if (path.includes('/template-validation') || path.includes('/template-preview') || path.includes('/preview/') || path.includes('/preview')) {
       return true;
     }
   }

@@ -38,25 +38,38 @@ export function EditableCategoryPills({
 
   // Resolve list of categories
   const resolvedCategories: string[] = React.useMemo(() => {
+    const rawCandidates: string[] = [];
     if (categories && categories.length > 0) {
-      return categories.includes(allLabel) ? categories : [allLabel, ...categories];
-    }
-    const rawCategories = (siteData as any)?.categories;
-    if (Array.isArray(rawCategories) && rawCategories.length > 0) {
-      const cats = rawCategories.map((c: any) => (typeof c === 'string' ? c : c.name || String(c)));
-      return cats.includes(allLabel) ? cats : [allLabel, ...cats];
-    }
-    // Infer categories from products array if present
-    const rawProducts = (siteData as any)?.products;
-    if (Array.isArray(rawProducts) && rawProducts.length > 0) {
-      const inferred = Array.from(
-        new Set(rawProducts.map((p: any) => p.category).filter(Boolean))
-      ) as string[];
-      if (inferred.length > 0) {
-        return [allLabel, ...inferred];
+      rawCandidates.push(...categories);
+    } else {
+      const rawCategories = (siteData as any)?.categories;
+      if (Array.isArray(rawCategories) && rawCategories.length > 0) {
+        for (const c of rawCategories) {
+          const name = typeof c === "string" ? c : c?.name || String(c);
+          if (name) rawCandidates.push(name);
+        }
+      } else {
+        const rawProducts = (siteData as any)?.products;
+        if (Array.isArray(rawProducts) && rawProducts.length > 0) {
+          for (const p of rawProducts) {
+            if (p?.category) rawCandidates.push(p.category);
+          }
+        }
       }
     }
-    return DEFAULT_CATEGORIES;
+
+    const map = new Map<string, string>();
+    for (const item of rawCandidates) {
+      if (typeof item !== "string") continue;
+      const trimmed = item.trim();
+      if (!trimmed || trimmed.toLowerCase() === allLabel.toLowerCase()) continue;
+      const lower = trimmed.toLowerCase();
+      if (!map.has(lower)) {
+        map.set(lower, trimmed);
+      }
+    }
+    const distinct = Array.from(map.values());
+    return distinct.length > 1 ? [allLabel, ...distinct] : [];
   }, [categories, siteData, allLabel]);
 
   const handleSelect = (category: string) => {
@@ -67,6 +80,10 @@ export function EditableCategoryPills({
       onSelectCategory(category);
     }
   };
+
+  if (resolvedCategories.length <= 1) {
+    return null;
+  }
 
   return (
     <nav
@@ -86,7 +103,7 @@ export function EditableCategoryPills({
       aria-label="Product categories"
     >
       {resolvedCategories.map((cat, idx) => {
-        const isSelected = activeCategory.toLowerCase() === cat.toLowerCase();
+        const isSelected = activeCategory.trim().toLowerCase() === cat.trim().toLowerCase();
         return (
           <button
             key={`${cat}-${idx}`}
