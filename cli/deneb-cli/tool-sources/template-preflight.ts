@@ -52,6 +52,7 @@ import {
 import {
   findDoubleBasePathNextRouterCalls,
   findLinksToUnselectedPages,
+  findMalformedBasePathLinks,
   getTemplateValidationSelectedPages,
   normalizeTemplatePageDefinitions,
 } from '../src/sites/universal-page-selection';
@@ -741,6 +742,19 @@ async function validateWorkspace(
           .map((marker) => marker.filePath),
       );
       result.errors.push(
+        ...emptyArtifacts
+          .filter((artifact) => artifact.kind === 'html')
+          .flatMap((artifact) =>
+            findMalformedBasePathLinks({
+              html: artifact.content,
+              basePath: VALIDATION_BASE_PATH,
+            }).map(
+              (href) =>
+                `${artifact.filePath} renders href="${href}" without a leading slash. Prefix the configured base path with "/" so navigation does not duplicate the preview URL.`,
+            ),
+          ),
+      );
+      result.errors.push(
         ...new Set(
           emptyArtifacts
             .filter(
@@ -855,6 +869,12 @@ async function buildOrReuseExport(
           }
         : {}),
       NODE_ENV: 'production',
+      NODE_OPTIONS: [
+        process.env.NODE_OPTIONS ?? '',
+        '--max-old-space-size=1024',
+      ]
+        .filter(Boolean)
+        .join(' '),
     };
     await runCommand(
       manifest.buildCommand?.trim() || 'npm run build',

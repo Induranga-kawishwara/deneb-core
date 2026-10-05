@@ -20,7 +20,6 @@
 
 import React from 'react';
 import { useSiteData } from './SiteDataProvider';
-import { EditableText } from './EditableText';
 import { EditableImage } from './EditableImage';
 import { EditableIcon } from './EditableIcon';
 

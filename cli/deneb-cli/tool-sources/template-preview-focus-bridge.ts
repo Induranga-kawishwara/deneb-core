@@ -8,7 +8,7 @@ import { installUniversalSectionNavigation } from './universal-section-navigatio
 
 export const TEMPLATE_PREVIEW_FOCUS_BRIDGE_FILE =
   '__fivora-preview-focus-bridge.js';
-export const TEMPLATE_PREVIEW_FOCUS_BRIDGE_VERSION = '47';
+export const TEMPLATE_PREVIEW_FOCUS_BRIDGE_VERSION = '51';
 
 const PREVIOUS_PREVIEW_BRIDGE_ATTRIBUTE = `data-${['market', 'place'].join('')}-preview-focus-bridge`;
 
@@ -75,14 +75,79 @@ export function resolveTemplatePreviewParentOrigin(input: {
   );
 }
 
+export function normalizeTemplatePreviewNavigationPath(pathname: string) {
+  const root = pathname.match(
+    /^(\/uploads\/generated-sites\/(?:template-preview|preview|live)\/[^/]+)/,
+  )?.[1];
+  if (!root) return pathname;
+
+  let normalized = pathname;
+  const duplicatedRoot = `${root}${root}`;
+  while (normalized.startsWith(duplicatedRoot)) {
+    normalized = `${root}${normalized.slice(duplicatedRoot.length)}`;
+  }
+  return normalized;
+}
+
 function fivoraPreviewFocusBridge(
   resolveParentOrigin: typeof resolveTemplatePreviewParentOrigin,
   buildUniversalThemeCss: typeof buildUniversalTemplateThemeCss,
   replaceColorLiterals: typeof replaceTemplateColorLiterals,
   universalThemeStyleId: string,
   enforceSelectedPages: typeof enforceSelectedTemplatePages,
+  normalizePreviewNavigationPath: typeof normalizeTemplatePreviewNavigationPath,
   installSectionNavigation: typeof installUniversalSectionNavigation,
 ) {
+  try {
+    if (typeof Node !== 'undefined' && Node.prototype) {
+      const originalRemoveChild = Node.prototype.removeChild;
+      Node.prototype.removeChild = function (child: Node) {
+        if (child && child.parentNode !== this) {
+          if (
+            typeof console !== 'undefined' &&
+            typeof console.warn === 'function'
+          ) {
+            console.warn(
+              'PreviewBridge: removeChild on non-child node prevented from crashing React',
+              child,
+            );
+          }
+          return child;
+        }
+        return originalRemoveChild.apply(this, arguments as unknown as [Node]);
+      };
+
+      const originalInsertBefore = Node.prototype.insertBefore;
+      Node.prototype.insertBefore = function (
+        newNode: Node,
+        referenceNode: Node | null,
+      ) {
+        if (referenceNode && referenceNode.parentNode !== this) {
+          if (
+            typeof console !== 'undefined' &&
+            typeof console.warn === 'function'
+          ) {
+            console.warn(
+              'PreviewBridge: insertBefore on non-child reference node prevented from crashing React',
+              referenceNode,
+            );
+          }
+          return newNode;
+        }
+        return originalInsertBefore.apply(
+          this,
+          arguments as unknown as [Node, Node | null],
+        );
+      };
+    }
+
+    if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.setAttribute('data-gramm', 'false');
+      document.documentElement.setAttribute('data-gramm_editor', 'false');
+      document.documentElement.setAttribute('data-enable-grammarly', 'false');
+      document.documentElement.setAttribute('translate', 'no');
+    }
+  } catch {}
   const PREVIOUS_PREVIEW_PREFIX = `${['MARKET', 'PLACE'].join('')}_PREVIEW_`;
   const previousPreviewMessage = (suffix: string) =>
     `${PREVIOUS_PREVIEW_PREFIX}${suffix}`;
@@ -126,8 +191,6 @@ function fivoraPreviewFocusBridge(
   // While typing, keep React/template relays rare. DOM patches carry live preview.
   const CONTENT_ONLY_RELAY_DELAY_MS = 1600;
   const CONTENT_ONLY_PERSIST_DELAY_MS = 12000;
-  const TEXT_SELECTOR =
-    'h1, h2, h3, h4, h5, h6, p, span, a, button, address, li, dt, dd, label, strong, em, small';
   class TargetRegistry {
     private elementToPath = new WeakMap<Element, string>();
     private pathToElements = new Map<string, Set<Element>>();
@@ -155,8 +218,11 @@ function fivoraPreviewFocusBridge(
       this.dynamicTargets.clear();
     }
   }
+
   const targetRegistry = new TargetRegistry();
 
+  const TEXT_SELECTOR =
+    'h1, h2, h3, h4, h5, h6, p, span, a, button, address, li, dt, dd, label, strong, em, small';
   let activeHighlights: Array<{
     target: HTMLElement;
     outline: string;
@@ -526,13 +592,6 @@ function fivoraPreviewFocusBridge(
         }
         continue;
       }
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        if (typeof value === 'string' || typeof value === 'number') {
-          (target as HTMLInputElement | HTMLTextAreaElement).placeholder = String(value);
-          target.setAttribute('placeholder', String(value));
-        }
-        continue;
-      }
       if (
         typeof value !== 'string' &&
         typeof value !== 'number' &&
@@ -540,41 +599,6 @@ function fivoraPreviewFocusBridge(
       ) {
         continue;
       }
-
-      // Special-case star ratings: update fill colors and text badge without destroying SVG children
-      if (
-        target.hasAttribute('data-fivora-rating-container') ||
-        target.querySelector('[data-fivora-stars-row]') ||
-        target.querySelector('[data-fivora-rating-text]') ||
-        fieldPath.endsWith('.rating')
-      ) {
-        const numericRating = Math.min(Math.max(Math.round(Number(value) || 0), 0), 5);
-        const ratingText = target.querySelector<HTMLElement>('[data-fivora-rating-text]');
-        if (ratingText) {
-          ratingText.textContent = String(numericRating);
-        } else if (target.hasAttribute('data-fivora-rating-text')) {
-          target.textContent = String(numericRating);
-        }
-        const container = target.hasAttribute('data-fivora-rating-container')
-          ? target
-          : target.closest('[data-fivora-rating-container]') || target.parentElement;
-        if (container) {
-          const starSvgs = Array.from(container.querySelectorAll<SVGSVGElement>('svg'));
-          starSvgs.forEach((svg, sIdx) => {
-            const filled = sIdx < numericRating;
-            const color = filled ? '#fa7014' : '#dadce0';
-            svg.style.fill = color;
-            svg.style.color = color;
-            const path = svg.querySelector('path');
-            if (path) {
-              path.style.fill = color;
-            }
-          });
-          container.setAttribute('data-rating-value', String(numericRating));
-        }
-        continue;
-      }
-
       const text =
         (target.getAttribute('data-fivora-value-prefix') ?? '') +
         String(value) +
@@ -675,10 +699,22 @@ function fivoraPreviewFocusBridge(
       !Array.isArray(theme.elementStyles)
         ? (theme.elementStyles as Record<string, unknown>)
         : {};
+    const hasAnyProp =
+      styles &&
+      typeof styles === 'object' &&
+      Object.values(styles).some(
+        (v) => v !== undefined && v !== null && v !== '',
+      );
+    const nextElementStyles = { ...elementStyles };
+    if (hasAnyProp) {
+      nextElementStyles[fieldPath] = styles;
+    } else {
+      delete nextElementStyles[fieldPath];
+    }
     const nextTheme = {
       ...theme,
       designCustomizationVersion: 1,
-      elementStyles: { ...elementStyles, [fieldPath]: styles },
+      elementStyles: nextElementStyles,
     };
     const nextTemplate = {
       ...template,
@@ -736,61 +772,130 @@ function fivoraPreviewFocusBridge(
       if (raw.color) {
         el.style.setProperty('color', String(raw.color), 'important');
         el.style.setProperty('--deneb-color', String(raw.color));
+      } else {
+        el.style.removeProperty('color');
+        el.style.removeProperty('--deneb-color');
       }
       if (raw.textAlign) {
         el.style.setProperty('text-align', String(raw.textAlign), 'important');
         el.style.setProperty('--deneb-text-align', String(raw.textAlign));
+      } else {
+        el.style.removeProperty('text-align');
+        el.style.removeProperty('--deneb-text-align');
       }
       if (raw.fontSize) {
         const sz = toCssVal(raw.fontSize);
         el.style.setProperty('font-size', sz, 'important');
         el.style.setProperty('--deneb-font-size', sz);
+      } else {
+        el.style.removeProperty('font-size');
+        el.style.removeProperty('--deneb-font-size');
       }
       if (raw.fontFamily) {
         el.style.setProperty('font-family', String(raw.fontFamily), 'important');
         el.style.setProperty('--deneb-font-family', String(raw.fontFamily));
+      } else {
+        el.style.removeProperty('font-family');
+        el.style.removeProperty('--deneb-font-family');
       }
       if (raw.lineHeight) {
         el.style.setProperty('line-height', String(raw.lineHeight), 'important');
         el.style.setProperty('--deneb-line-height', String(raw.lineHeight));
+      } else {
+        el.style.removeProperty('line-height');
+        el.style.removeProperty('--deneb-line-height');
       }
       if (raw.fontWeight) {
         el.style.setProperty('font-weight', String(raw.fontWeight), 'important');
         el.style.setProperty('--deneb-font-weight', String(raw.fontWeight));
+      } else {
+        el.style.removeProperty('font-weight');
+        el.style.removeProperty('--deneb-font-weight');
+      }
+      if (raw.letterSpacing) {
+        el.style.setProperty('letter-spacing', toCssVal(raw.letterSpacing), 'important');
+        el.style.setProperty('--deneb-letter-spacing', toCssVal(raw.letterSpacing));
+      } else {
+        el.style.removeProperty('letter-spacing');
+        el.style.removeProperty('--deneb-letter-spacing');
+      }
+      if (raw.textTransform) {
+        el.style.setProperty('text-transform', String(raw.textTransform), 'important');
+        el.style.setProperty('--deneb-text-transform', String(raw.textTransform));
+      } else {
+        el.style.removeProperty('text-transform');
+        el.style.removeProperty('--deneb-text-transform');
       }
       if (raw.backgroundColor) {
         el.style.setProperty('background-color', String(raw.backgroundColor), 'important');
         el.style.setProperty('background', String(raw.backgroundColor), 'important');
         el.style.setProperty('--deneb-card-bg', String(raw.backgroundColor));
+      } else {
+        el.style.removeProperty('background-color');
+        el.style.removeProperty('background');
+        el.style.removeProperty('--deneb-card-bg');
       }
       if (raw.borderRadius) {
         const rad = toCssVal(raw.borderRadius);
         el.style.setProperty('border-radius', rad, 'important');
         el.style.setProperty('--deneb-card-radius', rad);
+      } else {
+        el.style.removeProperty('border-radius');
+        el.style.removeProperty('--deneb-card-radius');
       }
       if (raw.padding) {
         const p = toCssVal(raw.padding);
         el.style.setProperty('padding', p, 'important');
         el.style.setProperty('--deneb-card-pt', p);
+      } else {
+        el.style.removeProperty('padding');
+        el.style.removeProperty('--deneb-card-pt');
       }
+      if (raw.paddingTop) el.style.setProperty('padding-top', toCssVal(raw.paddingTop), 'important');
+      else el.style.removeProperty('padding-top');
+      if (raw.paddingBottom) el.style.setProperty('padding-bottom', toCssVal(raw.paddingBottom), 'important');
+      else el.style.removeProperty('padding-bottom');
+      if (raw.paddingLeft) el.style.setProperty('padding-left', toCssVal(raw.paddingLeft), 'important');
+      else el.style.removeProperty('padding-left');
+      if (raw.paddingRight) el.style.setProperty('padding-right', toCssVal(raw.paddingRight), 'important');
+      else el.style.removeProperty('padding-right');
+
       if (raw.boxShadow) {
         el.style.setProperty('box-shadow', String(raw.boxShadow), 'important');
         el.style.setProperty('--deneb-card-shadow', String(raw.boxShadow));
+      } else {
+        el.style.removeProperty('box-shadow');
+        el.style.removeProperty('--deneb-card-shadow');
       }
       if (raw.borderColor) {
         el.style.setProperty('border-color', String(raw.borderColor), 'important');
         el.style.setProperty('--deneb-card-border-c', String(raw.borderColor));
+      } else {
+        el.style.removeProperty('border-color');
+        el.style.removeProperty('--deneb-card-border-c');
       }
       if (raw.borderWidth) {
         const bw = toCssVal(raw.borderWidth);
         el.style.setProperty('border-width', bw, 'important');
         el.style.setProperty('border-style', 'solid', 'important');
         el.style.setProperty('--deneb-card-border-w', bw);
+      } else {
+        el.style.removeProperty('border-width');
+        el.style.removeProperty('border-style');
+        el.style.removeProperty('--deneb-card-border-w');
       }
       if (raw.marginTop) el.style.setProperty('margin-top', toCssVal(raw.marginTop), 'important');
+      else el.style.removeProperty('margin-top');
       if (raw.marginBottom) el.style.setProperty('margin-bottom', toCssVal(raw.marginBottom), 'important');
+      else el.style.removeProperty('margin-bottom');
       if (raw.marginLeft) el.style.setProperty('margin-left', toCssVal(raw.marginLeft), 'important');
+      else el.style.removeProperty('margin-left');
       if (raw.marginRight) el.style.setProperty('margin-right', toCssVal(raw.marginRight), 'important');
+      else el.style.removeProperty('margin-right');
+      if (raw.display) el.style.setProperty('display', String(raw.display), 'important');
+      else el.style.removeProperty('display');
+      if (raw.order !== undefined && raw.order !== null && raw.order !== '') el.style.setProperty('order', String(raw.order), 'important');
+      else el.style.removeProperty('order');
     }
   }
 
@@ -1085,6 +1190,47 @@ function fivoraPreviewFocusBridge(
     const themeChanged = themeSignature !== lastAppliedThemeSignature;
     if (themeChanged) {
       lastAppliedThemeSignature = themeSignature;
+      const themeRecord =
+        theme && typeof theme === 'object' && !Array.isArray(theme)
+          ? (theme as Record<string, unknown>)
+          : null;
+      const themeBg =
+        typeof themeRecord?.backgroundColor === 'string'
+          ? themeRecord.backgroundColor
+          : typeof themeRecord?.background === 'string'
+            ? themeRecord.background
+            : '';
+      const isThemeDark =
+        themeBg && /^#[0-9a-f]{3,6}$/i.test(themeBg.trim())
+          ? (() => {
+              const h = themeBg.trim().toLowerCase();
+              const f =
+                h.length === 4
+                  ? `#${h[1]}${h[1]}${h[2]}${h[2]}${h[3]}${h[3]}`
+                  : h;
+              const r = Number.parseInt(f.slice(1, 3), 16);
+              const g = Number.parseInt(f.slice(3, 5), 16);
+              const b = Number.parseInt(f.slice(5, 7), 16);
+              return (r * 299 + g * 587 + b * 114) / 1000 < 130;
+            })()
+          : false;
+
+      if (isThemeDark) {
+        document.documentElement.classList.add('dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
+        if (document.body) {
+          document.body.classList.add('dark');
+          document.body.setAttribute('data-theme', 'dark');
+        }
+      } else if (themeBg) {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.setAttribute('data-theme', 'light');
+        if (document.body) {
+          document.body.classList.remove('dark');
+          document.body.setAttribute('data-theme', 'light');
+        }
+      }
+
       const css = buildUniversalThemeCss(theme);
       const existing = document.getElementById(universalThemeStyleId);
       if (!css) {
@@ -2223,7 +2369,7 @@ function fivoraPreviewFocusBridge(
 
   let editModeActive = false;
   let hoverBadge: HTMLElement | null = null;
-  let hoveredElement: Element | null = null;
+  let hoveredElement: HTMLElement | null = null;
   let hoverOutlineCleanup: (() => void) | null = null;
   let activeInlineEdit: {
     target: HTMLElement;
@@ -2368,95 +2514,7 @@ function fivoraPreviewFocusBridge(
     }
   }
 
-  
-  function updateDynamicStyles(emptyEditablePaths: string[], emptyCollectionPaths: string[]) {
-    // Dynamic styles are safe from hydration as we use classlists here.
-    // Wait, manipulating classList during hydration STILL causes mismatch.
-    // Instead we map by data-preview-field-path.
-    let styleEl = document.getElementById('fivora-dynamic-empty-styles');
-    if (!styleEl) {
-       styleEl = document.createElement('style');
-       styleEl.id = 'fivora-dynamic-empty-styles';
-       document.head.appendChild(styleEl);
-    }
-    
-    const rules: string[] = [];
-    
-    // For dynamically mapped elements that lack data attributes, 
-    // we generate a unique fivora-id and target it.
-    targetRegistry.getDynamicTargets().forEach((el, index) => {
-        const id = 'fivora-target-' + index;
-        if (!el.hasAttribute('data-fivora-id')) el.setAttribute('data-fivora-id', id);
-    });
-
-    const buildSelectors = (paths: string[]) => {
-       const selectors: string[] = [];
-       for (const path of paths) {
-          const escaped = CSS.escape(path);
-          selectors.push(`[data-preview-field-path="${escaped}"]`);
-          selectors.push(`[data-preview-list-path="${escaped}"]`);
-          
-          targetRegistry.findTargets(path).forEach(el => {
-             const fid = el.getAttribute('data-fivora-id');
-             if (fid) selectors.push(`[data-fivora-id="${CSS.escape(fid)}"]`);
-          });
-       }
-       return selectors.length > 0 ? selectors.join(', ') : null;
-    };
-    
-    const editableSelectors = buildSelectors(emptyEditablePaths);
-    if (editableSelectors) {
-       rules.push(`
-         ${editableSelectors} {
-            min-width: 7rem !important;
-            min-height: 1.25em !important;
-            outline: 1px dashed rgba(37, 99, 235, 0.28) !important;
-            outline-offset: 3px !important;
-         }
-         ${editableSelectors.replace(/,/g, ':empty::before,')} :empty::before {
-            content: "";
-            color: rgba(37, 99, 235, 0.78);
-            font: 500 12px/1.4 system-ui, sans-serif;
-            letter-spacing: normal;
-            text-transform: none;
-            white-space: nowrap;
-         }
-         ${editableSelectors.replace(/,/g, ':empty:hover::before,')} :empty:hover::before {
-            content: "Click to add text";
-         }
-       `);
-    }
-
-    const collectionSelectors = buildSelectors(emptyCollectionPaths);
-    if (collectionSelectors) {
-       rules.push(`
-         ${collectionSelectors} {
-            min-width: 10rem !important;
-            min-height: 3.5rem !important;
-            outline: 1px dashed rgba(37, 99, 235, 0.28) !important;
-            outline-offset: 3px !important;
-         }
-         ${collectionSelectors.replace(/,/g, ':empty::before,')} :empty::before {
-            content: "";
-            display: inline-flex;
-            align-items: center;
-            min-height: 3.5rem;
-            color: rgba(37, 99, 235, 0.78);
-            font: 500 12px/1.4 system-ui, sans-serif;
-            letter-spacing: normal;
-            text-transform: none;
-            white-space: nowrap;
-         }
-         ${collectionSelectors.replace(/,/g, ':empty:hover::before,')} :empty:hover::before {
-            content: "Click to add the first item";
-         }
-       `);
-    }
-    
-    styleEl.textContent = rules.join('\n');
-  }
-
-function clearResolvedEditableTargets() {
+  function clearResolvedEditableTargets() {
     document
       .querySelectorAll<HTMLElement>(`[${RESOLVED_PATH_ATTRIBUTE}]`)
       .forEach((element) => {
@@ -2468,11 +2526,11 @@ function clearResolvedEditableTargets() {
   }
 
   function annotateEditableTarget(
-    element: Element,
+    element: HTMLElement,
     field: EditableField,
     remember = true,
   ) {
-    const existingPath = targetRegistry.getPath(element);
+    const existingPath = element.getAttribute(RESOLVED_PATH_ATTRIBUTE);
     const authoredPath =
       element.getAttribute('data-preview-field-path') ??
       element.getAttribute(LIST_PATH_ATTRIBUTE) ??
@@ -2485,14 +2543,12 @@ function clearResolvedEditableTargets() {
     ) {
       return false;
     }
-    // In-memory target registration only to prevent React hydration mismatches [DNB-HYD-007]
-    const isInputOrTextarea = element.tagName === 'INPUT' || element.tagName === 'TEXTAREA';
+    element.setAttribute(RESOLVED_PATH_ATTRIBUTE, field.path);
+    targetRegistry.register(element, field.path);
     const isEmpty =
       String(field.value ?? '').trim().length === 0 &&
-      (isInputOrTextarea
-        ? !((element as HTMLInputElement | HTMLTextAreaElement).placeholder || (element as HTMLInputElement | HTMLTextAreaElement).value || '').trim()
-        : normalizeText(element.textContent).length === 0);
-    if (editModeActive && isEmpty && element.tagName !== 'IMG' && element.tagName.toLowerCase() !== 'svg') {
+      normalizeText(element.textContent).length === 0;
+    if (editModeActive && isEmpty && element.tagName !== 'IMG') {
       element.setAttribute(EMPTY_EDITABLE_ATTRIBUTE, 'true');
     } else {
       element.removeAttribute(EMPTY_EDITABLE_ATTRIBUTE);
@@ -2509,8 +2565,7 @@ function clearResolvedEditableTargets() {
     } else {
       element.removeAttribute(EMPTY_COLLECTION_ATTRIBUTE);
     }
-    targetRegistry.register(element, field.path);
-    if (remember && !isCollection && element instanceof HTMLElement) {
+    if (remember && !isCollection) {
       rememberResolvedTarget(element, field.path);
     }
     return true;
@@ -2601,7 +2656,7 @@ function clearResolvedEditableTargets() {
         if (target.closest(`[${STATIC_ATTRIBUTE}]`)) {
           continue;
         }
-        const resolvedPath = targetRegistry.getPath(target);
+        const resolvedPath = target.getAttribute(RESOLVED_PATH_ATTRIBUTE);
         if (!resolvedPath || resolvedPath === field.path) {
           return target;
         }
@@ -2756,6 +2811,7 @@ function clearResolvedEditableTargets() {
         current.hasAttribute(ITEM_PATH_ATTRIBUTE) ||
         current.hasAttribute('data-content-path') ||
         current.hasAttribute('data-field-path') ||
+        current.hasAttribute(RESOLVED_PATH_ATTRIBUTE) ||
         Boolean(targetRegistry.getPath(current)) ||
         (current instanceof HTMLElement && current.matches(EDITABLE_SELECTOR));
       if (isCandidate) {
@@ -2769,7 +2825,7 @@ function clearResolvedEditableTargets() {
     return null;
   }
 
-  function resolveEditableField(element: Element): EditableField | null {
+  function resolveEditableField(element: HTMLElement): EditableField | null {
     if (element.closest(`[${STATIC_ATTRIBUTE}]`)) {
       return null;
     }
@@ -2781,32 +2837,20 @@ function clearResolvedEditableTargets() {
       element.getAttribute('data-preview-field-path') ??
       element.getAttribute('data-content-path') ??
       element.getAttribute('data-field-path') ??
-      targetRegistry.getPath(element);
+      element.getAttribute(RESOLVED_PATH_ATTRIBUTE);
     if (explicitPath) {
       const explicitField = editableFields.find((field) =>
         pathVariants(field.path).includes(explicitPath),
       );
-      const isImg = element.tagName === 'IMG';
-      const isInputOrTextarea = element.tagName === 'INPUT' || element.tagName === 'TEXTAREA';
-      const isIcon =
-        element.tagName.toLowerCase() === 'svg' ||
-        element.tagName.toLowerCase() === 'path' ||
-        element.tagName.toLowerCase() === 'circle' ||
-        element.hasAttribute('data-preview-icon') ||
-        element.getAttribute('data-preview-control') === 'icon-picker';
-
       return (
         explicitField ?? {
           path: explicitPath,
           label: explicitPath.split('.').pop() ?? 'Content',
-          type: isImg ? 'image' : (isIcon ? 'icon' : 'text'),
-          control: isIcon ? 'icon-picker' : undefined,
+          type: element.tagName === 'IMG' ? 'image' : 'text',
           value:
-            isImg
+            element.tagName === 'IMG'
               ? (element as HTMLImageElement).src
-              : isInputOrTextarea
-              ? ((element as HTMLInputElement | HTMLTextAreaElement).placeholder || (element as HTMLInputElement | HTMLTextAreaElement).value || '')
-              : (element.getAttribute('data-preview-icon') ?? element.textContent?.trim() ?? ''),
+              : (element.textContent?.trim() ?? ''),
         }
       );
     }
@@ -2896,7 +2940,7 @@ function clearResolvedEditableTargets() {
           container.getAttribute('data-preview-field-path') ||
           container.getAttribute('data-content-path') ||
           container.getAttribute('data-field-path') ||
-          targetRegistry.getPath(container);
+          container.getAttribute(RESOLVED_PATH_ATTRIBUTE);
         if (containerHint) {
           const prefix = containerHint.split('.')[0];
           const sectionImage = editableFields.find(
@@ -2996,7 +3040,7 @@ function clearResolvedEditableTargets() {
         current.getAttribute(LIST_PATH_ATTRIBUTE) ??
         current.getAttribute('data-content-path') ??
         current.getAttribute('data-field-path') ??
-        targetRegistry.getPath(current);
+        current.getAttribute(RESOLVED_PATH_ATTRIBUTE);
       if (path) return path;
       current = current.parentElement;
     }
@@ -3023,7 +3067,7 @@ function clearResolvedEditableTargets() {
         current.getAttribute('data-preview-field-path') ??
         current.getAttribute('data-content-path') ??
         current.getAttribute('data-field-path') ??
-        targetRegistry.getPath(current);
+        current.getAttribute(RESOLVED_PATH_ATTRIBUTE);
       if (path) {
         const match = path.match(/^(.+)\[(\d+)\]/);
         if (match) {
@@ -3070,7 +3114,7 @@ function clearResolvedEditableTargets() {
         current.hasAttribute('data-preview-field-path') ||
         current.hasAttribute('data-content-path') ||
         current.hasAttribute('data-field-path') ||
-        Boolean(targetRegistry.getPath(current))
+        current.hasAttribute(RESOLVED_PATH_ATTRIBUTE)
       ) {
         const candidate = resolveEditableField(current);
         if (
@@ -3573,17 +3617,85 @@ function clearResolvedEditableTargets() {
 
   // Restore live data/edit mode and tell the host which page is open after
   // both full document loads and client-side router navigation.
+  function normalizePreviewHistoryUrl(url?: string | URL | null) {
+    if (url == null) return url;
+    try {
+      const parsed = new URL(String(url), window.location.href);
+      if (parsed.origin !== window.location.origin) return url;
+      const pathname = normalizePreviewNavigationPath(parsed.pathname);
+      if (pathname === parsed.pathname) return url;
+      return `${pathname}${parsed.search}${parsed.hash}`;
+    } catch {
+      return url;
+    }
+  }
+
   const originalPushState = window.history.pushState.bind(window.history);
   const originalReplaceState = window.history.replaceState.bind(window.history);
-  window.history.pushState = (...args) => {
-    originalPushState(...args);
+  window.history.pushState = (data, unused, url) => {
+    originalPushState(data, unused, normalizePreviewHistoryUrl(url));
     window.setTimeout(announceReady, 0);
   };
-  window.history.replaceState = (...args) => {
-    originalReplaceState(...args);
+  window.history.replaceState = (data, unused, url) => {
+    originalReplaceState(data, unused, normalizePreviewHistoryUrl(url));
     window.setTimeout(announceReady, 0);
   };
   window.addEventListener('popstate', announceReady);
+
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const rawUrl =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : null;
+    if (!rawUrl) return originalFetch(input, init);
+    try {
+      const parsed = new URL(rawUrl, window.location.href);
+      if (parsed.origin !== window.location.origin) {
+        return originalFetch(input, init);
+      }
+      const pathname = normalizePreviewNavigationPath(parsed.pathname);
+      if (pathname === parsed.pathname) return originalFetch(input, init);
+      parsed.pathname = pathname;
+      return originalFetch(parsed.href, init);
+    } catch {
+      return originalFetch(input, init);
+    }
+  };
+
+  // Template/design previews are inert sandboxes. Forms can be exercised
+  // visually, but must not create enquiries, reservations, orders, or open
+  // third-party actions using validation/demo data.
+  const isInertPreview =
+    /^\/uploads\/generated-sites\/(?:template-preview|preview)\//.test(
+      window.location.pathname,
+    );
+  if (isInertPreview) {
+    window.addEventListener(
+      'submit',
+      (event) => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        let status = form.parentElement?.querySelector<HTMLElement>(
+          '[data-fivora-preview-action-status]',
+        );
+        if (!status) {
+          status = document.createElement('p');
+          status.setAttribute('data-fivora-preview-action-status', 'true');
+          status.setAttribute('role', 'status');
+          status.style.marginTop = '0.75rem';
+          form.insertAdjacentElement('afterend', status);
+        }
+        status.textContent =
+          'Preview only — this form was not submitted. It becomes active on the published website.';
+      },
+      true,
+    );
+  }
 
   // Static template previews are HTML exports — Next.js soft navigation tries
   // to fetch missing RSC `.txt` payloads (404 spam) and glitches the preview.
@@ -3598,7 +3710,7 @@ function clearResolvedEditableTargets() {
     return match?.[1] ?? '';
   }
 
-  function isInternalPreviewNavigation(anchor: HTMLAnchorElement) {
+  function resolveInternalPreviewNavigation(anchor: HTMLAnchorElement) {
     if (anchor.target && anchor.target !== '_self') return false;
     if (anchor.hasAttribute('download')) return false;
     const rawHref = anchor.getAttribute('href');
@@ -3606,18 +3718,30 @@ function clearResolvedEditableTargets() {
     if (/^(mailto:|tel:|sms:|whatsapp:|javascript:)/i.test(rawHref)) {
       return false;
     }
+    const root = resolvePreviewRootPrefix();
+    // Some templates accidentally emit the configured basePath without its
+    // leading slash. Browsers then append the whole path to the current page,
+    // producing /template-preview/<id>/uploads/generated-sites/... . Repair
+    // that package-level mistake at the preview boundary so customer design
+    // previews remain navigable while the developer fixes the template.
+    const candidateHref = rawHref.startsWith('uploads/generated-sites/')
+      ? `/${rawHref}`
+      : root && rawHref.startsWith(root.slice(1))
+        ? `/${rawHref}`
+        : rawHref;
     let url: URL;
     try {
-      url = new URL(rawHref, window.location.href);
+      url = new URL(candidateHref, window.location.href);
     } catch {
       return false;
     }
     if (url.origin !== window.location.origin) return false;
-    const root = resolvePreviewRootPrefix();
     if (root && !url.pathname.startsWith(root)) return false;
     const current = window.location.pathname.replace(/\/+$/, '') || '/';
     const next = url.pathname.replace(/\/+$/, '') || '/';
-    return current !== next || url.search !== window.location.search;
+    return current !== next || url.search !== window.location.search
+      ? url
+      : false;
   }
 
   document.addEventListener(
@@ -3631,10 +3755,12 @@ function clearResolvedEditableTargets() {
       const anchor = (event.target as Element | null)?.closest?.(
         'a[href]',
       ) as HTMLAnchorElement | null;
-      if (!anchor || !isInternalPreviewNavigation(anchor)) return;
+      if (!anchor) return;
+      const target = resolveInternalPreviewNavigation(anchor);
+      if (!target) return;
       event.preventDefault();
       event.stopPropagation();
-      window.location.assign(anchor.href);
+      window.location.assign(target.href);
     },
     true,
   );
@@ -3653,4 +3779,5 @@ export const TEMPLATE_PREVIEW_FOCUS_BRIDGE_SCRIPT =
   `${replaceTemplateColorLiterals.toString()},` +
   `${JSON.stringify(UNIVERSAL_TEMPLATE_THEME_STYLE_ID)},` +
   `${enforceSelectedTemplatePages.toString()},` +
+  `${normalizeTemplatePreviewNavigationPath.toString()},` +
   `${installUniversalSectionNavigation.toString()});`;

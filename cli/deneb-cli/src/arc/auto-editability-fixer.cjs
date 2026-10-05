@@ -706,13 +706,9 @@ function patchSiteFooter(projectDir, dryRun, log, report) {
 }
 
 function patchUniversalIcons(projectDir, dryRun, log, report) {
-  // Scans and ensures all feature icons across files are editable
   try {
-    const patcherPath = path.join(__dirname, 'universal-icon-patcher.cjs');
-    if (fs.existsSync(patcherPath)) {
-      // Patcher is executed to guarantee all icons across the project are converted
-      log('[auto-fix] Running universal icon pass...');
-    }
+    const { patchUniversalIcons: runPatcher } = require('./universal-icon-patcher.cjs');
+    runPatcher(projectDir, dryRun, log);
   } catch (err) {
     log('[auto-fix] Universal icon scan warning: ' + err.message);
   }

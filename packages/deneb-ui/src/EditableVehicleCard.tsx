@@ -114,6 +114,7 @@ export function EditableVehicleCard({
   return (
     <article
       className={className}
+      data-layout={layout}
       data-preview-item-path={`cards.vehicles.${vehicleId}`}
     >
       {/* Image slot */}

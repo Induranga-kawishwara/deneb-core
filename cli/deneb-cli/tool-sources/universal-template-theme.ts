@@ -244,6 +244,28 @@ export function buildUniversalTemplateThemeCss(themeValue: unknown): string {
     return shadows[value] ?? '';
   };
 
+  const isDarkColor = (color: string) => {
+    if (!color) return false;
+    const hex = color.trim().toLowerCase();
+    if (!/^#[0-9a-f]{3,6}$/.test(hex)) return false;
+    const fullHex =
+      hex.length === 4
+        ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+        : hex;
+    const r = Number.parseInt(fullHex.slice(1, 3), 16);
+    const g = Number.parseInt(fullHex.slice(3, 5), 16);
+    const b = Number.parseInt(fullHex.slice(5, 7), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 < 130;
+  };
+  const isDark = isDarkColor(read('backgroundColor'));
+  const effectiveHeadingColor = read('headingColor') || read('textColor');
+  const effectiveTextColor = read('textColor');
+  const effectiveMutedColor =
+    read('mutedTextColor') ||
+    (effectiveTextColor
+      ? `color-mix(in srgb, ${effectiveTextColor} 72%, transparent)`
+      : '');
+
   const colorVariables: Array<[string, string]> = [
     ['--brand-color', read('primaryColor')],
     ['--brand-primary', read('primaryColor')],
@@ -254,25 +276,97 @@ export function buildUniversalTemplateThemeCss(themeValue: unknown): string {
     ['--brand-accent', read('accentColor')],
     ['--accent-color', read('accentColor')],
     ['--page-background', read('backgroundColor')],
+    ['--page-bg', read('backgroundColor') || read('canvasColor')],
     ['--page-text', read('textColor')],
-    ['--bg-primary', read('canvasColor')],
-    ['--bg-secondary', read('surfaceColor')],
-    ['--surface', read('surfaceColor')],
-    ['--card-bg', read('surfaceColor')],
-    ['--background', read('canvasColor')],
-    ['--brand-primary', read('brandPrimary')],
-    ['--brand-secondary', read('brandSecondary')],
-    ['--brand-accent', read('brandAccent')],
-    ['--primary', read('brandPrimary')],
-    ['--secondary', read('brandSecondary')],
-    ['--accent', read('brandAccent')],
-    ['--text-primary', read('textPrimary')],
-    ['--text-secondary', read('textSecondary')],
-    ['--text-muted', read('textMuted')],
-    ['--muted', read('textMuted')],
+    ['--heading-color', effectiveHeadingColor],
+    ['--color-heading', effectiveHeadingColor],
+    ['--text-color', read('textColor')],
+    ['--text', read('textColor')],
+    ['--foreground', read('textColor')],
+    ['--color-foreground', read('textColor')],
+    ['--bg-primary', read('backgroundColor') || read('canvasColor')],
+    ['--bg-secondary', read('cardBackgroundColor') || read('surfaceColor')],
+    ['--surface', read('cardBackgroundColor') || read('surfaceColor')],
+    ['--surface-color', read('cardBackgroundColor') || read('surfaceColor')],
+    ['--card-bg', read('cardBackgroundColor') || read('surfaceColor')],
+    ['--card-background', read('cardBackgroundColor') || read('surfaceColor')],
+    ['--background', read('backgroundColor') || read('canvasColor')],
+    ['--brand-primary', read('primaryColor') || read('brandPrimary')],
+    ['--brand-secondary', read('secondaryColor') || read('brandSecondary')],
+    ['--brand-accent', read('accentColor') || read('brandAccent')],
+    ['--primary', read('primaryColor') || read('brandPrimary')],
+    ['--secondary', read('secondaryColor') || read('brandSecondary')],
+    ['--accent', read('accentColor') || read('brandAccent')],
+    ['--text-primary', read('textColor') || read('textPrimary')],
+    [
+      '--text-secondary',
+      read('mutedTextColor') || read('textSecondary') || read('textColor'),
+    ],
+    ['--text-muted', effectiveMutedColor],
+    ['--muted', effectiveMutedColor],
+    ['--muted-color', effectiveMutedColor],
+    ['--muted-text', effectiveMutedColor],
     ['--border-primary', read('borderColor')],
     ['--border-secondary', read('borderColor')],
     ['--border', read('borderColor')],
+    [
+      '--color-border',
+      isDark ? 'rgba(255, 255, 255, 0.1)' : read('borderColor') || '#e2e8f0',
+    ],
+    [
+      '--card-border',
+      isDark ? 'rgba(255, 255, 255, 0.09)' : read('borderColor') || '#e2e8f0',
+    ],
+    ['--color-text', effectiveTextColor],
+    ['--color-text-muted', effectiveMutedColor],
+    [
+      '--header-bg',
+      read('headerBackgroundColor') ||
+        (isDark
+          ? `color-mix(in srgb, ${read('backgroundColor') || '#090d16'} 85%, transparent)`
+          : 'rgba(255, 255, 255, 0.85)'),
+    ],
+    [
+      '--input-bg',
+      isDark
+        ? `color-mix(in srgb, ${read('backgroundColor') || '#090d16'} 60%, ${read('cardBackgroundColor') || '#131b2e'})`
+        : '#ffffff',
+    ],
+    ['--input-color', effectiveTextColor],
+    ['--input-border', isDark ? 'rgba(255, 255, 255, 0.15)' : '#cbd5e1'],
+    ['--button-bg', read('buttonBackgroundColor') || read('primaryColor') || '#2563eb'],
+    [
+      '--button-text',
+      read('buttonTextColor') ||
+        (isDarkColor(read('buttonBackgroundColor') || read('primaryColor') || '#2563eb')
+          ? '#ffffff'
+          : '#0f172a'),
+    ],
+    ['--button-primary-bg', read('buttonBackgroundColor') || read('primaryColor') || '#2563eb'],
+    [
+      '--button-primary-text',
+      read('buttonTextColor') ||
+        (isDarkColor(read('buttonBackgroundColor') || read('primaryColor') || '#2563eb')
+          ? '#ffffff'
+          : '#0f172a'),
+    ],
+    [
+      '--button-secondary-bg',
+      isDark
+        ? 'rgba(255, 255, 255, 0.08)'
+        : (read('secondaryColor') && !isDarkColor(read('secondaryColor'))
+            ? read('secondaryColor')
+            : '#f1f5f9'),
+    ],
+    ['--button-secondary-text', isDark ? '#f8fafc' : '#0f172a'],
+    ['--button-outline-border', isDark ? 'rgba(255, 255, 255, 0.22)' : 'currentColor'],
+    ['--button-outline-text', effectiveTextColor || (isDark ? '#f8fafc' : '#0f172a')],
+    ['--button-ghost-text', effectiveTextColor || (isDark ? '#f8fafc' : '#0f172a')],
+    ['--product-card-bg', read('cardBackgroundColor') || read('surfaceColor') || (isDark ? '#111a2e' : '#ffffff')],
+    ['--product-card-border', isDark ? 'rgba(255, 255, 255, 0.09)' : read('borderColor') || '#e2e8f0'],
+    ['--tag-bg', isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(241, 245, 249, 0.9)'],
+    ['--tag-color', effectiveMutedColor || (isDark ? '#94a3b8' : '#64748b')],
+    ['--card-shadow', isDark ? '0 10px 25px -5px rgba(0, 0, 0, 0.4)' : '0 10px 25px -5px rgba(0, 0, 0, 0.05)'],
     ['--card-radius', read('cardRadius')],
     ['--button-radius', read('buttonRadius')],
     ['--image-radius', read('imageRadius')],
@@ -316,10 +410,10 @@ export function buildUniversalTemplateThemeCss(themeValue: unknown): string {
 
   const css: string[] = [
     ...fontImports,
-    rule(
-      ':root,body',
-      colorVariables.map(([name, value]) => declaration(name, value)),
-    ),
+    rule(':root,html,body', [
+      declaration('color-scheme', isDark ? 'dark' : 'light'),
+      ...colorVariables.map(([name, value]) => declaration(name, value)),
+    ]),
     rule('html', [declaration('font-size', read('baseSize'))]),
     rule('body', [
       declaration(
@@ -330,19 +424,26 @@ export function buildUniversalTemplateThemeCss(themeValue: unknown): string {
       declaration('line-height', read('bodyLineHeight')),
       declaration('letter-spacing', read('letterSpacing')),
       ...backgroundDeclarations(read('backgroundColor')),
-      declaration('color', read('textColor')),
+      declaration('color', effectiveTextColor),
     ]),
-    rule('body :where(h1,h2,h3,h4,h5,h6)', [
-      declaration(
-        'font-family',
-        read('headingFont') ? `${read('headingFont')},sans-serif` : '',
-      ),
-      declaration('font-weight', read('headingWeight')),
-      declaration('line-height', read('headingLineHeight')),
-      declaration('color', read('headingColor')),
-    ]),
-    rule('body :where(p,small,.muted,[class*="muted"])', [
-      declaration('color', read('mutedTextColor')),
+    rule(
+      'body :where(h1,h2,h3,h4,h5,h6),[data-preview-field-path*="title"],[data-preview-field-path*="heading"],[data-field-path*="title"],[data-field-path*="heading"]',
+      [
+        declaration(
+          'font-family',
+          read('headingFont') ? `${read('headingFont')},sans-serif` : '',
+        ),
+        declaration('font-weight', read('headingWeight')),
+        declaration('line-height', read('headingLineHeight')),
+        declaration('color', effectiveHeadingColor),
+      ],
+    ),
+    rule(
+      'body :where(p,li,label,address,[data-preview-field-path*="description"],[data-preview-field-path*="subtitle"])',
+      [declaration('color', effectiveTextColor)],
+    ),
+    rule('body :where(small,.muted,[class*="muted"])', [
+      declaration('color', effectiveMutedColor),
     ]),
     scale
       ? `body h1{font-size:calc(2.5rem * ${scale}) !important}` +
@@ -357,9 +458,11 @@ export function buildUniversalTemplateThemeCss(themeValue: unknown): string {
     rule('body footer', [
       ...backgroundDeclarations(read('footerBackgroundColor')),
     ]),
-    rule('body main', [
+    rule('body main,body [data-preview-page-key]', [
       ...backgroundDeclarations(read('backgroundColor')),
-      declaration('color', read('textColor')),
+      declaration('color', effectiveTextColor),
+      declaration('display', 'flex'),
+      declaration('flex-direction', 'column'),
     ]),
     rule('body main > section,body main [data-preview-page-key] > section', [
       declaration('padding-block', read('sectionPadding')),
@@ -376,14 +479,6 @@ export function buildUniversalTemplateThemeCss(themeValue: unknown): string {
     rule(
       'body main :where([class*="flex"],[class*="grid"],[data-design-stack])',
       [declaration('gap', read('elementGap'))],
-    ),
-    rule(
-      'body main > section:nth-of-type(even),body main [data-preview-page-key] > section:nth-of-type(even)',
-      backgroundDeclarations(read('surfaceAltColor')),
-    ),
-    rule(
-      'body main > section:nth-of-type(odd),body main [data-preview-page-key] > section:nth-of-type(odd)',
-      backgroundDeclarations(read('surfaceColor')),
     ),
     rule(
       'body main > section:first-of-type,body main [data-preview-page-key] > section:first-of-type',
@@ -427,7 +522,9 @@ export function buildUniversalTemplateThemeCss(themeValue: unknown): string {
         declaration('border-width', read('cardBorderWidth')),
         read('cardBorderWidth') ? 'border-style:solid !important;' : '',
         declaration('border-color', read('borderColor')),
-        ...backgroundDeclarations(read('cardBackgroundColor')),
+        ...backgroundDeclarations(
+          read('cardBackgroundColor') || read('surfaceColor'),
+        ),
         declaration('box-shadow', shadow(read('cardShadow'))),
         declaration('text-align', read('cardTextAlign')),
       ],
@@ -447,6 +544,162 @@ export function buildUniversalTemplateThemeCss(themeValue: unknown): string {
       ],
     ),
     rule('body main img', [declaration('border-radius', read('imageRadius'))]),
+    ...(isDark
+      ? [
+          /* Dark mode card styling */
+          rule(
+            'body :where([data-preview-item-path],[data-design-card],.card,[class*="card-"],.editable-product-card,.editable-pricing-card,.editable-testimonial-card,.editable-service-card)',
+            [
+              declaration(
+                'background',
+                read('cardBackgroundColor') || read('surfaceColor') || '#111a2e',
+              ),
+              declaration(
+                'background-color',
+                read('cardBackgroundColor') || read('surfaceColor') || '#111a2e',
+              ),
+              'border:1px solid rgba(255, 255, 255, 0.09) !important;',
+              'box-shadow:0 10px 30px -10px rgba(0,0,0,0.5), 0 1px 3px 0 rgba(255,255,255,0.02) !important;',
+              declaration('color', effectiveTextColor),
+            ],
+          ),
+          /* Dark mode card headings & body text */
+          rule(
+            'body :where([data-preview-item-path],[data-design-card],.card,[class*="card-"],.editable-product-card,.editable-pricing-card,.editable-testimonial-card) :where(h1,h2,h3,h4,h5,h6,strong,b)',
+            [declaration('color', effectiveHeadingColor)],
+          ),
+          rule(
+            'body :where([data-preview-item-path],[data-design-card],.card,[class*="card-"],.editable-product-card,.editable-pricing-card,.editable-testimonial-card) :where(p,li,span:not([class*="badge"]):not([class*="tag"]):not([class*="pill"]))',
+            [
+              declaration(
+                'color',
+                effectiveMutedColor ||
+                  `color-mix(in srgb, ${effectiveTextColor} 75%, transparent)`,
+              ),
+            ],
+          ),
+          /* Dark mode navbar / header */
+          rule(
+            'body header, body .deneb-navbar, body [class*="navbar"]',
+            [
+              declaration(
+                'background-color',
+                read('headerBackgroundColor') ||
+                  `color-mix(in srgb, ${read('backgroundColor') || '#090d16'} 85%, transparent)`,
+              ),
+              'backdrop-filter:blur(16px) !important;',
+              '-webkit-backdrop-filter:blur(16px) !important;',
+              'border-bottom:1px solid rgba(255, 255, 255, 0.08) !important;',
+            ],
+          ),
+          /* Dark mode nav items */
+          rule('body .deneb-nav-item, body nav a, body nav button', [
+            `color:color-mix(in srgb, ${effectiveTextColor} 75%, transparent) !important;`,
+          ]),
+          rule(
+            'body .deneb-nav-item:hover, body nav a:hover, body nav button:hover',
+            [
+              'color:#ffffff !important;',
+              'background-color:rgba(255, 255, 255, 0.08) !important;',
+            ],
+          ),
+          rule(
+            'body .deneb-nav-item.active, body nav a.active',
+            [
+              'color:#ffffff !important;',
+              'background-color:rgba(255, 255, 255, 0.12) !important;',
+            ],
+          ),
+          /* Dark mode inputs & textareas */
+          rule(
+            'body input:not([type="button"]):not([type="submit"]):not([type="color"]):not([type="checkbox"]):not([type="radio"]), body textarea, body select',
+            [
+              declaration(
+                'background-color',
+                `color-mix(in srgb, ${read('backgroundColor') || '#090d16'} 60%, ${read('cardBackgroundColor') || '#131b2e'})`,
+              ),
+              'border:1px solid rgba(255, 255, 255, 0.14) !important;',
+              declaration('color', effectiveTextColor),
+            ],
+          ),
+          /* Dark mode footer */
+          rule('body footer, body .site-footer', [
+            declaration(
+              'background-color',
+              read('footerBackgroundColor') ||
+                `color-mix(in srgb, ${read('backgroundColor') || '#090d16'} 80%, #000000)`,
+            ),
+            'border-top:1px solid rgba(255, 255, 255, 0.08) !important;',
+            declaration('color', effectiveTextColor),
+          ]),
+          /* Dark mode hero glow */
+          rule('body .hero, body [class*="hero"]:not(button):not(a):not(span)', [
+            `background:radial-gradient(ellipse at 50% 0%, color-mix(in srgb, ${read('primaryColor') || '#38bdf8'} 14%, transparent), transparent 70%), ${read('backgroundColor') || '#090d16'} !important;`,
+          ]),
+          /* Dark mode mobile drawer & dialog */
+          rule('body .deneb-mobile-drawer, body .deneb-dialog-content', [
+            declaration(
+              'background-color',
+              read('cardBackgroundColor') || read('surfaceColor') || '#111a2e',
+            ),
+            'border-color:rgba(255, 255, 255, 0.1) !important;',
+            declaration('color', effectiveTextColor),
+          ]),
+          /* Dark mode badges & pills */
+          rule('body :where(.eyebrow,[class*="badge"],[class*="pill"]:not(button))', [
+            `background-color:color-mix(in srgb, ${read('primaryColor') || '#38bdf8'} 15%, transparent) !important;`,
+            `color:${read('accentColor') || read('primaryColor') || '#38bdf8'} !important;`,
+            `border-color:color-mix(in srgb, ${read('primaryColor') || '#38bdf8'} 28%, transparent) !important;`,
+          ]),
+          /* Dark mode card hover elevation */
+          rule(
+            'body :where([data-preview-item-path],[data-design-card],.card,[class*="card-"],.editable-product-card,.editable-pricing-card,.editable-testimonial-card):hover',
+            [
+              'border-color:rgba(255, 255, 255, 0.18) !important;',
+              'box-shadow:0 16px 40px -10px rgba(0,0,0,0.65), 0 1px 3px 0 rgba(255,255,255,0.04) !important;',
+            ],
+          ),
+          /* Dark mode dividers & rules */
+          rule('body :where(hr,[class*="divider"],[class*="separator"])', [
+            'border-color:rgba(255, 255, 255, 0.08) !important;',
+          ]),
+          /* Dark mode alternate sections subtle glow */
+          rule('body :where(.page-section.alt,section.alt)', [
+            `background:color-mix(in srgb, ${read('primaryColor') || '#38bdf8'} 3%, ${read('backgroundColor') || '#090d16'}) !important;`,
+          ]),
+          /* Dark mode button contrast harmony */
+          rule(
+            'body :where(.btn-secondary,[class*="btn-secondary"],[class*="button-secondary"],[data-variant="secondary"],.editable-btn-secondary)',
+            [
+              'background-color:rgba(255, 255, 255, 0.08) !important;',
+              'color:#f8fafc !important;',
+              'border:1px solid rgba(255, 255, 255, 0.14) !important;',
+            ],
+          ),
+          rule(
+            'body :where(.btn-outline,[class*="btn-outline"],[class*="button-outline"],[data-variant="outline"])',
+            [
+              'background-color:transparent !important;',
+              'color:#f8fafc !important;',
+              'border-color:rgba(255, 255, 255, 0.22) !important;',
+            ],
+          ),
+          rule(
+            'body :where(.btn-ghost,[class*="btn-ghost"],[class*="button-ghost"],[data-variant="ghost"])',
+            [
+              'background-color:transparent !important;',
+              'color:#f8fafc !important;',
+            ],
+          ),
+          rule(
+            'body :where(.btn-primary,[class*="btn-primary"],[class*="button-primary"],[data-variant="primary"],.editable-btn-primary)',
+            [
+              `background-color:${read('buttonBackgroundColor') || read('primaryColor') || '#2563eb'} !important;`,
+              `color:${read('buttonTextColor') || (isDarkColor(read('buttonBackgroundColor') || read('primaryColor') || '#2563eb') ? '#ffffff' : '#0f172a')} !important;`,
+            ],
+          ),
+        ]
+      : []),
   ];
 
   const sections = isRecord(theme.sections) ? theme.sections : {};
@@ -555,6 +808,8 @@ export function buildUniversalTemplateThemeCss(themeValue: unknown): string {
     ? theme.elementStyles
     : {};
   const elementProperties: Array<[string, string]> = [
+    ['display', 'display'],
+    ['order', 'order'],
     ['fontFamily', 'font-family'],
     ['fontSize', 'font-size'],
     ['lineHeight', 'line-height'],
@@ -563,6 +818,8 @@ export function buildUniversalTemplateThemeCss(themeValue: unknown): string {
     ['color', 'color'],
     ['backgroundColor', 'background-color'],
     ['textAlign', 'text-align'],
+    ['justifyContent', 'justify-content'],
+    ['alignItems', 'align-items'],
     ['width', 'width'],
     ['height', 'height'],
     ['minWidth', 'min-width'],
@@ -599,11 +856,11 @@ export function buildUniversalTemplateThemeCss(themeValue: unknown): string {
         const [, pageKey = 'all', sectionKey = ''] = selectorPath.split(':');
         const pagePrefix =
           pageKey === 'all'
-            ? 'body main'
+            ? 'body'
             : `body :where([data-preview-page-key="${pageKey}"])`;
         const nth = sectionKey.match(/^nth-(\d+)$/)?.[1];
         if (nth) return `${pagePrefix} > section:nth-of-type(${nth})`;
-        return `${pagePrefix} :where([data-design-section="${sectionKey}"],[data-section-id="${sectionKey}"],section#${sectionKey})`;
+        return `${pagePrefix} :where([data-design-section="${sectionKey}"],[data-section-id="${sectionKey}"],section#${sectionKey},section.${sectionKey})`;
       }
       if (path.includes(':')) {
         const [listPrefix, subPart] = selectorPath.split(':');

@@ -519,10 +519,32 @@ export function findLinksToUnselectedPages(input: {
   return findings;
 }
 
+/** Detect links that contain the configured base path but omit its leading
+ * slash. Browsers resolve these relative to the current page and duplicate the
+ * generated-site prefix after navigation. */
+export function findMalformedBasePathLinks(input: {
+  html: string;
+  basePath: string;
+}) {
+  const prefix = input.basePath.replace(/^\/+|\/+$/g, '');
+  if (!prefix) return [];
+  const findings = new Set<string>();
+  for (const match of input.html.matchAll(
+    /<[a-z][^>]*\b(?:href|formaction|data-href|data-route|data-url)\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>/gi,
+  )) {
+    const value = (match[1] ?? match[2] ?? '').trim();
+    const path = value.split(/[?#]/, 1)[0].replace(/^\.\//, '');
+    if (path === prefix || path.startsWith(`${prefix}/`)) {
+      findings.add(value);
+    }
+  }
+  return [...findings];
+}
+
 /**
  * Next's client router applies next.config `basePath` automatically. Wrapping
- * a router destination in a helper that also prepends the base path duplicates
- * the generated-site prefix at runtime.
+ * a router destination in a package helper that also prepends the base path
+ * duplicates the generated-site prefix at runtime.
  */
 export function findDoubleBasePathNextRouterCalls(source: string) {
   const findings: Array<{
