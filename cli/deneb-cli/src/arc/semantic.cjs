@@ -10,12 +10,16 @@ const {
   collectJsxText,
   findJsxAttribute,
   unwrapExpr,
+  extractItemMemberName,
 } = require('./ast.cjs');
 const {
   activeAdapters,
   recognizeWithAdapters,
   resolveActionWithAdapters,
   isIconComponent,
+  isUtilityIcon,
+  isFeatureIcon,
+  extractIconBaseName,
   classifyHref,
   classifyActionIntent,
   isLikelyCtaClass,
@@ -498,6 +502,141 @@ function classNameOf(node) {
   return getJsxAttributeLiteral(node, 'className') || getJsxAttributeLiteral(node, 'class') || '';
 }
 
+function collectPatternNames(param, out) {
+  if (!param) return;
+  if (param.type === 'Identifier') out.push(param.name);
+  else if (param.type === 'AssignmentPattern') collectPatternNames(param.left, out);
+  else if (param.type === 'RestElement') collectPatternNames(param.argument, out);
+  else if (param.type === 'ObjectPattern') {
+    for (const prop of param.properties || []) {
+      if (prop.type === 'RestElement') collectPatternNames(prop.argument, out);
+      else collectPatternNames(prop.value || prop.argument, out);
+    }
+  } else if (param.type === 'ArrayPattern') {
+    for (const el of param.elements || []) collectPatternNames(el, out);
+  }
+}
+
+function enclosingComponentParams(pathNode) {
+  let current = pathNode.parent;
+  while (current) {
+    const node = current.node || current.value;
+    if (
+      node &&
+      (node.type === 'FunctionDeclaration' ||
+        node.type === 'FunctionExpression' ||
+        node.type === 'ArrowFunctionExpression')
+    ) {
+      const parent = current.parent?.node || current.parent?.value;
+      const isMapCallback =
+        parent?.type === 'CallExpression' &&
+        parent.callee?.type === 'MemberExpression' &&
+        parent.callee.property?.name === 'map';
+      if (!isMapCallback) {
+        const names = [];
+        for (const param of node.params || []) collectPatternNames(param, names);
+        return { fn: node, names };
+      }
+    }
+    current = current.parentPath || current.parent;
+  }
+  return { fn: null, names: [] };
+}
+
+function identifiersIn(expr, out) {
+  const node = unwrapExpr(expr);
+  if (!node) return;
+  if (node.type === 'Identifier') {
+    out.add(node.name);
+    return;
+  }
+  if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+    identifiersIn(node.object, out);
+    if (node.computed) identifiersIn(node.property, out);
+    return;
+  }
+  if (node.type === 'ChainExpression') {
+    identifiersIn(node.expression, out);
+    return;
+  }
+  if (node.type === 'LogicalExpression' || node.type === 'BinaryExpression') {
+    identifiersIn(node.left, out);
+    identifiersIn(node.right, out);
+    return;
+  }
+  if (node.type === 'ConditionalExpression') {
+    identifiersIn(node.test, out);
+    identifiersIn(node.consequent, out);
+    identifiersIn(node.alternate, out);
+  }
+}
+
+function namesTiedToParams(fn, paramNames) {
+  const blocked = new Set(paramNames);
+  if (!fn?.body) return blocked;
+  let grew = true;
+  while (grew) {
+    grew = false;
+    recast.types.visit(fn.body, {
+      visitVariableDeclarator(pathNode) {
+        const node = pathNode.node;
+        if (node.id?.type === 'Identifier' && node.init && !blocked.has(node.id.name)) {
+          const used = new Set();
+          identifiersIn(node.init, used);
+          for (const name of used) {
+            if (blocked.has(name)) {
+              blocked.add(node.id.name);
+              grew = true;
+            }
+          }
+        }
+        this.traverse(pathNode);
+      },
+    });
+  }
+  return blocked;
+}
+
+function imageExpression(node) {
+  if (!node) return null;
+  const attr = findJsxAttribute(node, 'src');
+  if (!attr?.value || attr.value.type !== 'JSXExpressionContainer') return null;
+  const expr = unwrapExpr(attr.value.expression);
+  if (!expr || expr.type === 'JSXEmptyExpression') return null;
+  if (expr.type === 'StringLiteral' || expr.type === 'Literal' || expr.type === 'TemplateLiteral') return null;
+  if (expr.type === 'Identifier' && expr.name === 'siteData') return null;
+  if (
+    expr.type === 'Identifier' ||
+    expr.type === 'MemberExpression' ||
+    expr.type === 'OptionalMemberExpression' ||
+    expr.type === 'ChainExpression' ||
+    expr.type === 'LogicalExpression' ||
+    expr.type === 'ConditionalExpression'
+  ) {
+    return expr;
+  }
+  return null;
+}
+
+function imageFieldHint(expr) {
+  const node = unwrapExpr(expr);
+  if (!node) return 'photoImage';
+  if (node.type === 'Identifier') {
+    return /image|photo|picture|banner|logo/i.test(node.name) ? node.name : `${node.name}Image`;
+  }
+  if ((node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') && !node.computed) {
+    const prop = node.property?.name || '';
+    const objectName = node.object?.type === 'Identifier' ? node.object.name : '';
+    const base = /^(src|url|href)$/i.test(prop) ? objectName || prop : prop || objectName;
+    if (!base) return 'photoImage';
+    return /image|photo|picture|banner|logo/i.test(base) ? base : `${base}Image`;
+  }
+  if (node.type === 'ChainExpression') return imageFieldHint(node.expression);
+  if (node.type === 'LogicalExpression') return imageFieldHint(node.left) || imageFieldHint(node.right);
+  if (node.type === 'ConditionalExpression') return imageFieldHint(node.consequent) || imageFieldHint(node.alternate);
+  return 'photoImage';
+}
+
 function confidenceFor(kind, extras = {}) {
   if (extras.already) return 1;
   if (extras.dynamic) return 0.15;
@@ -641,7 +780,7 @@ function analyzeFile(optionsOrFile, codeArg, profileArg) {
         if (!binding || binding.kind !== 'array') apiOwned = true;
       }
 
-      if (DECORATIVE_TAGS.has(name) || isIconComponent(name, importSource)) {
+      if (DECORATIVE_TAGS.has(name) || isUtilityIcon(name)) {
         candidates.push({
           loc,
           tag: name,
@@ -652,6 +791,29 @@ function analyzeFile(optionsOrFile, codeArg, profileArg) {
           file: relativeFile,
           ownerScope,
           fingerprint: fingerprintCandidate({ tag: name, kind: 'icon', importSource }),
+        });
+        this.traverse(pathNode);
+        return;
+      }
+
+      if (isFeatureIcon(name, importSource)) {
+        const iconBase = extractIconBaseName(name);
+        candidates.push({
+          loc,
+          tag: name,
+          kind: 'feature-icon',
+          operation: 'feature-icon',
+          confidence: 0.95,
+          skip: false,
+          value: iconBase,
+          file: relativeFile,
+          ownerScope,
+          fingerprint: fingerprintCandidate({ tag: name, kind: 'icon', importSource }),
+          extra: {
+            iconName: iconBase,
+            originalComponent: name,
+            importSource,
+          },
         });
         this.traverse(pathNode);
         return;
@@ -816,6 +978,43 @@ function analyzeFile(optionsOrFile, codeArg, profileArg) {
         }
         this.traverse(pathNode);
         return;
+      }
+
+      const dynamicImageNode = name === 'picture'
+        ? (node.children || []).find((c) => c && c.type === 'JSXElement' && (getJsxName(c) === 'img' || getJsxName(c) === 'Image'))
+        : node;
+      const dynamicExpr = !src ? imageExpression(dynamicImageNode) : null;
+      if ((IMAGE_TAGS.has(name) || recognition?.kind === 'image') && dynamicExpr && !hasJsxAttribute(dynamicImageNode, 'data-preview-field-path')) {
+        const itemBound = mapInfo?.itemParam && extractItemMemberName(dynamicExpr, mapInfo.itemParam);
+        const componentParams = enclosingComponentParams(pathNode);
+        const blocked = namesTiedToParams(componentParams.fn, componentParams.names);
+        const usedNames = new Set();
+        identifiersIn(dynamicExpr, usedNames);
+        const fromProps = [...usedNames].some((usedName) => blocked.has(usedName));
+        // A photo that lives on one page (the home hero, for example) gets its
+        // own image field even when the src is a prop. A shared image widget
+        // must not, or every call site would show the same photo.
+        const pageOwned = Boolean(ownerScope) && ownerScope !== 'common';
+        if (!itemBound && (!fromProps || pageOwned)) {
+          usedLocs.add(loc);
+          candidates.push({
+            ...baseMeta,
+            kind: 'image',
+            operation: 'extract-image',
+            value: '',
+            extra: {
+              alt,
+              dynamicSrc: true,
+              fieldHint: isLogoContext ? undefined : imageFieldHint(dynamicExpr),
+              isBrandLogo: Boolean(isLogoContext),
+            },
+            confidence: 0.9,
+            reason: 'dynamic-image-source',
+            fingerprint: fingerprintCandidate({ tag: name, kind: 'image', dynamic: true, hint: imageFieldHint(dynamicExpr) }),
+          });
+          this.traverse(pathNode);
+          return;
+        }
       }
 
       if (placeholder && !isStaticSkipText(placeholder)) {

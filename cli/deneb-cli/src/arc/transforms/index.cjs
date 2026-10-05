@@ -77,6 +77,7 @@ function applyFilePlan(filePlan, profile) {
     'bind-highlighted-heading',
     'prop-flow-callsite',
     'instrument-reusable-component',
+    'feature-icon',
   ]);
 
   const isTypeScript = Boolean(filePlan.file && /\.(tsx|ts)$/.test(filePlan.file));

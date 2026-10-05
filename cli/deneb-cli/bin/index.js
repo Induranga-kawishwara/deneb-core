@@ -1276,6 +1276,18 @@ async function initProject(targetInput, options = {}) {
     // Non-blocking doctor check
   }
 
+  // 7.5. Auto-Fix Editability (ensures all cards, text, and photos have field paths + site-data + recipe)
+  try {
+    const { runAutoEditabilityFix } = require('../src/arc/auto-editability-fixer.cjs');
+    console.log('\n\x1b[36m⚡ Running DENEB auto-editability audit & field sync...\x1b[0m');
+    const fixReport = runAutoEditabilityFix(targetDir, { dryRun: false, verbose: false });
+    if (fixReport.fixed && fixReport.fixed.length > 0) {
+      console.log(`\x1b[32m✔ Auto-fixed ${fixReport.fixed.length} editability targets (field paths, site-data, recipe)\x1b[0m`);
+    }
+  } catch (fixErr) {
+    // Non-blocking auto-fix
+  }
+
   console.log(`\n\x1b[32m✔ Project initialization complete!\x1b[0m`);
   console.log(`\nYou can now run:`);
   console.log(`  \x1b[36mnpm run lab\x1b[0m               \x1b[90m# Launch Local Visual Editing Lab\x1b[0m`);
@@ -1666,6 +1678,34 @@ if (command === 'init' || command === 'arc') {
     console.error(`\x1b[31m✖ Failed to save recipe:\x1b[0m ${err.message}`);
     process.exit(1);
   }
+} else if (command === 'fix-editability' || command === 'fix-fields') {
+  let targetInput = '.';
+  let dryRun = false;
+  let verbose = false;
+  for (let i = 0; i < commandArgs.length; i++) {
+    const arg = commandArgs[i];
+    if (arg === '--dry-run' || arg === '--dryrun') {
+      dryRun = true;
+    } else if (arg === '--verbose' || arg === '-v') {
+      verbose = true;
+    } else if (!arg.startsWith('-')) {
+      targetInput = arg;
+    }
+  }
+  const targetDir = path.resolve(process.cwd(), targetInput || '.');
+  try {
+    const { runFixEditability } = require('../src/arc/index.cjs');
+    console.log(`\n\x1b[36m⚡ Running Deneb Auto-Editability Fixer on:\x1b[0m ${targetDir}`);
+    const report = runFixEditability(targetDir, { dryRun, verbose });
+    if (report.fixed.length > 0) {
+      console.log(`\n\x1b[32m✔ Auto-fix completed! Updated ${report.fixed.length} target(s).\x1b[0m\n`);
+    } else {
+      console.log(`\n\x1b[32m✔ All cards, text, and photos are already fully editable!\x1b[0m\n`);
+    }
+  } catch (err) {
+    console.error(`\x1b[31m✖ Auto-fix failed:\x1b[0m ${err.message}`);
+    process.exit(1);
+  }
 } else {
   console.log(`Usage: deneb <command> [options]
   DENEB UI Framework — Powered by DENEB-UI Collaborate with FIVORA
@@ -1682,6 +1722,8 @@ Core Commands:
   fonts             Google Fonts catalog — list presets or install self-hosted @fontsource packages
   update            Update DENEB packages (@deneb-ui/ui, @deneb-ui/cli) and UI components
   validate          Validate website configuration and visual editing contracts with Fivora platform
+  fix-editability   Auto-fix missing field paths: patches components, populates site-data.json, updates recipe
+                    flags: --dry-run  --verbose
   zip               Zip the project without unnecessary folders or files (node_modules, .next, .git, .env)
   validate-and-zip  Validate website configuration and immediately package clean upload-ready ZIP
 
@@ -1714,6 +1756,9 @@ Examples:
   deneb validate-and-zip
   deneb zip .
   deneb add product-card
-  deneb add all`);
+  deneb add all
+  deneb fix-editability .
+  deneb fix-editability . --dry-run
+  deneb fix-editability . --verbose`);
   process.exit(1);
 }

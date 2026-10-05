@@ -302,15 +302,27 @@ export function EditableProductCard({
       : 'originalPrice';
 
   const descriptionKey =
-    'desc' in (product || {}) && !('description' in (product || {}) && (product as any).description)
-      ? 'desc'
-      : 'description';
-  const description = String(product?.description || (product as any)?.desc || (product as any)?.details || '');
+    (['details', 'description', 'desc'] as const).find(
+      (key) => product && key in (product as object) && (product as any)[key],
+    ) ||
+    (['details', 'description', 'desc'] as const).find(
+      (key) => product && key in (product as object),
+    ) ||
+    'details';
+  const description = String(
+    (product as any)?.[descriptionKey] || product?.description || (product as any)?.desc || (product as any)?.details || '',
+  );
+  const hasDescriptionField = Boolean(
+    product && ('details' in product || 'description' in product || 'desc' in product),
+  );
 
   const category = String(product?.category || '');
   const badgeKey =
     'tag' in (product || {}) && !('badge' in (product || {}) && (product as any).badge) ? 'tag' : 'badge';
   const badge = String(product?.badge || (product as any)?.tag || '');
+  const hasBadgeField = Boolean(
+    product && ('badge' in (product as object) || 'tag' in (product as object)),
+  );
 
   const fallbackImage =
     imageFallback || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80';
@@ -509,8 +521,23 @@ export function EditableProductCard({
         />
 
         {/* Floating Sale / New Badge */}
-        {badge && (
-          <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 10 }}>
+        {hasBadgeField ? (
+          <div
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: '10px',
+              zIndex: 10,
+              ...(badge
+                ? {}
+                : {
+                    width: 1,
+                    height: 1,
+                    overflow: 'hidden',
+                    clip: 'rect(0, 0, 0, 0)',
+                  }),
+            }}
+          >
             <EditableBadge
               id={`${itemPath}.${badgeKey}`}
               data-preview-field-path={`${itemPath}.${badgeKey}`}
@@ -518,10 +545,8 @@ export function EditableProductCard({
               badgeVariant="primary"
             />
           </div>
-        )}
+        ) : null}
       </div>
-
-      {/* Body Wrap */}
       <div
         style={{
           padding: '1.25rem',
@@ -587,7 +612,7 @@ export function EditableProductCard({
           />
 
           {/* Description */}
-          {showDescription && description ? (
+          {showDescription && (description || hasDescriptionField) ? (
             <EditableText
               as="p"
               id={`${itemPath}.${descriptionKey}`}
@@ -597,6 +622,7 @@ export function EditableProductCard({
                 fontSize: '0.875rem',
                 color: 'var(--muted-text, #94a3b8)',
                 lineHeight: 1.5,
+                minHeight: description ? undefined : '1.25em',
                 marginBottom: '0.625rem',
                 display: '-webkit-box',
                 WebkitLineClamp: 2,

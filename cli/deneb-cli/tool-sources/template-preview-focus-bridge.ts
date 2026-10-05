@@ -126,6 +126,35 @@ function fivoraPreviewFocusBridge(
   const CONTENT_ONLY_PERSIST_DELAY_MS = 12000;
   const TEXT_SELECTOR =
     'h1, h2, h3, h4, h5, h6, p, span, a, button, address, li, dt, dd, label, strong, em, small';
+  class TargetRegistry {
+    private elementToPath = new WeakMap<Element, string>();
+    private pathToElements = new Map<string, Set<Element>>();
+    private dynamicTargets = new Set<Element>();
+
+    getPath(element: Element): string | undefined {
+      return this.elementToPath.get(element);
+    }
+    findTargets(path: string): Element[] {
+      return Array.from(this.pathToElements.get(path) ?? []);
+    }
+    getDynamicTargets(): Element[] {
+      return Array.from(this.dynamicTargets);
+    }
+    register(element: Element, path: string) {
+      this.elementToPath.set(element, path);
+      if (!this.pathToElements.has(path)) {
+        this.pathToElements.set(path, new Set());
+      }
+      this.pathToElements.get(path)!.add(element);
+      this.dynamicTargets.add(element);
+    }
+    clear() {
+      this.pathToElements.clear();
+      this.dynamicTargets.clear();
+    }
+  }
+  const targetRegistry = new TargetRegistry();
+
   let activeHighlights: Array<{
     target: HTMLElement;
     outline: string;
@@ -492,6 +521,13 @@ function fivoraPreviewFocusBridge(
       if (target.tagName === 'IMG') {
         if (typeof value === 'string' && value.trim()) {
           target.setAttribute('src', value);
+        }
+        continue;
+      }
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        if (typeof value === 'string' || typeof value === 'number') {
+          (target as HTMLInputElement | HTMLTextAreaElement).placeholder = String(value);
+          target.setAttribute('placeholder', String(value));
         }
         continue;
       }
@@ -2185,7 +2221,7 @@ function fivoraPreviewFocusBridge(
 
   let editModeActive = false;
   let hoverBadge: HTMLElement | null = null;
-  let hoveredElement: HTMLElement | null = null;
+  let hoveredElement: Element | null = null;
   let hoverOutlineCleanup: (() => void) | null = null;
   let activeInlineEdit: {
     target: HTMLElement;
@@ -2430,7 +2466,7 @@ function clearResolvedEditableTargets() {
   }
 
   function annotateEditableTarget(
-    element: HTMLElement,
+    element: Element,
     field: EditableField,
     remember = true,
   ) {
@@ -2447,11 +2483,14 @@ function clearResolvedEditableTargets() {
     ) {
       return false;
     }
-    element.setAttribute(RESOLVED_PATH_ATTRIBUTE, field.path);
+    // In-memory target registration only to prevent React hydration mismatches [DNB-HYD-007]
+    const isInputOrTextarea = element.tagName === 'INPUT' || element.tagName === 'TEXTAREA';
     const isEmpty =
       String(field.value ?? '').trim().length === 0 &&
-      normalizeText(element.textContent).length === 0;
-    if (editModeActive && isEmpty && element.tagName !== 'IMG') {
+      (isInputOrTextarea
+        ? !((element as HTMLInputElement | HTMLTextAreaElement).placeholder || (element as HTMLInputElement | HTMLTextAreaElement).value || '').trim()
+        : normalizeText(element.textContent).length === 0);
+    if (editModeActive && isEmpty && element.tagName !== 'IMG' && element.tagName.toLowerCase() !== 'svg') {
       element.setAttribute(EMPTY_EDITABLE_ATTRIBUTE, 'true');
     } else {
       element.removeAttribute(EMPTY_EDITABLE_ATTRIBUTE);
@@ -2468,7 +2507,8 @@ function clearResolvedEditableTargets() {
     } else {
       element.removeAttribute(EMPTY_COLLECTION_ATTRIBUTE);
     }
-    if (remember && !isCollection) {
+    targetRegistry.register(element, field.path);
+    if (remember && !isCollection && element instanceof HTMLElement) {
       rememberResolvedTarget(element, field.path);
     }
     return true;
@@ -2559,7 +2599,7 @@ function clearResolvedEditableTargets() {
         if (target.closest(`[${STATIC_ATTRIBUTE}]`)) {
           continue;
         }
-        const resolvedPath = target.getAttribute(RESOLVED_PATH_ATTRIBUTE);
+        const resolvedPath = targetRegistry.getPath(target);
         if (!resolvedPath || resolvedPath === field.path) {
           return target;
         }
@@ -2650,7 +2690,7 @@ function clearResolvedEditableTargets() {
     return badge;
   }
 
-  function positionBadge(target: HTMLElement) {
+  function positionBadge(target: Element) {
     if (!hoverBadge) return;
     const rect = target.getBoundingClientRect();
     hoverBadge.style.top = `${Math.max(4, rect.top - 4)}px`;
@@ -2669,23 +2709,28 @@ function clearResolvedEditableTargets() {
     hoveredElement = null;
   }
 
-  function applyHoverOverlay(target: HTMLElement) {
+  function applyHoverOverlay(target: Element) {
     if (target === hoveredElement) return;
     clearHoverOverlay();
     hoveredElement = target;
 
-    const prevOutline = target.style.outline;
-    const prevOutlineOffset = target.style.outlineOffset;
-    const prevCursor = target.style.cursor;
+    const htmlOrSvg = target as HTMLElement | SVGElement;
+    const prevOutline = htmlOrSvg.style?.outline ?? '';
+    const prevOutlineOffset = htmlOrSvg.style?.outlineOffset ?? '';
+    const prevCursor = htmlOrSvg.style?.cursor ?? '';
 
-    target.style.outline = '2px dashed rgba(37, 99, 235, 0.6)';
-    target.style.outlineOffset = '2px';
-    target.style.cursor = 'pointer';
+    if (htmlOrSvg.style) {
+      htmlOrSvg.style.outline = '2px dashed rgba(37, 99, 235, 0.6)';
+      htmlOrSvg.style.outlineOffset = '2px';
+      htmlOrSvg.style.cursor = 'pointer';
+    }
 
     hoverOutlineCleanup = () => {
-      target.style.outline = prevOutline;
-      target.style.outlineOffset = prevOutlineOffset;
-      target.style.cursor = prevCursor;
+      if (htmlOrSvg.style) {
+        htmlOrSvg.style.outline = prevOutline;
+        htmlOrSvg.style.outlineOffset = prevOutlineOffset;
+        htmlOrSvg.style.cursor = prevCursor;
+      }
     };
 
     positionBadge(target);
@@ -2693,12 +2738,8 @@ function clearResolvedEditableTargets() {
 
   function findEditableTarget(
     target: EventTarget | null,
-  ): { element: HTMLElement; field: EditableField } | null {
-    let currentElement = target instanceof Element ? target : null;
-    while (currentElement && !(currentElement instanceof HTMLElement)) {
-      currentElement = currentElement.parentElement;
-    }
-    let current = currentElement as HTMLElement | null;
+  ): { element: Element; field: EditableField } | null {
+    let current = target instanceof Element ? target : null;
     while (current && current !== document.body) {
       if (current.hasAttribute(STATIC_ATTRIBUTE)) {
         // A template can place a full-card static navigation link above an
@@ -2713,8 +2754,8 @@ function clearResolvedEditableTargets() {
         current.hasAttribute(ITEM_PATH_ATTRIBUTE) ||
         current.hasAttribute('data-content-path') ||
         current.hasAttribute('data-field-path') ||
-        current.hasAttribute(RESOLVED_PATH_ATTRIBUTE) ||
-        current.matches(EDITABLE_SELECTOR);
+        Boolean(targetRegistry.getPath(current)) ||
+        (current instanceof HTMLElement && current.matches(EDITABLE_SELECTOR));
       if (isCandidate) {
         const field = resolveEditableField(current);
         if (field) {
@@ -2726,7 +2767,7 @@ function clearResolvedEditableTargets() {
     return null;
   }
 
-  function resolveEditableField(element: HTMLElement): EditableField | null {
+  function resolveEditableField(element: Element): EditableField | null {
     if (element.closest(`[${STATIC_ATTRIBUTE}]`)) {
       return null;
     }
@@ -2743,15 +2784,27 @@ function clearResolvedEditableTargets() {
       const explicitField = editableFields.find((field) =>
         pathVariants(field.path).includes(explicitPath),
       );
+      const isImg = element.tagName === 'IMG';
+      const isInputOrTextarea = element.tagName === 'INPUT' || element.tagName === 'TEXTAREA';
+      const isIcon =
+        element.tagName.toLowerCase() === 'svg' ||
+        element.tagName.toLowerCase() === 'path' ||
+        element.tagName.toLowerCase() === 'circle' ||
+        element.hasAttribute('data-preview-icon') ||
+        element.getAttribute('data-preview-control') === 'icon-picker';
+
       return (
         explicitField ?? {
           path: explicitPath,
           label: explicitPath.split('.').pop() ?? 'Content',
-          type: element.tagName === 'IMG' ? 'image' : 'text',
+          type: isImg ? 'image' : (isIcon ? 'icon' : 'text'),
+          control: isIcon ? 'icon-picker' : undefined,
           value:
-            element.tagName === 'IMG'
+            isImg
               ? (element as HTMLImageElement).src
-              : (element.textContent?.trim() ?? ''),
+              : isInputOrTextarea
+              ? ((element as HTMLInputElement | HTMLTextAreaElement).placeholder || (element as HTMLInputElement | HTMLTextAreaElement).value || '')
+              : (element.getAttribute('data-preview-icon') ?? element.textContent?.trim() ?? ''),
         }
       );
     }
@@ -2841,7 +2894,7 @@ function clearResolvedEditableTargets() {
           container.getAttribute('data-preview-field-path') ||
           container.getAttribute('data-content-path') ||
           container.getAttribute('data-field-path') ||
-          container.getAttribute(RESOLVED_PATH_ATTRIBUTE);
+          targetRegistry.getPath(container);
         if (containerHint) {
           const prefix = containerHint.split('.')[0];
           const sectionImage = editableFields.find(
@@ -2941,7 +2994,7 @@ function clearResolvedEditableTargets() {
         current.getAttribute(LIST_PATH_ATTRIBUTE) ??
         current.getAttribute('data-content-path') ??
         current.getAttribute('data-field-path') ??
-        current.getAttribute(RESOLVED_PATH_ATTRIBUTE);
+        targetRegistry.getPath(current);
       if (path) return path;
       current = current.parentElement;
     }
@@ -2968,7 +3021,7 @@ function clearResolvedEditableTargets() {
         current.getAttribute('data-preview-field-path') ??
         current.getAttribute('data-content-path') ??
         current.getAttribute('data-field-path') ??
-        current.getAttribute(RESOLVED_PATH_ATTRIBUTE);
+        targetRegistry.getPath(current);
       if (path) {
         const match = path.match(/^(.+)\[(\d+)\]/);
         if (match) {
@@ -3015,7 +3068,7 @@ function clearResolvedEditableTargets() {
         current.hasAttribute('data-preview-field-path') ||
         current.hasAttribute('data-content-path') ||
         current.hasAttribute('data-field-path') ||
-        current.hasAttribute(RESOLVED_PATH_ATTRIBUTE)
+        Boolean(targetRegistry.getPath(current))
       ) {
         const candidate = resolveEditableField(current);
         if (
@@ -3048,9 +3101,12 @@ function clearResolvedEditableTargets() {
     const rect = element.getBoundingClientRect();
     const computed = window.getComputedStyle(element);
     const isImage = element.tagName === 'IMG';
+    const isInputOrTextarea = element.tagName === 'INPUT' || element.tagName === 'TEXTAREA';
     const fieldPath = field?.path ?? extractFieldPath(element);
     const fieldValue = isImage
       ? (element as HTMLImageElement).src
+      : isInputOrTextarea
+      ? ((element as HTMLInputElement | HTMLTextAreaElement).placeholder || (element as HTMLInputElement | HTMLTextAreaElement).value || '')
       : (element.textContent?.trim() ?? '');
     const extractedContext = extractCollectionContext(element);
     let collectionPath =
