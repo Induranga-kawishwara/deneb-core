@@ -36,7 +36,7 @@ const TYPE_COERCION_MAP = {
   float: 'number',
   bool: 'boolean',
   img: 'image',
-  icon: 'image',
+  icon: 'text',
 };
 
 /**
@@ -49,6 +49,11 @@ function normalizeFieldType(rawType, fieldKey = '') {
   if (!rawType || typeof rawType !== 'string') return 'text';
   const lower = rawType.toLowerCase().trim();
 
+  // Explicit icon or emoji fields always coerce to text
+  if (lower === 'icon' || lower === 'emoji') {
+    return 'text';
+  }
+
   if (PLATFORM_ALLOWED_TYPES.has(lower)) {
     return lower;
   }
@@ -59,6 +64,9 @@ function normalizeFieldType(rawType, fieldKey = '') {
 
   // Heuristic from fieldKey
   const keyLower = fieldKey.toLowerCase();
+  if (keyLower.endsWith('icon') || keyLower.startsWith('icon') || keyLower.includes('emoji')) {
+    return 'text';
+  }
   if (keyLower.endsWith('url') || keyLower.endsWith('link') || keyLower.endsWith('href')) {
     return 'url';
   }

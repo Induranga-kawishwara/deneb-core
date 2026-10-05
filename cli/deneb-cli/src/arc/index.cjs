@@ -69,6 +69,7 @@ const {
   testMutationResilience,
   runFuzzHarness,
 } = require('./fuzz-engine.cjs');
+const { runAutoEditabilityFix } = require('./auto-editability-fixer.cjs');
 const {
   analyzeBlockedProject,
   formatBlockedExplanationTerminal,
@@ -1306,6 +1307,27 @@ function runTransactionalPipeline(targetDirInput = '.', options = {}) {
   }
 }
 
+/**
+ * Standalone entry point for `deneb fix-editability`.
+ * Scans the project for missing field paths and auto-patches everything.
+ *
+ * @param {string} projectDir
+ * @param {{ dryRun?: boolean, verbose?: boolean }} options
+ */
+function runFixEditability(projectDir, options) {
+  const verbose = !!(options && options.verbose);
+  const dryRun = !!(options && options.dryRun);
+  if (verbose) console.log('[deneb] Running auto-editability fix on ' + projectDir);
+  const report = runAutoEditabilityFix(projectDir, { dryRun, verbose: true });
+  if (report.fixed.length === 0) {
+    console.log('[deneb] ✅ All fields already present — nothing to fix.');
+  } else {
+    console.log('[deneb] ✅ Fixed ' + report.fixed.length + ' file(s):');
+    for (const f of report.fixed) console.log('   • ' + f);
+  }
+  return report;
+}
+
 module.exports = {
   runDenebArc,
   runTransactionalPipeline,
@@ -1332,4 +1354,6 @@ module.exports = {
   printBlockedExplanation,
   ENGINE_ID,
   ARC_VERSION,
+  runAutoEditabilityFix,
+  runFixEditability,
 };

@@ -31,12 +31,42 @@ const FORM_CONTAINER_TAGS = new Set(['form', 'Form']);
 
 const ADAPTERS = BUILTIN_ADAPTERS;
 
+const UTILITY_ICON_PATTERNS = [
+  /^(Chevron|Arrow|Move|Caret|Angle|Sort|Chevrons)/i,
+  /^(X|Close|Menu|MenuAlt|Hamburger)/i,
+  /^(Loader|Spinner)/i,
+];
+
+function isUtilityIcon(name) {
+  if (!name) return false;
+  const clean = String(name).replace(/Icon$/i, '');
+  if (UTILITY_ICON_PATTERNS.some((re) => re.test(clean))) return true;
+  const lower = clean.toLowerCase();
+  return ['x', 'close', 'menu', 'spinner', 'loader'].includes(lower);
+}
+
 function isIconComponent(name, importSource) {
   if (!name) return false;
   if (DECORATIVE_TAGS.has(name)) return true;
   if (ICON_NAME_RE.test(name)) return true;
   if (importSource && /(lucide-react|heroicons|react-icons|tabler\/icons)/i.test(importSource)) return true;
   return false;
+}
+
+function isFeatureIcon(name, importSource) {
+  if (!name) return false;
+  if (DECORATIVE_TAGS.has(name)) return false;
+  if (!isIconComponent(name, importSource)) return false;
+  return !isUtilityIcon(name);
+}
+
+function extractIconBaseName(name) {
+  if (!name) return 'circle';
+  let clean = String(name).replace(/Icon$/i, '');
+  return clean
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .toLowerCase()
+    .trim();
 }
 
 function classifyHref(href) {
@@ -157,6 +187,9 @@ module.exports = {
   recognizeWithAdapters,
   resolveActionWithAdapters,
   isIconComponent,
+  isUtilityIcon,
+  isFeatureIcon,
+  extractIconBaseName,
   classifyHref,
   classifyActionIntent,
   isLikelyCtaClass,

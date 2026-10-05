@@ -225,6 +225,84 @@ test('AST transformer preserves className and uses nullish fallbacks', () => {
   parseSource(result.code, relativeFile);
 });
 
+test('init marks a variable photo source as an editable image field', () => {
+  const relativeFile = 'src/components/DynamicHero.tsx';
+  const code = `
+export function DynamicHero() {
+  const hero = { src: "/hero.webp" };
+  return <Image src={hero.src} alt="Lounge chair" className="rounded" />;
+}
+`;
+  const profile = scanProject(FIXTURE);
+  const analysis = analyzeFile({
+    code,
+    relativeFile,
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'home',
+    componentMeta: { name: 'DynamicHero', role: 'hero' },
+  });
+  analysis.relativeFile = relativeFile;
+  analysis.code = code;
+  const image = analysis.candidates.find((candidate) => candidate.reason === 'dynamic-image-source');
+  assert.ok(image, 'expected a dynamic image candidate');
+  const plan = planTransformations({ profile, analyses: [analysis] });
+  const result = applyFilePlan(plan.files[0], profile);
+  assert.match(result.code, /data-preview-field-path="home\.hero\.heroImage"/);
+  assert.match(result.code, /hero\.src/);
+  assert.match(result.code, /\|\|/);
+  parseSource(result.code, relativeFile);
+});
+
+test('init does not assign one shared photo field inside a reusable image component', () => {
+  const relativeFile = 'src/components/VehicleImage.tsx';
+  const code = `
+export function VehicleImage({ image }) {
+  const src = image?.src || "/placeholder.svg";
+  return <Image src={src} alt="" />;
+}
+`;
+  const profile = scanProject(FIXTURE);
+  const analysis = analyzeFile({
+    code,
+    relativeFile,
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'common',
+    componentMeta: { name: 'VehicleImage', role: 'card' },
+  });
+  const image = analysis.candidates.find((candidate) => candidate.reason === 'dynamic-image-source');
+  assert.equal(image, undefined);
+});
+
+test('init marks a home page photo passed in as a prop', () => {
+  const relativeFile = 'src/components/Hero.tsx';
+  const code = `
+export function Hero({ image }) {
+  return <Image src={image.src} alt="Showroom" />;
+}
+`;
+  const profile = scanProject(FIXTURE);
+  const analysis = analyzeFile({
+    code,
+    relativeFile,
+    profile,
+    graph: { sharedFiles: [] },
+    ownerScope: 'home',
+    componentMeta: { name: 'Hero', role: 'hero' },
+  });
+  analysis.relativeFile = relativeFile;
+  analysis.code = code;
+  const image = analysis.candidates.find((candidate) => candidate.reason === 'dynamic-image-source');
+  assert.ok(image, 'expected a home photo candidate');
+  const plan = planTransformations({ profile, analyses: [analysis] });
+  const result = applyFilePlan(plan.files[0], profile);
+  assert.match(result.code, /data-preview-field-path="home\.hero\.image"/);
+  assert.match(result.code, /image\.src/);
+  assert.match(result.code, /\|\|/);
+  parseSource(result.code, relativeFile);
+});
+
 test('planner emits style-bind next to content transforms', () => {
   const relativeFile = 'src/components/Hero.tsx';
   const code = fs.readFileSync(path.join(FIXTURE, relativeFile), 'utf8');
@@ -3953,9 +4031,38 @@ test('ARC v3 Phase 18: formatBlockedExplanationTerminal renders actionable remed
   }
 });
 
+test('ARC Component Registry recognizes EditableUniversalCard and multi-industry card aliases', () => {
+  const { isKnownComponent, classifyComponents } = require('../component-registry.cjs');
+  assert.equal(isKnownComponent('EditableUniversalCard'), true);
+  assert.equal(isKnownComponent('UniversalCard'), true);
+  assert.equal(isKnownComponent('ListingCard'), true);
+  assert.equal(isKnownComponent('EntityCard'), true);
+  assert.equal(isKnownComponent('EditableVehicleCard'), true);
+  assert.equal(isKnownComponent('VehicleCard'), true);
 
+  const res = classifyComponents(['UniversalCard', 'VehicleCard', 'UnknownCustomWidget']);
+  assert.deepEqual(res.known, ['UniversalCard', 'VehicleCard']);
+  assert.deepEqual(res.unknown, ['UnknownCustomWidget']);
+});
 
-
-
-
+test('ARC auto-editability fixer handles multi-industry card collections (books, gym plans, restaurants, vehicles)', () => {
+  const { buildGenericCardRecipeSection } = require('../auto-editability-fixer.cjs');
+  const bookCollection = {
+    'book-1': {
+      title: 'To Kill a Mockingbird',
+      author: 'Harper Lee',
+      year: '1960',
+      price: '$18.50',
+    },
+  };
+  const section = buildGenericCardRecipeSection('books', bookCollection);
+  assert.equal(section.id, 'cards.books');
+  assert.equal(section.type, 'collection');
+  assert.equal(section.items.length, 1);
+  assert.equal(section.items[0].key, 'book-1');
+  const keys = section.items[0].fields.map((f) => f.key);
+  assert.ok(keys.includes('title'));
+  assert.ok(keys.includes('author'));
+  assert.ok(keys.includes('price'));
+});
 

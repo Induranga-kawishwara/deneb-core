@@ -91,7 +91,10 @@ function inferFieldName(kind, tag, text, extra = {}) {
     if (kind === 'image') return 'logoUrl';
     return 'logoText';
   }
-  if (kind === 'image') return extra.alt ? toCamel([extra.alt, 'image']) || 'image' : 'image';
+  if (kind === 'image') {
+    if (extra.fieldHint) return extra.fieldHint;
+    return extra.alt ? toCamel([extra.alt, 'image']) || 'image' : 'image';
+  }
   if (kind === 'alt') return extra.imageField ? extra.imageField.replace(/Image$/, 'ImageAlt').replace(/image$/, 'imageAlt') : 'imageAlt';
   if (kind === 'placeholder') return toCamel([text || '', 'placeholder']) || 'placeholder';
 

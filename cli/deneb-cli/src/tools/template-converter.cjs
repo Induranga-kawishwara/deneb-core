@@ -270,6 +270,59 @@ function transformFileContent(filePath, pageKey, extractedData, backupDir, proje
     }
   }
 
+  // 0. Brand Logo & Monogram Guardian (Auto-binds logo icons and images on deneb init)
+  const isHeaderOrLogoFile = /logo|header|navbar|nav/i.test(filePath);
+  if (isHeaderOrLogoFile) {
+    // 0a. Image logos
+    code = code.replace(/<(img|Image)(\s+[^>]*?src=["{][^>]*?)>/gi, (match, tag, rest) => {
+      if (rest.includes('data-preview-field-path') || /avatar|hero|banner|photo|car|product/i.test(rest)) return match;
+      fileModified = true;
+      return `<${tag}${rest} data-preview-field-path="common.logoUrl" data-preview-style-target="common.logoUrl" data-preview-style-type="image">`;
+    });
+
+    // 0b. Monogram / SVG Logo fallback wrappers
+    code = code.replace(/<span(\s+[^>]*?class(?:Name)?="[^"]*(?:place-items-center|rounded|bg-primary|logo|monogram)[^"]*"[^>]*?)>(\s*<svg[\s\S]*?<\/svg>\s*)<\/span>/gi, (match, attrs, svg) => {
+      if (attrs.includes('data-preview-field-path')) return match;
+      const cleanAttrs = attrs.replace(/\s*aria-hidden(?:="[^"]*")?/g, '');
+      const cleanSvg = svg.replace(/\s*data-preview-static="[^"]*"/g, '');
+      fileModified = true;
+      return `<span${cleanAttrs} data-preview-field-path="common.logoUrl" data-preview-style-target="common.logoUrl" data-preview-style-type="image" title="Click to edit logo">${cleanSvg}</span>`;
+    });
+  }
+
+  // 1b. Eyebrow Badges & Section Eyebrows (e.g. <p className="eyebrow">...</p> or eyebrow="..." props)
+  const eyebrowTagRegex = /<(p|span)(\s+[^>]*?class(?:Name)?="[^"]*\beyebrow\b[^"]*"[^>]*)>([^<>{}]+)<\/\1>/gi;
+  code = code.replace(eyebrowTagRegex, (match, tag, attrs = '', text) => {
+    const trimmed = text.trim().replace(/\s+/g, ' ');
+    if (!trimmed || trimmed.length < 2 || attrs.includes('data-preview-field-path')) {
+      return match;
+    }
+    const rawKey = toFieldKey(trimmed, 'eyebrow', elementCount + 1);
+    const fieldKey = getUniqueKey(rawKey);
+
+    extractedData[fieldKey] = trimmed;
+    elementCount++;
+    fileModified = true;
+
+    return `<${tag} data-preview-field-path="${pageKey}.${fieldKey}" data-preview-style-target="${pageKey}.${fieldKey}" data-preview-style-type="text"${attrs}>{${ `siteData?.content?.${pageKey}?.${fieldKey} || ${JSON.stringify(trimmed)}` }}</${tag}>`;
+  });
+
+  const sectionHeadingEyebrowRegex = /<(SectionHeading|PageHeader)(\s+[^>]*?)eyebrow="([^"]+)"([^>]*?)\/?>/gi;
+  code = code.replace(sectionHeadingEyebrowRegex, (match, tag, pre = '', eyebrowText, post = '') => {
+    if (pre.includes('eyebrowPath=') || post.includes('eyebrowPath=')) {
+      return match;
+    }
+    const trimmed = eyebrowText.trim();
+    const rawKey = toFieldKey(trimmed, 'eyebrow', elementCount + 1);
+    const fieldKey = getUniqueKey(rawKey);
+
+    extractedData[fieldKey] = trimmed;
+    elementCount++;
+    fileModified = true;
+
+    return `<${tag}${pre}eyebrow={${ `siteData?.content?.${pageKey}?.${fieldKey} ?? ${JSON.stringify(trimmed)}` }} eyebrowPath="${pageKey}.${fieldKey}"${post}/>`;
+  });
+
   // 2. Headings: <h1> to <h6>
   const headingRegex = /<(h[1-6])(\s+[^>]*)?>([^<>{}]+)<\/\1>/g;
   code = code.replace(headingRegex, (match, tag, attrs = '', text) => {
@@ -459,9 +512,9 @@ function transformFileContent(filePath, pageKey, extractedData, backupDir, proje
     return `<a${preHref}href={siteData?.content?.common?.footer?.${fieldKey} || siteData?.content?.${pageKey}?.${fieldKey} || ${JSON.stringify(href)}} data-preview-field-path="common.footer.${fieldKey}"${postHref}>${innerContent}</a>`;
   });
 
-  // 9c. Button / CTA Action Links with Text (Split URL on <a> and Label on <span>)
-  const btnLinkRegex = /<a(\s+[^>]*?class(?:Name)?="[^"]*(?:btn|button|cta|action|rounded|bg-)[^"]*"[^>]*?)href="([^"]+)"([^>]*)>([\s\S]*?)<\/a>/gi;
-  code = code.replace(btnLinkRegex, (match, preHref = '', href, postHref = '', innerContent) => {
+  // 9c. Button / CTA Action Links with Text (Split URL on <a>/<Link> and Label on <span>)
+  const btnLinkRegex = /<(a|Link|GatedLink)(\s+[^>]*?class(?:Name)?="[^"]*(?:btn|button|cta|action|rounded|bg-)[^"]*"[^>]*?)href="([^"]+)"([^>]*)>([\s\S]*?)<\/\1>/gi;
+  code = code.replace(btnLinkRegex, (match, tag, preHref = '', href, postHref = '', innerContent) => {
     if (preHref.includes('data-preview-field-path') || postHref.includes('data-preview-field-path') || href.startsWith('#') || href.includes('javascript:')) {
       return match;
     }
@@ -481,21 +534,21 @@ function transformFileContent(filePath, pageKey, extractedData, backupDir, proje
     if (/<span(\s+[^>]*)?>([^<>{}]+)<\/span>/i.test(innerContent)) {
       updatedInner = innerContent.replace(
         /<span(\s+[^>]*)?>([^<>{}]+)<\/span>/i,
-        `<span data-preview-field-path="${pageKey}.${labelKey}"$1>{siteData?.content?.${pageKey}?.${labelKey} || ${JSON.stringify(textOnly)}}</span>`
+        `<span data-preview-field-path="${pageKey}.${labelKey}" data-preview-style-target="${pageKey}.${labelKey}" data-preview-style-type="text"$1>{siteData?.content?.${pageKey}?.${labelKey} || ${JSON.stringify(textOnly)}}</span>`
       );
     } else {
       updatedInner = innerContent.replace(
         textOnly,
-        `<span data-preview-field-path="${pageKey}.${labelKey}">{siteData?.content?.${pageKey}?.${labelKey} || ${JSON.stringify(textOnly)}}</span>`
+        `<span data-preview-field-path="${pageKey}.${labelKey}" data-preview-style-target="${pageKey}.${labelKey}" data-preview-style-type="text">{siteData?.content?.${pageKey}?.${labelKey} || ${JSON.stringify(textOnly)}}</span>`
       );
     }
 
-    return `<a${preHref}href={siteData?.content?.${pageKey}?.${urlKey} || ${JSON.stringify(href)}} data-preview-field-path="${pageKey}.${urlKey}"${postHref}>${updatedInner}</a>`;
+    return `<${tag}${preHref}href={siteData?.content?.${pageKey}?.${urlKey} || ${JSON.stringify(href)}} data-preview-field-path="${pageKey}.${urlKey}"${postHref}>${updatedInner}</${tag}>`;
   });
 
-  // 9d. Standard Anchor Links with Plain Text
-  const linkRegex = /<a(\s+[^>]*)?>([^<>{}]+)<\/a>/g;
-  code = code.replace(linkRegex, (match, attrs = '', text) => {
+  // 9d. Standard Links with Plain Text (<a>, <Link>, <GatedLink> with inner span)
+  const linkRegex = /<(a|Link|GatedLink)(\s+[^>]*)?>([^<>{}]+)<\/\1>/g;
+  code = code.replace(linkRegex, (match, tag, attrs = '', text) => {
     const trimmed = text.trim().replace(/\s+/g, ' ');
     if (!trimmed || trimmed.length < 2 || attrs.includes('data-preview-field-path')) {
       return match;
@@ -507,7 +560,18 @@ function transformFileContent(filePath, pageKey, extractedData, backupDir, proje
     elementCount++;
     fileModified = true;
 
-    return `<a data-preview-field-path="${pageKey}.${fieldKey}"${attrs}>{siteData?.content?.${pageKey}?.${fieldKey} || ${JSON.stringify(trimmed)}}</a>`;
+    return `<${tag}${attrs}><span data-preview-field-path="${pageKey}.${fieldKey}" data-preview-style-target="${pageKey}.${fieldKey}" data-preview-style-type="text">{siteData?.content?.${pageKey}?.${fieldKey} || ${JSON.stringify(trimmed)}}</span></${tag}>`;
+  });
+
+  // 9e. Dynamic Link Expressions (e.g. <Link href={...}>{item.label}</Link>)
+  const dynamicLinkRegex = /<(a|Link|GatedLink)(\s+[^>]*)?>\s*\{([a-zA-Z0-9_$.]+(?:\.(?:label|name|title|text|displayName|countLabel)))\s*\}\s*<\/\1>/g;
+  code = code.replace(dynamicLinkRegex, (match, tag, attrs = '', expr) => {
+    if (attrs.includes('data-preview-field-path') || match.includes('data-preview-field-path')) {
+      return match;
+    }
+    const varPrefix = expr.split('.')[0];
+    fileModified = true;
+    return `<${tag}${attrs}><span data-preview-field-path={\`common.navLabels.\${ ${varPrefix}.id || ${varPrefix}.key || ${varPrefix}.slug || 'item'} \`} data-preview-style-target={\`common.navLabels.\${ ${varPrefix}.id || ${varPrefix}.key || ${varPrefix}.slug || 'item'} \`} data-preview-style-type="text">{${expr}}</span></${tag}>`;
   });
 
   // 10. List items: <li>
@@ -578,20 +642,8 @@ function transformFileContent(filePath, pageKey, extractedData, backupDir, proje
     return `<div data-preview-field-path="${pageKey}.${fieldKey}"${attrs}>{siteData?.content?.${pageKey}?.${fieldKey} || ${JSON.stringify(trimmed)}}</div>`;
   });
 
-  // 14. Sensitive Element Guardian: Auto-annotate non-bound <a> and <img> tags with data-preview-static
-  // CRITICAL FIVORA RULE: Never mark an <a> as static if it encloses any children with data-preview-field-path
-  // This completely eliminates "markers cannot be on or inside data-preview-static" errors across cards and links.
-  code = code.replace(/<a(\s+[^>]*?href="[^"]*"[^>]*?)>([\s\S]*?)<\/a>/gi, (match, attrs, inner) => {
-    if (attrs.includes('data-preview-field-path') || attrs.includes('data-preview-static')) {
-      return match;
-    }
-    // If the inner content has editable field markers or is a card wrapper, NEVER mark the anchor static!
-    if (inner.includes('data-preview-field-path') || inner.includes('data-preview-item-path') || /card|product|shoe|item/i.test(attrs)) {
-      return match;
-    }
-    fileModified = true;
-    return `<a${attrs} data-preview-static="navigation-link">${inner}</a>`;
-  });
+  // 14. Sensitive Element Guardian: Navigation links and anchors are NEVER marked static so they remain editable.
+  // Only non-bound decorative <img> tags receive static markers if not already bound.
 
   code = code.replace(/<img(\s+[^>]*?src="[^"]*"[^>]*?)>/gi, (match, attrs) => {
     if (attrs.includes('data-preview-field-path') || attrs.includes('data-preview-static')) {

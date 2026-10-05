@@ -163,6 +163,7 @@ function planTransformations({ profile, analyses, recipe, ir }) {
           used: usedPaths,
         });
         transform.fieldType = 'image';
+        transform.dynamicSrc = Boolean(extra.dynamicSrc);
       } else if (candidate.operation === 'extract-alt') {
         transform.field = buildFieldPath({
           scope,
@@ -233,6 +234,18 @@ function planTransformations({ profile, analyses, recipe, ir }) {
         transform.targetComponent = extra.componentName;
         transform.targetFile = extra.componentFile;
         transform.previewPath = prefix;
+      } else if (candidate.operation === 'feature-icon') {
+        const iconBase = extra.iconName || 'icon';
+        const fieldName = inferFieldName(iconBase + 'Icon', candidate.tag, candidate.value, extra);
+        transform.field = buildFieldPath({
+          scope,
+          section,
+          field: fieldName,
+          used: usedPaths,
+        });
+        transform.fieldType = 'text';
+        transform.control = 'icon-picker';
+        transform.fallback = candidate.value || iconBase;
       } else if (candidate.operation === 'extract-tailwind-bg') {
         transform.field = buildFieldPath({
           scope,

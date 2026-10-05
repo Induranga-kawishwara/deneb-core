@@ -31,6 +31,8 @@ const {
   IMAGE_TAGS,
   DECORATIVE_TAGS,
   isIconComponent,
+  isUtilityIcon,
+  isFeatureIcon,
 } = require('./adapters.cjs');
 const { BROAD_CONTENT_CONTAINERS } = require('./fivora-contract.cjs');
 const { inferSection, inferFieldName, buildFieldPath, classifyFieldType } = require('./field-paths.cjs');
@@ -118,7 +120,7 @@ function isDecorativeCopy(text, tag, className) {
 function classifyResidual(node, text, tag) {
   const className = attrLiteral(node, 'className') || attrLiteral(node, 'class');
   const ariaHidden = attrLiteral(node, 'aria-hidden') === 'true' || hasJsxAttribute(node, 'hidden') || /(^|\s)hidden(\s|$)/.test(className);
-  if (ariaHidden || DECORATIVE_TAGS.has(tag) || isIconComponent(tag, '')) {
+  if (ariaHidden || DECORATIVE_TAGS.has(tag) || isUtilityIcon(tag)) {
     return { bind: false, reason: 'decorative-icon' };
   }
   if (isDecorativeCopy(text, tag, className)) {
@@ -224,7 +226,7 @@ function applyResidualPass({ code, file, ownerScope, usedPaths, componentName, r
         return;
       }
 
-      if (DECORATIVE_TAGS.has(tag) || isIconComponent(tag, '')) {
+      if (DECORATIVE_TAGS.has(tag) || isUtilityIcon(tag)) {
         if (ensureStaticOnLeaf(node, 'decorative-icon')) applied++;
         this.traverse(pathNode);
         return;

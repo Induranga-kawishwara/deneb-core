@@ -5,6 +5,7 @@ const {
   findJsxAttribute,
   hasJsxAttribute,
   siteDataBinding,
+  optionalMember,
   ensureStyleAttrs,
   b,
 } = require('../ast.cjs');
@@ -19,6 +20,22 @@ const { replaceTextChildren, wrapLiteralTextChildren } = require('./primitives/t
 const { splitActionChildren } = require('./primitives/action.cjs');
 const { bindButtonWithIcon, bindHighlightedHeading } = require('./components/compound-content.cjs');
 const { extractTailwindBg } = require('./assets/tailwind-bg.cjs');
+
+function bindDynamicImageSource(node, field) {
+  const tagName = getJsxName(node);
+  const target = tagName === 'picture'
+    ? (node.children || []).find((child) => child && child.type === 'JSXElement' && (getJsxName(child) === 'img' || getJsxName(child) === 'Image'))
+    : node;
+  if (!target) return;
+  const srcAttr = findJsxAttribute(target, 'src');
+  if (srcAttr?.value?.type === 'JSXExpressionContainer' && srcAttr.value.expression) {
+    const original = srcAttr.value.expression;
+    const edited = optionalMember(['siteData', 'content', ...String(field).split('.')]);
+    srcAttr.value = b.jsxExpressionContainer(b.logicalExpression('||', edited, original));
+  }
+  ensurePreviewPath(target, field);
+  if (target !== node) ensurePreviewPath(node, field);
+}
 
 function applyTransformToElement(pathNode, transform) {
   const node = pathNode.node;
@@ -96,6 +113,10 @@ function applyTransformToElement(pathNode, transform) {
     return;
   }
   if (transform.operation === 'extract-image' || transform.operation === 'extract-picture') {
+    if (transform.dynamicSrc) {
+      bindDynamicImageSource(node, transform.field);
+      return;
+    }
     const tagName = getJsxName(node);
     if (tagName === 'picture') {
       const children = node.children || [];
@@ -183,6 +204,20 @@ function applyTransformToElement(pathNode, transform) {
   }
   if (transform.operation === 'extract-tailwind-bg') {
     extractTailwindBg(node, transform);
+    return;
+  }
+  if (transform.operation === 'feature-icon') {
+    if (hasJsxAttribute(node, 'data-preview-static')) {
+      node.openingElement.attributes = node.openingElement.attributes.filter(
+        (attr) => !(attr.type === 'JSXAttribute' && attr.name && attr.name.name === 'data-preview-static')
+      );
+    }
+    replaceAttrValue(node, 'data-preview-field-path', b.stringLiteral(transform.field));
+    if (!hasJsxAttribute(node, 'data-preview-control')) {
+      node.openingElement.attributes.push(
+        b.jsxAttribute(b.jsxIdentifier('data-preview-control'), b.stringLiteral('icon-picker'))
+      );
+    }
     return;
   }
 }
