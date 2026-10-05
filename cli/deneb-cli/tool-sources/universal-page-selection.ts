@@ -613,7 +613,7 @@ export function findDoubleBasePathNextRouterCalls(source: string) {
       .map((match) => stripNonCode(match[1]))
       .join(' ');
     const codeOnly = stripNonCode(expression);
-    return /\b(?:[A-Za-z_$][\w$]*\s*\.\s*)*[A-Za-z_$][\w$]*(?:base_?path|path_?base)[\w$]*\b/i.test(
+    return /\b(?:[A-Za-z_$][\w$]*\s*\.\s*)*(?:[A-Za-z_$][\w$]*(?:base_?path|path_?base)[\w$]*|platformProductDetailHref)\b/i.test(
       `${codeOnly} ${templateExpressions}`,
     );
   };
