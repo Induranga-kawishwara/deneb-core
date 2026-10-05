@@ -452,9 +452,11 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
           }
 
           if (live.shop.openingHours) {
+            const hoursStr = formatWeeklyHoursToString(live.shop.openingHours);
+            const liveText = hoursStr || (typeof live.shop.openingHours === "string" ? live.shop.openingHours : "");
             nextContact.hours = live.shop.openingHours;
-            nextContact.openingHours = live.shop.openingHours;
-            nextCommon.openingHours = live.shop.openingHours;
+            nextContact.openingHours = liveText;
+            nextCommon.openingHours = liveText;
             nextCommon.hours = live.shop.openingHours;
             nextHome.businessHours = live.shop.openingHours;
           }
@@ -880,6 +882,76 @@ export type DenebData = SiteData;
  * with clean numbers and resolved image URLs, so any template component code works flawlessly
  * regardless of whether the developer wrote .title or .name, .cost or .price, .image or .imageUrl.
  */
+
+function formatTime12(timeStr?: string | null): string {
+  if (!timeStr) return "";
+  const clean = timeStr.trim();
+  if (/am|pm/i.test(clean)) return clean;
+  const [hourStr, minStr = "00"] = clean.split(":");
+  const hour = parseInt(hourStr, 10);
+  if (isNaN(hour)) return clean;
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const formattedHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${formattedHour}:${minStr.padStart(2, "0")} ${ampm}`;
+}
+
+export function formatWeeklyHoursToString(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+
+  const days = [
+    ["monday", "Mon"],
+    ["tuesday", "Tue"],
+    ["wednesday", "Wed"],
+    ["thursday", "Thu"],
+    ["friday", "Fri"],
+    ["saturday", "Sat"],
+    ["sunday", "Sun"],
+  ] as const;
+
+  const entries: Array<{ label: string; hours: string }> = [];
+  const rec = value as Record<string, any>;
+
+  for (const [key, label] of days) {
+    const day = rec[key];
+    if (!day) continue;
+    if (typeof day === "string") {
+      const trimmed = day.trim();
+      if (trimmed) entries.push({ label, hours: trimmed });
+      continue;
+    }
+    if (day.closed === true) {
+      entries.push({ label, hours: "Closed" });
+      continue;
+    }
+    const open = typeof day.open === "string" ? formatTime12(day.open) : "";
+    const close = typeof day.close === "string" ? formatTime12(day.close) : "";
+    if (open && close) {
+      entries.push({ label, hours: `${open} – ${close}` });
+    } else if (open) {
+      entries.push({ label, hours: `From ${open}` });
+    }
+  }
+
+  if (entries.length === 0) return "";
+
+  const groups: Array<{ first: string; last: string; hours: string }> = [];
+  for (const entry of entries) {
+    const prev = groups[groups.length - 1];
+    if (prev && prev.hours === entry.hours) {
+      prev.last = entry.label;
+    } else {
+      groups.push({ first: entry.label, last: entry.label, hours: entry.hours });
+    }
+  }
+
+  const activeGroups = groups.filter((g) => g.hours && g.hours !== "Closed");
+  if (activeGroups.length === 0) return "Closed";
+  return activeGroups
+    .map((g) => (g.first === g.last ? `${g.first}: ${g.hours}` : `${g.first} – ${g.last}: ${g.hours}`))
+    .join(", ");
+}
+
 export function normalizeProductItem(p: unknown): ProductItem {
   if (!isRecord(p)) return p as ProductItem;
   const customData = isRecord(p.customData) ? p.customData : {};
@@ -962,7 +1034,9 @@ export function normalizeProductItem(p: unknown): ProductItem {
     productName: (titleCandidate ?? nameCandidate) as string | undefined,
     itemTitle: (titleCandidate ?? nameCandidate) as string | undefined,
     minPrice: explicitMin !== undefined ? explicitMin : undefined,
+    priceMin: (explicitMin ?? p.priceMin) !== undefined ? (explicitMin ?? p.priceMin) : undefined,
     maxPrice: explicitMax !== undefined ? explicitMax : undefined,
+    priceMax: (explicitMax ?? p.priceMax) !== undefined ? (explicitMax ?? p.priceMax) : undefined,
     priceRange: explicitRange !== undefined ? explicitRange : undefined,
     isPriceRange: isRange,
     ...(numPrice !== undefined
