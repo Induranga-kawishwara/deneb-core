@@ -163,8 +163,7 @@
     {
       "id": "contact",
       "label": "Contact & Concierge",
-      "route": "/contact",
-      "required": true
+      "route": "/contact"
     },
     {
       "id": "product",

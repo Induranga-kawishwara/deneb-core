@@ -162,8 +162,7 @@
     {
       "id": "contact",
       "label": "Skin Consultation",
-      "route": "/contact",
-      "required": true
+      "route": "/contact"
     },
     {
       "id": "product",

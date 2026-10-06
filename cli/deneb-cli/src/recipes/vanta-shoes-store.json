@@ -113,8 +113,7 @@
     {
       "id": "contact",
       "label": "Contact",
-      "route": "/contact",
-      "required": true
+      "route": "/contact"
     },
     {
       "id": "products",

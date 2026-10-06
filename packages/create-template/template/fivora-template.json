@@ -38,8 +38,7 @@
     {
       "id": "contact",
       "label": "Contact",
-      "route": "/contact",
-      "required": true
+      "route": "/contact"
     }
   ],
   "editorSchema": {
