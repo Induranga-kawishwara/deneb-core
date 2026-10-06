@@ -157,8 +157,7 @@
     {
       "id": "contact",
       "label": "Tech Support Hotline",
-      "route": "/contact",
-      "required": true
+      "route": "/contact"
     },
     {
       "id": "product",
