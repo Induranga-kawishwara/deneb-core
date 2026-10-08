@@ -101,7 +101,10 @@ function fivoraPreviewFocusBridge(
   try {
     if (typeof Node !== 'undefined' && Node.prototype) {
       const originalRemoveChild = Node.prototype.removeChild;
-      Node.prototype.removeChild = function (child: Node) {
+      Node.prototype.removeChild = function <T extends Node>(
+        this: Node,
+        child: T,
+      ): T {
         if (child && child.parentNode !== this) {
           if (
             typeof console !== 'undefined' &&
@@ -114,14 +117,18 @@ function fivoraPreviewFocusBridge(
           }
           return child;
         }
-        return originalRemoveChild.apply(this, arguments as unknown as [Node]);
+        return originalRemoveChild.apply(
+          this,
+          arguments as unknown as [T],
+        ) as T;
       };
 
       const originalInsertBefore = Node.prototype.insertBefore;
-      Node.prototype.insertBefore = function (
-        newNode: Node,
+      Node.prototype.insertBefore = function <T extends Node>(
+        this: Node,
+        newNode: T,
         referenceNode: Node | null,
-      ) {
+      ): T {
         if (referenceNode && referenceNode.parentNode !== this) {
           if (
             typeof console !== 'undefined' &&
@@ -136,8 +143,8 @@ function fivoraPreviewFocusBridge(
         }
         return originalInsertBefore.apply(
           this,
-          arguments as unknown as [Node, Node | null],
-        );
+          arguments as unknown as [T, Node | null],
+        ) as T;
       };
     }
 
