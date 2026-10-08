@@ -86,6 +86,7 @@ const args = process.argv.slice(2);
 const toolsDir = path.join(__dirname, '..', 'src', 'tools');
 
 const FORBIDDEN_DIRS = new Set([
+  '.deneb',
   '.git',
   '.next',
   '.turbo',
