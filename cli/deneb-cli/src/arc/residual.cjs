@@ -107,12 +107,15 @@ function isMeaningfulVisibleText(text, isLogoOrList = false) {
   return true;
 }
 
+const THEME_UI_TEXT_RE = /^(dark|light|system|theme|theme\s*mode|toggle\s*theme)$/i;
+
 function isDecorativeCopy(text, tag, className) {
   const value = String(text || '').replace(/\s+/g, ' ').trim();
   if (!value) return true;
   if (CHROME_TEXT_RE.test(value)) return true;
+  if (THEME_UI_TEXT_RE.test(value)) return true;
   if (CART_CHROME_RE.test(value) && /cart|drawer|qty|quantity/i.test(className || '')) return true;
-  if (DECORATIVE_TAGS.has(tag) || tag === 'svg') return true;
+  if (DECORATIVE_TAGS.has(tag) || tag === 'svg' || isUtilityIcon(tag)) return true;
   if (/\bsr-only\b|\bhidden\b/.test(className || '')) return true;
   return false;
 }

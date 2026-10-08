@@ -20,7 +20,7 @@ const DECORATIVE_TAGS = new Set([
 ]);
 const SKIP_TAGS = new Set([
   'script', 'style', 'link', 'meta', 'head', 'html', 'Fragment', 'Suspense',
-  'StrictMode', 'ErrorBoundary',
+  'StrictMode', 'ErrorBoundary', 'ThemeToggle', 'ThemeStyles',
 ]);
 const HEADING_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'Heading', 'Title', 'CardTitle', 'ModalHeader', 'DialogTitle']);
 const TEXT_TAGS = new Set(['p', 'span', 'li', 'blockquote', 'figcaption', 'label', 'CardDescription', 'Description', 'Subtitle', 'Typography', 'Text', 'Badge', 'badge']);
@@ -35,14 +35,23 @@ const UTILITY_ICON_PATTERNS = [
   /^(Chevron|Arrow|Move|Caret|Angle|Sort|Chevrons)/i,
   /^(X|Close|Menu|MenuAlt|Hamburger)/i,
   /^(Loader|Spinner)/i,
+  /^(Sun|Moon|Sparkles?|Theme|SunMoon|HalfMoon)/i,
+  /^(Quote|Star)/i,
+  /^(RotateCcw|RotateCw|Refresh|Undo|Redo|Reset)/i,
 ];
 
 function isUtilityIcon(name) {
   if (!name) return false;
-  const clean = String(name).replace(/Icon$/i, '');
+  const clean = String(name)
+    .replace(/^(Lucide|Fa|Hi|Io|Md)/, '')
+    .replace(/Icon$/i, '');
   if (UTILITY_ICON_PATTERNS.some((re) => re.test(clean))) return true;
   const lower = clean.toLowerCase();
-  return ['x', 'close', 'menu', 'spinner', 'loader'].includes(lower);
+  return [
+    'x', 'close', 'menu', 'spinner', 'loader',
+    'sun', 'moon', 'sparkle', 'sparkles', 'theme', 'quote', 'star',
+    'rotate-ccw', 'rotateccw', 'rotate-cw', 'rotatecw', 'refresh', 'reset',
+  ].includes(lower);
 }
 
 function isIconComponent(name, importSource) {
