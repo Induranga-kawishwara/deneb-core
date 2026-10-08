@@ -4066,3 +4066,20 @@ test('ARC auto-editability fixer handles multi-industry card collections (books,
   assert.ok(keys.includes('price'));
 });
 
+test('ARC recognizes theme toggles, stars, quotes, and reset icons as utility/decorative icons', () => {
+  const { isUtilityIcon, isFeatureIcon } = require('../adapters.cjs');
+  const { isStaticSkipText } = require('../semantic.cjs');
+
+  const decorativeIcons = ['Sun', 'Moon', 'Sparkles', 'Quote', 'Star', 'RotateCcw', 'RefreshCw'];
+  for (const name of decorativeIcons) {
+    assert.equal(isUtilityIcon(name), true, `${name} should be recognized as utility/decorative icon`);
+    assert.equal(isFeatureIcon(name, 'lucide-react'), false, `${name} should not be classified as feature icon`);
+  }
+
+  assert.equal(isStaticSkipText('Theme Mode'), true);
+  assert.equal(isStaticSkipText('Toggle theme'), true);
+  assert.equal(isStaticSkipText('Dark'), true);
+  assert.equal(isStaticSkipText('Light'), true);
+});
+
+

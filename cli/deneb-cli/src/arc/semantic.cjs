@@ -85,11 +85,14 @@ function normalizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
+const THEME_UI_TEXT_RE = /^(dark|light|system|theme|theme\s*mode|toggle\s*theme)$/i;
+
 function isStaticSkipText(text, isLogoContext = false) {
   const value = normalizeText(text);
   if (!value) return true;
   if (value.length < 2 && !isLogoContext) return true;
   if (TECHNICAL_TEXT_RE.test(value)) return true;
+  if (THEME_UI_TEXT_RE.test(value)) return true;
   if (/^[{}`\\]/.test(value)) return true;
   if (/^https?:\/\/(localhost|127\.0\.0\.1)/i.test(value)) return true;
   return false;
