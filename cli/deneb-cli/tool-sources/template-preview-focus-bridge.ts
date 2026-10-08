@@ -2766,7 +2766,7 @@ function fivoraPreviewFocusBridge(
     hoveredElement = null;
   }
 
-  function applyHoverOverlay(target: Element) {
+  function applyHoverOverlay(target: HTMLElement) {
     if (target === hoveredElement) return;
     clearHoverOverlay();
     hoveredElement = target;
@@ -2795,8 +2795,12 @@ function fivoraPreviewFocusBridge(
 
   function findEditableTarget(
     target: EventTarget | null,
-  ): { element: Element; field: EditableField } | null {
-    let current = target instanceof Element ? target : null;
+  ): { element: HTMLElement; field: EditableField } | null {
+    let currentElement = target instanceof Element ? target : null;
+    while (currentElement && !(currentElement instanceof HTMLElement)) {
+      currentElement = currentElement.parentElement;
+    }
+    let current = currentElement as HTMLElement | null;
     while (current && current !== document.body) {
       if (current.hasAttribute(STATIC_ATTRIBUTE)) {
         // A template can place a full-card static navigation link above an
@@ -2813,14 +2817,14 @@ function fivoraPreviewFocusBridge(
         current.hasAttribute('data-field-path') ||
         current.hasAttribute(RESOLVED_PATH_ATTRIBUTE) ||
         Boolean(targetRegistry.getPath(current)) ||
-        (current instanceof HTMLElement && current.matches(EDITABLE_SELECTOR));
+        current.matches(EDITABLE_SELECTOR);
       if (isCandidate) {
         const field = resolveEditableField(current);
         if (field) {
           return { element: current, field };
         }
       }
-      current = current.parentElement;
+      current = current.parentElement instanceof HTMLElement ? current.parentElement : null;
     }
     return null;
   }
