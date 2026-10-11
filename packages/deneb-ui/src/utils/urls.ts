@@ -201,3 +201,9 @@ export function resolvePageRoute(pageKey: string, pages?: Array<{ id: string; ro
   const match = pages?.find((page) => page.id === pageKey);
   return match?.route ?? `/${pageKey.replace(/_/g, '/')}`;
 }
+
+/**
+ * Resolves static assets with subpath prefix support.
+ * Canonical alias for `withBasePath`.
+ */
+export const resolveAsset = withBasePath;
