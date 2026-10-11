@@ -30,3 +30,5 @@ export function withBasePath(value?: string | null) {
 export function pageRoute(pageKey: string) {
   return pageKey === 'home' ? '/' : `/${pageKey}`;
 }
+
+export const resolveAsset = withBasePath;

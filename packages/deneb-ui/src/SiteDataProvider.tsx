@@ -20,6 +20,7 @@ import { ResponsiveBaseStyles } from './ResponsiveBaseStyles';
 import type { ProductItem } from './EditableProductCard';
 import type { ServiceItem } from './EditableServiceCard';
 import { ThemeStyles, type TemplateTheme } from './ThemeStyles';
+import { withBasePath, resolveAsset } from './utils';
 
 export const DENEB_PREVIEW_DATA_MESSAGE = 'DENEB_PREVIEW_SITE_DATA';
 export const PREVIEW_DATA_MESSAGE = 'FIVORA_PREVIEW_SITE_DATA';
@@ -809,6 +810,16 @@ export function contentText(value: unknown): string {
 export function contentList<Item = unknown>(value: unknown): Item[] {
   return Array.isArray(value) ? (value as Item[]) : [];
 }
+
+/**
+ * Safely extracts an image URL from siteData and ensures subpath base path is applied.
+ */
+export function contentImage(value: unknown, fallback: string = ''): string {
+  const val = typeof value === 'string' && value.trim() ? value.trim() : fallback;
+  return withBasePath(val);
+}
+
+export { withBasePath, resolveAsset };
 
 export function contentNumber(value: unknown, fallback: number = 0): number {
   return typeof value === 'number' && !Number.isNaN(value) ? value : fallback;

@@ -1068,6 +1068,66 @@ function runDoctor(targetDirInput = '.', options = {}) {
     addCheck(suite5, 'warn', 'Next.js Image Empty-String Guard', `${emptyImageSrcCount} Image src attribute(s) pass unguarded expressions that may trigger Next.js empty string download errors. Run with --fix to guard.`, { code: 'DNB-IMG-002' });
   }
 
+  // Check: Next.js Image BasePath Safety (DNB-IMG-003)
+  let unwrappedLocalImageCount = 0;
+  for (const file of sourceFiles) {
+    let c = fs.readFileSync(file, 'utf-8');
+    if (c.includes('<Image') || c.includes('<img')) {
+      const rawImageTagRegex = /<(?:Image|img)\b([^>]*\bsrc=(?:["'](\/[^"'#?][^"']*)["']|\{(?:["'](\/[^"'#?][^"']*)["'])\})[^>]*)>/g;
+      const tagMatches = [...c.matchAll(rawImageTagRegex)];
+      let fileModified = false;
+
+      for (const m of tagMatches) {
+        const fullTag = m[0];
+        const rawPath = m[2] || m[3];
+        if (rawPath && !rawPath.startsWith('//') && !fullTag.includes('withBasePath') && !fullTag.includes('resolveAsset') && !fullTag.includes('contentImage')) {
+          unwrappedLocalImageCount++;
+          if (shouldFix) {
+            const doubleQuoteSrc = 'src="' + rawPath + '"';
+            const singleQuoteSrc = "src='" + rawPath + "'";
+            const curlyDoubleSrc = 'src={"' + rawPath + '"}';
+            const curlySingleSrc = "src={'" + rawPath + "'}";
+
+            if (c.includes(doubleQuoteSrc)) {
+              c = c.replace(doubleQuoteSrc, "src={withBasePath('" + rawPath + "')}");
+              fileModified = true;
+            } else if (c.includes(singleQuoteSrc)) {
+              c = c.replace(singleQuoteSrc, "src={withBasePath('" + rawPath + "')}");
+              fileModified = true;
+            } else if (c.includes(curlyDoubleSrc)) {
+              c = c.replace(curlyDoubleSrc, "src={withBasePath('" + rawPath + "')}");
+              fileModified = true;
+            } else if (c.includes(curlySingleSrc)) {
+              c = c.replace(curlySingleSrc, "src={withBasePath('" + rawPath + "')}");
+              fileModified = true;
+            }
+          }
+        }
+      }
+
+      if (shouldFix && fileModified) {
+        if (!c.includes('withBasePath')) {
+          if (c.includes("from '@deneb-ui/ui'") || c.includes('from "@deneb-ui/ui"')) {
+            c = c.replace(/import\s*\{([^}]+)\}\s*from\s*(['"]@deneb-ui\/ui['"])/, 'import { $1, withBasePath } from $2');
+          } else if (c.includes("from '@/lib/utils'") || c.includes('from "@/lib/utils"')) {
+            c = c.replace(/import\s*\{([^}]+)\}\s*from\s*(['"]@\/lib\/utils['"])/, 'import { $1, withBasePath } from $2');
+          } else {
+            c = "import { withBasePath } from '@deneb-ui/ui';\n" + c;
+          }
+        }
+        fs.writeFileSync(file, c, 'utf8');
+      }
+    }
+  }
+
+  if (unwrappedLocalImageCount === 0) {
+    addCheck(suite5, 'pass', 'Next.js Image BasePath Safety', 'All local Image src attributes are protected with withBasePath()', { code: 'DNB-IMG-003' });
+  } else if (shouldFix) {
+    addCheck(suite5, 'fixed', 'Next.js Image BasePath Safety', `Protected ${unwrappedLocalImageCount} local Image path(s) with withBasePath()`, { code: 'DNB-IMG-003', action: 'Wrapped with withBasePath()' });
+  } else {
+    addCheck(suite5, 'warn', 'Next.js Image BasePath Safety', `${unwrappedLocalImageCount} local Image path(s) lack withBasePath(). Will 404 under Fivora preview subpaths. Run with --fix to wrap.`, { code: 'DNB-IMG-003', action: 'Wrap with withBasePath() or use DenebImage' });
+  }
+
   // Check: Product Card Color Swatch & Strikethrough Price Editability (DNB-COL-009)
   let staticSwatchCount = 0;
   let missingColorSchemaCount = 0;

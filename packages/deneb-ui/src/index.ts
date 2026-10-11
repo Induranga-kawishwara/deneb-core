@@ -6,6 +6,7 @@
 export * from './PreviewField';
 export * from './EditableText';
 export * from './EditableImage';
+export * from './DenebImage';
 export * from './EditableIcon';
 export * from './EditableMap';
 export * from './EditableList';
@@ -94,6 +95,7 @@ export { EditableParagraph as Paragraph } from './EditableText';
 export { EditableBadge as Badge } from './EditableText';
 export { EditableQuote as Quote } from './EditableText';
 export { EditableImage as Image } from './EditableImage';
+export { DenebImage, DenebImage as SafeImage } from './DenebImage';
 export { EditableMap as Map } from './EditableMap';
 export { EditableGrid as Grid } from './EditableGrid';
 export { EditableSection as Section } from './EditableSection';
