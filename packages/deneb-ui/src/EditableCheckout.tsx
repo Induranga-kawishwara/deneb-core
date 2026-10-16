@@ -56,8 +56,8 @@ interface ShopPaymentConfig {
  */
 export function EditableCheckout({
   basePath = 'checkout',
-  apiEndpoint = '/site-orders/create',
-  configEndpoint = '/site-orders/config',
+  apiEndpoint,
+  configEndpoint,
   successUrl = '/order-success',
   shopSlug: customSlug,
   whatsappNumber: customWhatsapp,
@@ -125,6 +125,20 @@ export function EditableCheckout({
     return 'default';
   }, [customSlug, siteData]);
 
+  const effectiveConfigUrl = useMemo(() => {
+    if (configEndpoint) return configEndpoint;
+    return resolvedSlug && resolvedSlug !== 'default'
+      ? '/site-orders/' + resolvedSlug + '/config'
+      : '/site-orders/config';
+  }, [configEndpoint, resolvedSlug]);
+
+  const effectiveApiUrl = useMemo(() => {
+    if (apiEndpoint) return apiEndpoint;
+    return resolvedSlug && resolvedSlug !== 'default'
+      ? '/site-orders/' + resolvedSlug + '/create'
+      : '/site-orders/create';
+  }, [apiEndpoint, resolvedSlug]);
+
   // Fetch Store Payment & Checkout Configuration
   useEffect(() => {
     if (!mounted) return;
@@ -132,7 +146,7 @@ export function EditableCheckout({
 
     async function loadConfig() {
       try {
-        const res = await fetch(configEndpoint);
+        const res = await fetch(effectiveConfigUrl);
         if (res.ok) {
           const data: ShopPaymentConfig = await res.json();
           if (!cancelled) {
@@ -157,7 +171,7 @@ export function EditableCheckout({
     return () => {
       cancelled = true;
     };
-  }, [mounted, configEndpoint]);
+  }, [mounted, effectiveConfigUrl]);
 
   // Resolve Store Capabilities
   const isEcommerceActive = useMemo(() => {
@@ -270,7 +284,7 @@ export function EditableCheckout({
         honeypot: honeypot || undefined,
       };
 
-      const res = await fetch(apiEndpoint, {
+      const res = await fetch(effectiveApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
