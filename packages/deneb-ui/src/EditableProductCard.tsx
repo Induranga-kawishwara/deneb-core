@@ -146,6 +146,8 @@ export interface EditableProductCardProps extends React.HTMLAttributes<HTMLEleme
   onDetailClick?: (product: ProductItem, url: string) => void;
   onAddToCart?: (product: ProductItem) => void;
   onWhatsAppClick?: (product: ProductItem, url: string) => void;
+  checkoutMode?: "WHATSAPP_ONLY" | "FULL_ECOMMERCE";
+  ecommerceEnabled?: boolean;
 }
 
 function WhatsAppIcon({ className = '', style = {} }: { className?: string; style?: React.CSSProperties }) {
@@ -210,6 +212,8 @@ export function EditableProductCard({
   actionLabelPath,
   onAddToCart,
   onWhatsAppClick,
+  checkoutMode: propCheckoutMode,
+  ecommerceEnabled: propEcommerceEnabled,
   href,
   detailHref,
   showDetailLink = true,
@@ -409,6 +413,18 @@ export function EditableProductCard({
         : 'imageUrl');
 
   const siteDataCard = useSiteData<any>();
+
+  const resolvedCheckoutMode =
+    propCheckoutMode ||
+    siteDataCard?.siteData?.checkoutMode ||
+    siteDataCard?.checkoutMode ||
+    (siteDataCard?.siteData?.ecommerceEnabled || siteDataCard?.ecommerceEnabled ? "FULL_ECOMMERCE" : undefined) ||
+    (propEcommerceEnabled ? "FULL_ECOMMERCE" : undefined);
+
+  const effectiveShowAddToCart =
+    resolvedCheckoutMode === "WHATSAPP_ONLY"
+      ? (props as any).showAddToCartButton === true
+      : showAddToCartButton;
   const liveShopCard = siteDataCard?.shop;
   const liveWaCard =
     liveShopCard?.contact?.whatsapp ||
@@ -932,11 +948,11 @@ export function EditableProductCard({
             <div>{actionSlot}</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
-              {(showWhatsAppButton || showAddToCartButton) && (
+              {(showWhatsAppButton || effectiveShowAddToCart) && (
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: showWhatsAppButton && showAddToCartButton ? '1fr 1fr' : '1fr',
+                    gridTemplateColumns: showWhatsAppButton && effectiveShowAddToCart ? '1fr 1fr' : '1fr',
                     gap: '0.5rem',
                     width: '100%',
                   }}
@@ -977,7 +993,7 @@ export function EditableProductCard({
               )}
 
               {/* Button 2: Add to Cart Button */}
-              {showAddToCartButton && (
+              {effectiveShowAddToCart && (
                 <button
                   type="button"
                   onClick={handleAddToCartClick}

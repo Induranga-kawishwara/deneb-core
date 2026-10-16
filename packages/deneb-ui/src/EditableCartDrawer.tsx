@@ -14,6 +14,8 @@ export interface EditableCartDrawerProps {
   freeShippingThreshold?: number;
   onCheckout?: (items: CartItem[], total: number) => void;
   className?: string;
+  checkoutMode?: "WHATSAPP_ONLY" | "FULL_ECOMMERCE";
+  ecommerceEnabled?: boolean;
 }
 
 export function EditableCartDrawer({
@@ -25,6 +27,8 @@ export function EditableCartDrawer({
   freeShippingThreshold,
   onCheckout,
   className = '',
+  checkoutMode,
+  ecommerceEnabled,
 }: EditableCartDrawerProps) {
   const {
     items,
@@ -39,6 +43,15 @@ export function EditableCartDrawer({
   } = useCart();
 
   const { siteData } = useSiteData();
+
+  const resolvedCheckoutMode =
+    checkoutMode ||
+    (siteData as Record<string, any>)?.checkoutMode ||
+    ((siteData as Record<string, any>)?.ecommerceEnabled ? "FULL_ECOMMERCE" : undefined) ||
+    (ecommerceEnabled ? "FULL_ECOMMERCE" : "WHATSAPP_ONLY");
+
+  const isFullEcommerce = resolvedCheckoutMode === "FULL_ECOMMERCE";
+  const resolvedCheckoutUrl = checkoutUrl || (isFullEcommerce ? "/checkout" : undefined);
 
   // Helper to read content from siteData
   const getContent = (key: string, fallback: string) => {
@@ -315,37 +328,77 @@ export function EditableCartDrawer({
             </p>
 
             <div className="space-y-2.5">
-              {/* Primary WhatsApp Order Link */}
-              <a
-                href={whatsappHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-preview-static="cart-whatsapp-cta"
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 hover:bg-emerald-500 transition-all active:scale-[0.98]"
-              >
-                <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24">
-                  <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.971.531 1.769.813 2.796.813h.001c3.182 0 5.768-2.586 5.768-5.766 0-3.18-2.586-5.766-5.769-5.766zm9.969 5.766c0 5.518-4.482 10-10 10-1.745 0-3.415-.453-4.887-1.258l-5.113 1.341 1.365-4.989c-.931-1.537-1.465-3.327-1.465-5.094 0-5.518 4.482-10 10-10 5.518 0 10 4.482 10 10z" />
-                </svg>
-                <span data-preview-field-path={fieldPath('whatsappButtonText')}>
-                  {whatsappButtonText}
-                </span>
-              </a>
+              {isFullEcommerce ? (
+                <>
+                  {/* Primary Online Checkout Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onCheckout) onCheckout(items, subtotal);
+                      if (resolvedCheckoutUrl) window.location.href = resolvedCheckoutUrl;
+                    }}
+                    data-preview-static="cart-checkout-btn"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 hover:bg-emerald-500 transition-all active:scale-[0.98]"
+                  >
+                    <svg className="h-4 w-4 fill-none stroke-current" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    <span data-preview-field-path={fieldPath('checkoutButtonText')}>
+                      {checkoutButtonText}
+                    </span>
+                  </button>
 
-              {/* Optional Custom Checkout Trigger / Link */}
-              {(checkoutUrl || onCheckout) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onCheckout) onCheckout(items, subtotal);
-                    if (checkoutUrl) window.location.href = checkoutUrl;
-                  }}
-                  data-preview-static="cart-checkout-btn"
-                  className="flex w-full items-center justify-center rounded-xl bg-neutral-800 px-5 py-3 text-sm font-semibold text-white hover:bg-neutral-700 transition-colors"
-                >
-                  <span data-preview-field-path={fieldPath('checkoutButtonText')}>
-                    {checkoutButtonText}
-                  </span>
-                </button>
+                  {/* Secondary WhatsApp Inquiry CTA */}
+                  <a
+                    href={whatsappHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-preview-static="cart-whatsapp-cta"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-800 px-5 py-3 text-sm font-semibold text-neutral-300 hover:text-white hover:bg-neutral-700 transition-colors"
+                  >
+                    <svg className="h-4 w-4 fill-emerald-500" viewBox="0 0 24 24">
+                      <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.971.531 1.769.813 2.796.813h.001c3.182 0 5.768-2.586 5.768-5.766 0-3.18-2.586-5.766-5.769-5.766zm9.969 5.766c0 5.518-4.482 10-10 10-1.745 0-3.415-.453-4.887-1.258l-5.113 1.341 1.365-4.989c-.931-1.537-1.465-3.327-1.465-5.094 0-5.518 4.482-10 10-10 5.518 0 10 4.482 10 10z" />
+                    </svg>
+                    <span data-preview-field-path={fieldPath('whatsappButtonText')}>
+                      {whatsappButtonText}
+                    </span>
+                  </a>
+                </>
+              ) : (
+                <>
+                  {/* Primary WhatsApp Order Link in Showcase Mode */}
+                  <a
+                    href={whatsappHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-preview-static="cart-whatsapp-cta"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 hover:bg-emerald-500 transition-all active:scale-[0.98]"
+                  >
+                    <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24">
+                      <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.971.531 1.769.813 2.796.813h.001c3.182 0 5.768-2.586 5.768-5.766 0-3.18-2.586-5.766-5.769-5.766zm9.969 5.766c0 5.518-4.482 10-10 10-1.745 0-3.415-.453-4.887-1.258l-5.113 1.341 1.365-4.989c-.931-1.537-1.465-3.327-1.465-5.094 0-5.518 4.482-10 10-10 5.518 0 10 4.482 10 10z" />
+                    </svg>
+                    <span data-preview-field-path={fieldPath('whatsappButtonText')}>
+                      {whatsappButtonText}
+                    </span>
+                  </a>
+
+                  {/* Optional Custom Checkout Trigger / Link */}
+                  {(resolvedCheckoutUrl || onCheckout) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onCheckout) onCheckout(items, subtotal);
+                        if (resolvedCheckoutUrl) window.location.href = resolvedCheckoutUrl;
+                      }}
+                      data-preview-static="cart-checkout-btn"
+                      className="flex w-full items-center justify-center rounded-xl bg-neutral-800 px-5 py-3 text-sm font-semibold text-white hover:bg-neutral-700 transition-colors"
+                    >
+                      <span data-preview-field-path={fieldPath('checkoutButtonText')}>
+                        {checkoutButtonText}
+                      </span>
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
