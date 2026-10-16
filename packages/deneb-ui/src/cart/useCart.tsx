@@ -107,7 +107,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 const STORAGE_KEY = 'deneb_cart_items_v1';
 
-export function CartProvider({
+function CartProviderInternal({
   children,
   storageKey = STORAGE_KEY,
 }: {
@@ -297,6 +297,20 @@ export function CartProvider({
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+}
+
+export function CartProvider({
+  children,
+  storageKey = STORAGE_KEY,
+}: {
+  children: React.ReactNode;
+  storageKey?: string;
+}) {
+  const existing = useContext(CartContext);
+  if (existing) {
+    return <>{children}</>;
+  }
+  return <CartProviderInternal storageKey={storageKey}>{children}</CartProviderInternal>;
 }
 
 export function useOptionalCart(): CartContextValue | null {

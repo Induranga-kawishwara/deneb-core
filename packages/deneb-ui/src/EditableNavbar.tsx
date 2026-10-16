@@ -1,5 +1,8 @@
 'use client';
 
+import { useOptionalCart } from './cart/useCart';
+
+
 import React, { useState } from 'react';
 import { useSiteData } from './SiteDataProvider';
 
@@ -68,6 +71,8 @@ export function EditableNavbar({
   ...props
 }: EditableNavbarProps) {
   const siteData = useSiteData();
+  const cart = useOptionalCart();
+  const effectiveCartCount = cartCount ?? cart?.totalCount ?? 0;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const content = (siteData?.content || {}) as Record<string, any>;
@@ -274,6 +279,63 @@ export function EditableNavbar({
           style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}
           className="flex items-center gap-3"
         >
+          {/* Cart Trigger Button */}
+          {(showCart || (cart && cart.totalCount > 0)) && (
+            <button
+              type="button"
+              onClick={() => {
+                if (onCartClick) onCartClick();
+                else if (cart) cart.toggleCart();
+              }}
+              data-preview-static="header-cart-toggle"
+              aria-label={`Shopping cart with ${effectiveCartCount} items`}
+              style={{
+                position: 'relative',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '40px',
+                height: '40px',
+                borderRadius: '9999px',
+                backgroundColor: 'var(--color-secondary, #f1f5f9)',
+                color: 'var(--color-text, #0f172a)',
+                border: '1px solid var(--color-border, #e2e8f0)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              className="deneb-cart-btn relative inline-flex items-center justify-center h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer border border-slate-200 dark:border-slate-700"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-preview-static="cart-icon">
+                <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+                <path d="M3 6h18" />
+                <path d="M16 10a4 4 0 0 1-8 0" />
+              </svg>
+              {effectiveCartCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    minWidth: '18px',
+                    height: '18px',
+                    padding: '0 4px',
+                    borderRadius: '9999px',
+                    backgroundColor: '#10b981',
+                    color: '#ffffff',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                  }}
+                  className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center shadow-sm"
+                >
+                  {effectiveCartCount > 99 ? '99+' : effectiveCartCount}
+                </span>
+              )}
+            </button>
+          )}
           {hasContact ? (
             <span data-target-page="contact">
               <button
