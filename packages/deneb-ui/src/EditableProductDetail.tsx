@@ -1,3 +1,7 @@
+'use client';
+
+import { useSiteData } from './SiteDataProvider';
+import { useOptionalCart, parseNumericPrice } from './cart/useCart';
 import React, { useState, useEffect, useMemo } from 'react';
 import { withBasePath } from './utils';
 import {
@@ -191,6 +195,11 @@ export function EditableProductDetail({
   const [selectedSize, setSelectedSize] = useState(effectiveOptions[0] || '');
   const [selectedColor, setSelectedColor] = useState(effectiveColors[0]?.name || '');
   const [activeTab, setActiveTab] = useState<'specs' | 'shipping'>('specs');
+  const cart = useOptionalCart();
+  const siteData = useSiteData() as Record<string, any>;
+  const isFullEcommerce =
+    (siteData as any)?.checkoutMode === 'FULL_ECOMMERCE' ||
+    Boolean((siteData as any)?.ecommerceEnabled);
 
   // Keep active image in sync when product or images change
   useEffect(() => {
@@ -511,13 +520,65 @@ export function EditableProductDetail({
               <button
                 type="button"
                 disabled={!isAvailable}
-                onClick={() => onAddToSelection?.({ ...product, price: resolvedPrice.numericPrice || product.price, showPrice: itemShowPrice }, selectedSize || undefined, selectedColor || undefined)}
-                className="w-full py-4 px-6 rounded-2xl font-black text-sm uppercase tracking-wider bg-lime-400 text-slate-950 hover:bg-lime-300 active:scale-98 transition-all duration-150 shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 disabled:shadow-none"
+                onClick={() => {
+                  const itemPrice = resolvedPrice.numericPrice || parseNumericPrice(product.price);
+                  if (onAddToSelection) {
+                    onAddToSelection({ ...product, price: itemPrice, showPrice: itemShowPrice }, selectedSize || undefined, selectedColor || undefined);
+                  } else if (cart) {
+                    cart.addItem({
+                      id: String(product.id || name),
+                      name,
+                      brand: product.brand,
+                      price: itemPrice,
+                      originalPrice: parseNumericPrice(product.compareAtPrice || product.originalPrice),
+                      image: validImages[0] || activeImage,
+                      size: selectedSize || undefined,
+                      color: selectedColor || undefined,
+                      quantity: 1,
+                      sku: product.sku ? String(product.sku) : undefined,
+                      showPrice: itemShowPrice,
+                    });
+                    cart.openCart();
+                  }
+                }}
+                className="w-full py-4 px-6 rounded-2xl font-black text-sm uppercase tracking-wider bg-lime-400 text-slate-950 hover:bg-lime-300 active:scale-98 transition-all duration-150 shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 disabled:shadow-none cursor-pointer"
               >
                 <span data-preview-field-path={`${sectionPath}.addToSelectionLabel`}>
-                  {isAvailable ? addToSelectionLabel : 'Out of Stock'}
+                  {isAvailable ? (isFullEcommerce ? 'Add to Cart' : addToSelectionLabel) : 'Out of Stock'}
                 </span>
               </button>
+
+              {/* Direct Checkout / Buy Now Button if full ecommerce is enabled */}
+              {isAvailable && isFullEcommerce && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const itemPrice = resolvedPrice.numericPrice || parseNumericPrice(product.price);
+                    if (cart) {
+                      cart.addItem({
+                        id: String(product.id || name),
+                        name,
+                        brand: product.brand,
+                        price: itemPrice,
+                        originalPrice: parseNumericPrice(product.compareAtPrice || product.originalPrice),
+                        image: validImages[0] || activeImage,
+                        size: selectedSize || undefined,
+                        color: selectedColor || undefined,
+                        quantity: 1,
+                        sku: product.sku ? String(product.sku) : undefined,
+                        showPrice: itemShowPrice,
+                      });
+                    }
+                    window.location.href = '/checkout';
+                  }}
+                  className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm bg-emerald-600 text-white hover:bg-emerald-500 transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-950/40"
+                >
+                  <svg className="w-5 h-5 fill-none stroke-current" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                  <span>Buy Now · Proceed to Checkout</span>
+                </button>
+              )}
 
               {/* Direct WhatsApp CTA Button */}
               {isAvailable && resolvedWhatsappUrl && (

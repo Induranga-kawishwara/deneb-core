@@ -44,6 +44,8 @@ export * from './ProductQuickView';
 export * from './CookieConsentBanner';
 export * from './cart/useCart';
 export * from './EditableCartDrawer';
+export * from './EditableCheckout';
+export * from './EditableOrderSuccess';
 export * from './EditableFilterSidebar';
 export * from './SiteDataProvider';
 export * from './ThemeStyles';
@@ -121,6 +123,8 @@ export { EditableHeroCentered as Hero, EditableHeroSplit as HeroSplit } from './
 export { EditableAnnouncementBar as AnnouncementBar } from './EditableAnnouncementBar';
 export { EditableCategoryPills as CategoryPills } from './EditableCategoryPills';
 export { EditableCartDrawer as CartDrawer } from './EditableCartDrawer';
+export { EditableCheckout as Checkout } from './EditableCheckout';
+export { EditableOrderSuccess as OrderSuccess } from './EditableOrderSuccess';
 export { EditableFilterSidebar as FilterSidebar } from './EditableFilterSidebar';
 export { EditableBeforeAfterSlider as BeforeAfterSlider } from './EditableBeforeAfterSlider';
 export { EditableBookingModal as BookingModal } from './EditableBookingModal';

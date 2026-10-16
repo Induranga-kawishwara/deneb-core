@@ -1,5 +1,8 @@
 'use client';
 
+import { CartProvider } from './cart/useCart';
+
+
 import React, {
   createContext,
   useContext,
@@ -779,7 +782,9 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
       <FontLoader />
       <ResponsiveBaseStyles />
       <DenebComponentStyles />
-      {children}
+      <CartProvider>
+        {children}
+      </CartProvider>
     </SiteDataContext.Provider>
   );
 }
