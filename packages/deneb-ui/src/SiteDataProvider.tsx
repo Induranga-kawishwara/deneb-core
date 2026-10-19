@@ -730,22 +730,46 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
     if (typeof document === "undefined") return;
     const sd = siteData as unknown as GenericRecord;
     const common = isRecord(sd?.content?.common) ? (sd.content.common as GenericRecord) : null;
-    const shop = isRecord(sd?.shop) ? (sd.shop as GenericRecord) : null;
+    const hasKeys = (o: unknown) => isRecord(o) && Object.keys(o).length > 0;
+    const shop = hasKeys(sd?.shop) ? (sd.shop as GenericRecord) : (hasKeys(sd?.merchant) ? (sd.merchant as GenericRecord) : (isRecord(sd?.shop) ? (sd.shop as GenericRecord) : null));
     const site = isRecord(sd?.site) ? (sd.site as GenericRecord) : null;
+    const merchant = isRecord(sd?.merchant) ? (sd.merchant as GenericRecord) : null;
+    const seo = isRecord(sd?.seo) ? (sd.seo as GenericRecord) : null;
+    const seoSite = isRecord(seo?.site) ? (seo.site as GenericRecord) : null;
+
+    const isPlaceholderTitle = (val?: unknown) =>
+      typeof val !== "string" ||
+      !val.trim() ||
+      /^(demo|template|storefront|website|my shop|coffee)$/i.test(val.trim());
+
+    const realShopName =
+      (typeof shop?.businessName === "string" && shop.businessName.trim()) ||
+      (typeof merchant?.businessName === "string" && merchant.businessName.trim()) ||
+      "";
 
     const candidateTitle =
-      (typeof common?.websiteTitle === "string" && common.websiteTitle.trim()) ||
-      (typeof shop?.businessName === "string" && shop.businessName.trim()) ||
-      (typeof site?.name === "string" && site.name.trim());
+      realShopName ||
+      (!isPlaceholderTitle(common?.websiteTitle) ? (common?.websiteTitle as string).trim() : "") ||
+      (typeof site?.name === "string" && site.name.trim()) ||
+      (typeof common?.websiteTitle === "string" ? common.websiteTitle.trim() : "");
 
     if (candidateTitle) {
       document.title = candidateTitle;
     }
 
+    const isPlaceholderLogo = (url?: unknown) =>
+      typeof url !== "string" ||
+      !url.trim() ||
+      url === "/fivora-logo.png" ||
+      url.includes("fivora-logo") ||
+      url === "/favicon.ico";
+
     const candidateIcon =
-      (typeof common?.logoUrl === "string" && common.logoUrl.trim()) ||
-      (typeof shop?.logoUrl === "string" && shop.logoUrl.trim()) ||
-      (typeof site?.logoUrl === "string" && site.logoUrl.trim());
+      (!isPlaceholderLogo(seoSite?.favicon) ? (seoSite?.favicon as string).trim() : "") ||
+      (!isPlaceholderLogo(shop?.logoUrl) ? (shop?.logoUrl as string).trim() : "") ||
+      (!isPlaceholderLogo(merchant?.logoUrl) ? (merchant?.logoUrl as string).trim() : "") ||
+      (!isPlaceholderLogo(site?.logoUrl) ? (site?.logoUrl as string).trim() : "") ||
+      (!isPlaceholderLogo(common?.logoUrl) ? (common?.logoUrl as string).trim() : "");
 
     if (candidateIcon) {
       let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
@@ -1204,6 +1228,8 @@ export function useSiteCatalog() {
  */
 export function useShop(fallback: GenericRecord = {}): GenericRecord {
   const siteData = useSiteData();
+  if (isRecord(siteData?.shop) && Object.keys(siteData.shop).length > 0) return siteData.shop;
+  if (isRecord(siteData?.merchant) && Object.keys(siteData.merchant).length > 0) return siteData.merchant;
   if (isRecord(siteData?.shop)) return siteData.shop;
   if (isRecord(siteData?.merchant)) return siteData.merchant;
   return fallback;
