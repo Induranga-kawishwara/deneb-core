@@ -735,6 +735,63 @@ export function FullStorefrontDemo() {
 
 ---
 
+## EditableBox container styles
+
+Use `stylePath` to give a container its own card style target without treating
+its child text as a single content field. Contact starter cards use
+`contact.informationCard` and `contact.formCard` in both templates. For example,
+`styles['contact.informationCard'] = { backgroundColor: '#f0fdf4', paddingTop: 0,
+paddingBottom: 24, paddingLeft: 24, paddingRight: 24, marginTop: 8, gap: 16 }`.
+These are root `styles` entries, not new content fields. Unedited boxes retain
+their existing props and class-based appearance. Saved styles override defaults;
+legacy content-suffix spacing remains supported. Gap affects a box's direct
+flex/grid children, not a nested form's internal spacing.
+
+In Local Lab, select the card's empty background/padding area to target its
+container. Text remains independently editable. Test background, each padding
+edge (including zero), margins, and flex/grid gap, then save/reload. The bridge
+forwards card style metadata; actual Inspector controls depend on the connected
+Fivora editor. Run `node scripts/box-editing.test.cjs` after building core/UI.
+
+## Footer headings and contact icons
+
+Built-in `EditableIcon` glyphs with a `fieldPath` now use an HTML span as their
+editing boundary, matching the existing custom-icon branches. The SVG remains
+inside it with its original size and SVG attributes; the field and icon-picker
+markers occur only on the wrapper. This lets HTML-based editor selection resolve
+clicks on SVG paths to the icon field rather than a neighboring text field.
+Icons without a `fieldPath` continue to render a bare SVG.
+
+`Footer` reuses `EditableText` for `common.footerExploreHeading` and
+`common.footerContactHeading`, including text style targets. It reuses
+`EditableIcon` for `common.footerEmailIcon`, `common.footerPhoneIcon`, and
+`common.footerLocationIcon`. These are content-relative paths under
+`content.common`; default icon names are `mail`, `phone`, and `map-pin`.
+The starter schemas declare the icons as text with `control: 'icon-picker'`.
+Contact icons appear alongside their corresponding nonempty contact values.
+Missing fields retain the original headings/icons; blank headings remain
+editable through placeholders. Verify heading text/typography and icon selection
+in the Lab, then save/reload. Contact values and destinations are independent
+of icon selection.
+
+## Footer newsletter description
+
+The newsletter also exposes `content.common.newsletterSubscribeLabel` and
+`content.common.newsletterEmailPlaceholder`. The button label reuses
+`EditableText`; the email input uses the existing input-placeholder field binding
+pattern. The visitor's entered email remains separate from the editable
+placeholder. Both starter schemas declare these as text fields. Original copy
+is the fallback when fields are missing; blank placeholder values are preserved.
+Verify edits and save/reload in Local Lab, plus newsletter submission in Preview.
+
+`Footer` / `EditableFooter` reuses `EditableText` for
+`content.common.newsletterDescription`. Its field and text style target are
+`common.newsletterDescription`; saved typography lives at
+`styles['common.newsletterDescription']`. Missing data uses the original copy;
+an empty string keeps an editable placeholder. Both starter templates declare
+the field as a textarea. With newsletters enabled, edit the paragraph in the
+Lab, save, and reload to verify persistence.
+
 ## Authors
 
 Created and maintained by **[Chamika Gayashan](https://github.com/chamikathereal)** and **[Induranga Kawishwara](https://github.com/Induranga-kawishwara)**.

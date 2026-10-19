@@ -48,6 +48,25 @@ npm install -D @deneb-ui/cli
 
 ---
 
+## Editable icons in Local Lab
+
+Bridge v54 also recognizes style-only card targets and sends their `styleType`
+without treating container contents as editable text. Padding/margin values of
+zero and container gap are supported by the live style updater.
+
+Bridge v53 preserves `control` in element-click messages. Icon targets also send
+`iconType` and `iconName` from the existing `EditableIcon` attributes. An icon
+name is still stored as schema type `text`; the parent editor must use
+`control: 'icon-picker'` to select its existing icon picker rather than its text
+editor. That parent UI is maintained in the Fivora developer-panel repository.
+This bridge metadata does not implement or replace the parent picker UI.
+
+Preview bridge v52 recognizes `EditableIcon` SVG targets, including clicks on
+their child paths. Icon updates are rendered through the site-data provider;
+the generic text updater must not replace SVG children with the icon name.
+Restart an existing Lab process and refresh its preview after upgrading the
+bridge. Verify icon selection, saving, and reloading in the connected editor.
+
 ## Commands
 
 | Command | Description |

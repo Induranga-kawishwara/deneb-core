@@ -106,6 +106,49 @@
             "label": "Footer heading"
           },
           {
+            "key": "newsletterSubscribeLabel",
+            "type": "text",
+            "label": "Newsletter subscribe button label"
+          },
+          {
+            "key": "newsletterEmailPlaceholder",
+            "type": "text",
+            "label": "Newsletter email placeholder"
+          },
+          {
+            "key": "newsletterDescription",
+            "type": "textarea",
+            "label": "Newsletter description"
+          },
+          {
+            "key": "footerExploreHeading",
+            "type": "text",
+            "label": "Footer navigation heading"
+          },
+          {
+            "key": "footerContactHeading",
+            "type": "text",
+            "label": "Footer contact heading"
+          },
+          {
+            "key": "footerEmailIcon",
+            "type": "text",
+            "control": "icon-picker",
+            "label": "Footer email icon"
+          },
+          {
+            "key": "footerPhoneIcon",
+            "type": "text",
+            "control": "icon-picker",
+            "label": "Footer phone icon"
+          },
+          {
+            "key": "footerLocationIcon",
+            "type": "text",
+            "control": "icon-picker",
+            "label": "Footer location icon"
+          },
+          {
             "key": "copyright",
             "type": "text",
             "label": "Copyright"
@@ -406,6 +449,26 @@
             "key": "directionsUrl",
             "type": "url",
             "label": "Directions Url"
+          },
+          {
+            "key": "directInformationTitle",
+            "type": "text",
+            "label": "Direct information heading"
+          },
+          {
+            "key": "nameLabel",
+            "type": "text",
+            "label": "Name field label"
+          },
+          {
+            "key": "emailLabel",
+            "type": "text",
+            "label": "Email field label"
+          },
+          {
+            "key": "messageLabel",
+            "type": "text",
+            "label": "Message field label"
           },
           {
             "key": "formTitle",

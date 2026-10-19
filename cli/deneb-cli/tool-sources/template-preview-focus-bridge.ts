@@ -8,7 +8,7 @@ import { installUniversalSectionNavigation } from './universal-section-navigatio
 
 export const TEMPLATE_PREVIEW_FOCUS_BRIDGE_FILE =
   '__fivora-preview-focus-bridge.js';
-export const TEMPLATE_PREVIEW_FOCUS_BRIDGE_VERSION = '51';
+export const TEMPLATE_PREVIEW_FOCUS_BRIDGE_VERSION = '54';
 
 const PREVIOUS_PREVIEW_BRIDGE_ATTRIBUTE = `data-${['market', 'place'].join('')}-preview-focus-bridge`;
 
@@ -593,6 +593,8 @@ function fivoraPreviewFocusBridge(
     );
     for (const target of targets) {
       if (activeInlineEdit?.target === target) continue;
+      // Icon names are data, not SVG text. The provider relay renders the glyph.
+      if (target.getAttribute('data-preview-control') === 'icon-picker') continue;
       if (target.tagName === 'IMG') {
         if (typeof value === 'string' && value.trim()) {
           target.setAttribute('src', value);
@@ -850,7 +852,7 @@ function fivoraPreviewFocusBridge(
         el.style.removeProperty('border-radius');
         el.style.removeProperty('--deneb-card-radius');
       }
-      if (raw.padding) {
+      if (raw.padding !== undefined) {
         const p = toCssVal(raw.padding);
         el.style.setProperty('padding', p, 'important');
         el.style.setProperty('--deneb-card-pt', p);
@@ -858,13 +860,13 @@ function fivoraPreviewFocusBridge(
         el.style.removeProperty('padding');
         el.style.removeProperty('--deneb-card-pt');
       }
-      if (raw.paddingTop) el.style.setProperty('padding-top', toCssVal(raw.paddingTop), 'important');
+      if (raw.paddingTop !== undefined) el.style.setProperty('padding-top', toCssVal(raw.paddingTop), 'important');
       else el.style.removeProperty('padding-top');
-      if (raw.paddingBottom) el.style.setProperty('padding-bottom', toCssVal(raw.paddingBottom), 'important');
+      if (raw.paddingBottom !== undefined) el.style.setProperty('padding-bottom', toCssVal(raw.paddingBottom), 'important');
       else el.style.removeProperty('padding-bottom');
-      if (raw.paddingLeft) el.style.setProperty('padding-left', toCssVal(raw.paddingLeft), 'important');
+      if (raw.paddingLeft !== undefined) el.style.setProperty('padding-left', toCssVal(raw.paddingLeft), 'important');
       else el.style.removeProperty('padding-left');
-      if (raw.paddingRight) el.style.setProperty('padding-right', toCssVal(raw.paddingRight), 'important');
+      if (raw.paddingRight !== undefined) el.style.setProperty('padding-right', toCssVal(raw.paddingRight), 'important');
       else el.style.removeProperty('padding-right');
 
       if (raw.boxShadow) {
@@ -891,14 +893,16 @@ function fivoraPreviewFocusBridge(
         el.style.removeProperty('border-style');
         el.style.removeProperty('--deneb-card-border-w');
       }
-      if (raw.marginTop) el.style.setProperty('margin-top', toCssVal(raw.marginTop), 'important');
+      if (raw.marginTop !== undefined) el.style.setProperty('margin-top', toCssVal(raw.marginTop), 'important');
       else el.style.removeProperty('margin-top');
-      if (raw.marginBottom) el.style.setProperty('margin-bottom', toCssVal(raw.marginBottom), 'important');
+      if (raw.marginBottom !== undefined) el.style.setProperty('margin-bottom', toCssVal(raw.marginBottom), 'important');
       else el.style.removeProperty('margin-bottom');
-      if (raw.marginLeft) el.style.setProperty('margin-left', toCssVal(raw.marginLeft), 'important');
+      if (raw.marginLeft !== undefined) el.style.setProperty('margin-left', toCssVal(raw.marginLeft), 'important');
       else el.style.removeProperty('margin-left');
-      if (raw.marginRight) el.style.setProperty('margin-right', toCssVal(raw.marginRight), 'important');
+      if (raw.marginRight !== undefined) el.style.setProperty('margin-right', toCssVal(raw.marginRight), 'important');
       else el.style.removeProperty('margin-right');
+      if (raw.gap !== undefined) el.style.setProperty('gap', toCssVal(raw.gap), 'important');
+      else el.style.removeProperty('gap');
       if (raw.display) el.style.setProperty('display', String(raw.display), 'important');
       else el.style.removeProperty('display');
       if (raw.order !== undefined && raw.order !== null && raw.order !== '') el.style.setProperty('order', String(raw.order), 'important');
@@ -1986,6 +1990,7 @@ function fivoraPreviewFocusBridge(
     path: string;
     label?: string;
     type?: string;
+    control?: string;
     value: string | number | boolean;
     matchValues?: Array<string | number>;
     collection?: {
@@ -2804,7 +2809,8 @@ function fivoraPreviewFocusBridge(
     target: EventTarget | null,
   ): { element: HTMLElement; field: EditableField } | null {
     let currentElement = target instanceof Element ? target : null;
-    while (currentElement && !(currentElement instanceof HTMLElement)) {
+    while (currentElement && !(currentElement instanceof HTMLElement) &&
+      currentElement.getAttribute('data-preview-control') !== 'icon-picker') {
       currentElement = currentElement.parentElement;
     }
     let current = currentElement as HTMLElement | null;
@@ -2817,6 +2823,7 @@ function fivoraPreviewFocusBridge(
         continue;
       }
       const isCandidate =
+        current.hasAttribute('data-preview-style-target') ||
         current.hasAttribute('data-preview-field-path') ||
         current.hasAttribute(LIST_PATH_ATTRIBUTE) ||
         current.hasAttribute(ITEM_PATH_ATTRIBUTE) ||
@@ -2864,6 +2871,13 @@ function fivoraPreviewFocusBridge(
               : (element.textContent?.trim() ?? ''),
         }
       );
+    }
+
+    // A container can own styles without pretending its children are one text field.
+    const containerStylePath = element.getAttribute('data-preview-style-target');
+    if (containerStylePath && element.getAttribute('data-preview-style-type') === 'card' &&
+      !element.hasAttribute(ITEM_PATH_ATTRIBUTE) && !element.hasAttribute(LIST_PATH_ATTRIBUTE)) {
+      return { path: containerStylePath, label: 'Container', type: 'object', value: '' };
     }
 
     const itemPath = element.getAttribute(ITEM_PATH_ATTRIBUTE);
@@ -3025,6 +3039,7 @@ function fivoraPreviewFocusBridge(
 
   function canEditInline(element: HTMLElement, field: EditableField) {
     return (
+      element.getAttribute('data-preview-control') !== 'icon-picker' &&
       element.tagName !== 'IMG' &&
       element.childElementCount === 0 &&
       ![
@@ -3037,7 +3052,7 @@ function fivoraPreviewFocusBridge(
         'IFRAME',
       ].includes(element.tagName) &&
       !field.context &&
-      !['image', 'color', 'boolean', 'select', 'list'].includes(
+      !['image', 'color', 'boolean', 'select', 'list', 'object'].includes(
         field.type ?? 'text',
       )
     );
@@ -3160,7 +3175,9 @@ function fivoraPreviewFocusBridge(
     const isImage = element.tagName === 'IMG';
     const isInputOrTextarea = element.tagName === 'INPUT' || element.tagName === 'TEXTAREA';
     const fieldPath = field?.path ?? extractFieldPath(element);
-    const fieldValue = isImage
+    const fieldValue = element.getAttribute('data-preview-control') === 'icon-picker'
+      ? (element.getAttribute('data-preview-icon') ?? field?.value ?? '')
+      : isImage
       ? (element as HTMLImageElement).src
       : isInputOrTextarea
       ? ((element as HTMLInputElement | HTMLTextAreaElement).placeholder || (element as HTMLInputElement | HTMLTextAreaElement).value || '')
@@ -3272,7 +3289,19 @@ function fivoraPreviewFocusBridge(
       type: CLICK_MESSAGE,
       fieldPath,
       descriptorKind: field?.kind ?? 'field',
+      ...(element.getAttribute('data-preview-style-type') ? {
+        styleType: element.getAttribute('data-preview-style-type'),
+      } : {}),
       fieldValue,
+      // Storage type alone cannot distinguish icon-name strings from copy.
+      // Preserve the same control hint used in editorSchema and EditableIcon.
+      ...(element.getAttribute('data-preview-control') || field?.control ? {
+        control: element.getAttribute('data-preview-control') || field?.control,
+      } : {}),
+      ...(element.getAttribute('data-preview-control') === 'icon-picker' ? {
+        iconType: element.getAttribute('data-preview-icon-type') ?? 'lucide',
+        iconName: element.getAttribute('data-preview-icon') ?? field?.value ?? '',
+      } : {}),
       elementTag: element.tagName.toLowerCase(),
       isImage,
       boundingRect: {
