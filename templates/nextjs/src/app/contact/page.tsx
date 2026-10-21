@@ -70,14 +70,15 @@ export default function ContactPage() {
       </section>
 
       <section className="page-section contact-grid" data-design-section="contact-details">
-        <EditableBox className="card contact-details" balance radius="xl">
+        <EditableBox stylePath="contact.informationCard" className="card contact-details" balance radius="xl">
           <EditableText
             variant="h3"
             size="xl"
             weight="bold"
             color="heading"
-            data-preview-static="contact-heading"
-            defaultValue="Direct Information"
+            fieldPath="contact.directInformationTitle"
+            defaultValue={contentText(contact.directInformationTitle ?? 'Direct Information')}
+            placeholder="Add an information heading"
           />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
             <a href={phone ? `tel:${phone}` : ''} data-preview-field-path="contact.phone">
@@ -137,7 +138,7 @@ export default function ContactPage() {
           </div>
         </EditableBox>
 
-        <EditableBox className="card" balance radius="xl">
+        <EditableBox stylePath="contact.formCard" className="card" balance radius="xl">
           <form
             className="contact-form"
             onSubmit={handleSubmit}
@@ -151,16 +152,31 @@ export default function ContactPage() {
               data-preview-field-path="contact.formTitle"
               defaultValue={contentText(contact.formTitle)}
             />
-            <label data-preview-static>
-              Name
+            <label>
+              <EditableText
+                as="span"
+                fieldPath="contact.nameLabel"
+                defaultValue={contentText(contact.nameLabel ?? 'Name')}
+                placeholder="Name"
+              />
               <input type="text" name="name" autoComplete="name" required />
             </label>
-            <label data-preview-static>
-              Email
+            <label>
+              <EditableText
+                as="span"
+                fieldPath="contact.emailLabel"
+                defaultValue={contentText(contact.emailLabel ?? 'Email')}
+                placeholder="Email"
+              />
               <input type="email" name="email" autoComplete="email" required />
             </label>
-            <label data-preview-static>
-              Message
+            <label>
+              <EditableText
+                as="span"
+                fieldPath="contact.messageLabel"
+                defaultValue={contentText(contact.messageLabel ?? 'Message')}
+                placeholder="Message"
+              />
               <textarea name="message" rows={4} required />
             </label>
             <button type="submit" className="button-primary" style={{ marginTop: '0.5rem' }}>

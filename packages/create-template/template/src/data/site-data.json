@@ -66,6 +66,14 @@
         "contact": "Contact"
       },
       "footerHeading": "Build something extraordinary with DENEB-UI & FIVORA.",
+      "newsletterDescription": "Join our exclusive community for releases, updates, and special perks.",
+      "newsletterSubscribeLabel": "Subscribe",
+      "newsletterEmailPlaceholder": "Enter your email",
+      "footerExploreHeading": "Explore",
+      "footerContactHeading": "Contact & Support",
+      "footerEmailIcon": "mail",
+      "footerPhoneIcon": "phone",
+      "footerLocationIcon": "map-pin",
       "copyright": "DENEB-UI. All rights reserved. Collaborate with FIVORA.",
       "socialMedia": {
         "twitter": "https://twitter.com/denebui",
@@ -185,6 +193,10 @@
       "directionsLabel": "Get Directions",
       "directionsUrl": "https://maps.app.goo.gl/example",
       "formTitle": "Send an Inquiry",
+      "directInformationTitle": "Direct Information",
+      "nameLabel": "Name",
+      "emailLabel": "Email",
+      "messageLabel": "Message",
       "submitLabel": "Send Message",
       "directMessageText": "Send us a direct message",
       "whatsapp": "+94 77 123 4567"

@@ -202,6 +202,16 @@ When your template design is ready:
 
 ---
 
+## Contact label editing
+
+The existing Contact page reuses `EditableText` for
+`contact.directInformationTitle`, `contact.nameLabel`, `contact.emailLabel`,
+and `contact.messageLabel`. Values live under `content.contact` and are
+declared as text fields in the template editor schema. Empty values retain
+editable placeholders. These fields change merchant labels, not visitor input
+values or submission field names. In Local Lab, open Contact, edit the four
+labels, then save and reload to verify persistence.
+
 ## License
 
 MIT © [Fivora](https://fivora.com)
