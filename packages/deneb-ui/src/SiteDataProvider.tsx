@@ -24,6 +24,7 @@ import type { ProductItem } from './EditableProductCard';
 import type { ServiceItem } from './EditableServiceCard';
 import { ThemeStyles, type TemplateTheme } from './ThemeStyles';
 import { withBasePath, resolveAsset } from './utils';
+import { resolveCatalogImages } from './utils/catalogMedia';
 
 export const DENEB_PREVIEW_DATA_MESSAGE = 'DENEB_PREVIEW_SITE_DATA';
 export const PREVIEW_DATA_MESSAGE = 'FIVORA_PREVIEW_SITE_DATA';
@@ -41,6 +42,8 @@ export const DENEB_PREVIEW_FOCUS_MESSAGE = 'DENEB_PREVIEW_FOCUS_PAGE';
 export const PREVIEW_FOCUS_MESSAGE = 'FIVORA_PREVIEW_FOCUS_PAGE';
 export const LEGACY_PREVIEW_FOCUS_MESSAGE =
   previousPreviewMessage('FOCUS_PAGE');
+export const DENEB_REFRESH_LIVE_CATALOG_EVENT =
+  'deneb:refresh-live-catalog';
 export const PREVIEW_FIELD_ATTRIBUTE = 'data-preview-field-path';
 export { STYLE_PATCH_MESSAGE, DENEB_STYLE_PATCH_MESSAGE } from '@deneb-ui/core';
 
@@ -467,6 +470,10 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
 
         return {
           ...current,
+          liveCatalogUpdatedAt:
+            typeof live.updatedAt === 'string'
+              ? live.updatedAt
+              : new Date().toISOString(),
           shop: nextShop,
           merchant: nextMerchant,
           reviews: nextReviews ?? (current as any).reviews,
@@ -488,6 +495,36 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
               : {}),
             ...(currentContent?.store && typeof currentContent.store === 'object' && nextProducts !== undefined
               ? { store: { ...currentContent.store, products: nextProducts } }
+              : {}),
+            ...(currentContent?.servicesPage &&
+            typeof currentContent.servicesPage === 'object' &&
+            nextServices !== undefined
+              ? {
+                  servicesPage: {
+                    ...currentContent.servicesPage,
+                    services: nextServices,
+                  },
+                }
+              : {}),
+            ...(currentContent?.company &&
+            typeof currentContent.company === 'object' &&
+            nextServices !== undefined
+              ? {
+                  company: {
+                    ...currentContent.company,
+                    services: nextServices,
+                  },
+                }
+              : {}),
+            ...(currentContent?.business &&
+            typeof currentContent.business === 'object' &&
+            nextServices !== undefined
+              ? {
+                  business: {
+                    ...currentContent.business,
+                    services: nextServices,
+                  },
+                }
               : {}),
             ...(currentHome || Object.keys(nextHome).length > 0
               ? {
@@ -564,9 +601,18 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
       }
     };
 
+    const refreshNow = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      retryTimer = null;
+      void loadLiveCatalog();
+    };
+
     void loadLiveCatalog();
     window.addEventListener("focus", refreshIfStale);
     window.addEventListener("online", refreshIfStale);
+    window.addEventListener('pageshow', refreshIfStale);
+    window.addEventListener(DENEB_REFRESH_LIVE_CATALOG_EVENT, refreshNow);
     document.addEventListener("visibilitychange", refreshIfStale);
 
     return () => {
@@ -575,6 +621,8 @@ export function SiteDataProvider<T extends SiteData = SiteData>({
       if (retryTimer !== null) window.clearTimeout(retryTimer);
       window.removeEventListener("focus", refreshIfStale);
       window.removeEventListener("online", refreshIfStale);
+      window.removeEventListener('pageshow', refreshIfStale);
+      window.removeEventListener(DENEB_REFRESH_LIVE_CATALOG_EVENT, refreshNow);
       document.removeEventListener("visibilitychange", refreshIfStale);
     };
   }, [liveCatalogEndpoint, siteSlug, initialSiteData]);
@@ -1055,7 +1103,9 @@ export function normalizeProductItem(p: unknown): ProductItem {
     p.src ??
     p.productImage ??
     (Array.isArray(p.gallery) ? p.gallery[0] : undefined) ??
-    (Array.isArray(p.images) ? p.images[0] : undefined);
+    (Array.isArray(p.images) ? p.images[0] : undefined) ??
+    (Array.isArray(p.additionalImages) ? p.additionalImages[0] : undefined);
+  const catalogImages = resolveCatalogImages(p);
 
   const badgeCandidate = p.badge ?? p.tag ?? p.label ?? p.badgeText ?? p.chip;
   const descCandidate = p.description ?? p.desc ?? p.details ?? p.shortDescription ?? p.subtitle;
@@ -1101,6 +1151,13 @@ export function normalizeProductItem(p: unknown): ProductItem {
           productImage: imageCandidate as string,
         }
       : {}),
+    ...(catalogImages.length > 0
+      ? {
+          gallery: catalogImages,
+          images: catalogImages,
+          additionalImages: catalogImages.slice(1),
+        }
+      : {}),
     ...(badgeCandidate !== undefined
       ? {
           badge: badgeCandidate as string,
@@ -1127,7 +1184,16 @@ export function normalizeServiceItem(s: unknown): ServiceItem {
   const nameCandidate = s.name ?? s.title ?? s.serviceName ?? s.heading;
   const titleCandidate = s.title ?? s.name ?? s.serviceName ?? s.heading;
   const descCandidate = s.description ?? s.desc ?? s.details ?? s.shortDescription;
-  const imageCandidate = s.imageUrl ?? s.image ?? s.photo ?? s.thumbnail ?? s.picture;
+  const imageCandidate =
+    s.imageUrl ??
+    s.image ??
+    s.photo ??
+    s.thumbnail ??
+    s.picture ??
+    (Array.isArray(s.gallery) ? s.gallery[0] : undefined) ??
+    (Array.isArray(s.images) ? s.images[0] : undefined) ??
+    (Array.isArray(s.additionalImages) ? s.additionalImages[0] : undefined);
+  const catalogImages = resolveCatalogImages(s);
 
   return {
     ...customData,
@@ -1136,6 +1202,13 @@ export function normalizeServiceItem(s: unknown): ServiceItem {
     title: titleCandidate as string | undefined,
     ...(descCandidate !== undefined ? { description: descCandidate as string, desc: descCandidate as string, details: descCandidate as string } : {}),
     ...(imageCandidate !== undefined ? { imageUrl: imageCandidate as string, image: imageCandidate as string, photo: imageCandidate as string } : {}),
+    ...(catalogImages.length > 0
+      ? {
+          gallery: catalogImages,
+          images: catalogImages,
+          additionalImages: catalogImages.slice(1),
+        }
+      : {}),
   } as ServiceItem;
 }
 
@@ -1143,6 +1216,16 @@ export function useProducts(fallback: ProductItem[] = []): ProductItem[] {
   const siteData = useSiteData();
   const content = isRecord(siteData?.content) ? (siteData.content as Record<string, unknown>) : null;
   if (!content) return fallback;
+
+  // Once the public catalog endpoint has answered, its top-level collection is
+  // authoritative even when it is empty. This prevents deleted products from
+  // falling back to stale products embedded in the generated site bundle.
+  if (
+    typeof siteData.liveCatalogUpdatedAt === 'string' &&
+    Array.isArray(content.products)
+  ) {
+    return (content.products as unknown[]).map(normalizeProductItem);
+  }
 
   let rawList: ProductItem[] | null = null;
   const candidates: unknown[] = [
@@ -1178,6 +1261,15 @@ export function useServices(fallback: ServiceItem[] = []): ServiceItem[] {
   const siteData = useSiteData();
   const content = isRecord(siteData?.content) ? (siteData.content as Record<string, unknown>) : null;
   if (!content) return fallback;
+
+  // An empty live response is meaningful: all services were removed. Do not
+  // resurrect build-time services from a nested legacy collection or fallback.
+  if (
+    typeof siteData.liveCatalogUpdatedAt === 'string' &&
+    Array.isArray(content.services)
+  ) {
+    return (content.services as unknown[]).map(normalizeServiceItem);
+  }
 
   const candidates: unknown[] = [
     content.services,
