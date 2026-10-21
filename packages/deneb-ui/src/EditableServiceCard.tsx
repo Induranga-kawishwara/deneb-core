@@ -1,6 +1,7 @@
 import React from 'react';
 import { EditableText } from './EditableText';
 import { EditableImage } from './EditableImage';
+import { resolveCatalogImages } from './utils/catalogMedia';
 
 export interface ServiceItem {
   id?: string | number;
@@ -13,6 +14,9 @@ export interface ServiceItem {
   description?: string;
   imageUrl?: string;
   image?: string;
+  gallery?: string[];
+  images?: string[];
+  additionalImages?: string[];
   features?: unknown[];
   [key: string]: unknown;
 }
@@ -84,7 +88,8 @@ export function EditableServiceCard({
         : 'LKR ' + String(rawPriceCandidate)
     : '';
 
-  const imageUrl = String(service?.imageUrl || service?.image || '');
+  const serviceImages = resolveCatalogImages(service);
+  const imageUrl = serviceImages[0] || '';
   const features = Array.isArray(service?.features) ? service.features : [];
 
   const mergedStyle: React.CSSProperties = {

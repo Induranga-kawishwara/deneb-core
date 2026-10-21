@@ -24,6 +24,7 @@ import type { ProductItem } from './EditableProductCard';
 import type { ServiceItem } from './EditableServiceCard';
 import { ThemeStyles, type TemplateTheme } from './ThemeStyles';
 import { withBasePath, resolveAsset } from './utils';
+import { resolveCatalogImages } from './utils/catalogMedia';
 
 export const DENEB_PREVIEW_DATA_MESSAGE = 'DENEB_PREVIEW_SITE_DATA';
 export const PREVIEW_DATA_MESSAGE = 'FIVORA_PREVIEW_SITE_DATA';
@@ -1055,7 +1056,9 @@ export function normalizeProductItem(p: unknown): ProductItem {
     p.src ??
     p.productImage ??
     (Array.isArray(p.gallery) ? p.gallery[0] : undefined) ??
-    (Array.isArray(p.images) ? p.images[0] : undefined);
+    (Array.isArray(p.images) ? p.images[0] : undefined) ??
+    (Array.isArray(p.additionalImages) ? p.additionalImages[0] : undefined);
+  const catalogImages = resolveCatalogImages(p);
 
   const badgeCandidate = p.badge ?? p.tag ?? p.label ?? p.badgeText ?? p.chip;
   const descCandidate = p.description ?? p.desc ?? p.details ?? p.shortDescription ?? p.subtitle;
@@ -1101,6 +1104,13 @@ export function normalizeProductItem(p: unknown): ProductItem {
           productImage: imageCandidate as string,
         }
       : {}),
+    ...(catalogImages.length > 0
+      ? {
+          gallery: catalogImages,
+          images: catalogImages,
+          additionalImages: catalogImages.slice(1),
+        }
+      : {}),
     ...(badgeCandidate !== undefined
       ? {
           badge: badgeCandidate as string,
@@ -1127,7 +1137,16 @@ export function normalizeServiceItem(s: unknown): ServiceItem {
   const nameCandidate = s.name ?? s.title ?? s.serviceName ?? s.heading;
   const titleCandidate = s.title ?? s.name ?? s.serviceName ?? s.heading;
   const descCandidate = s.description ?? s.desc ?? s.details ?? s.shortDescription;
-  const imageCandidate = s.imageUrl ?? s.image ?? s.photo ?? s.thumbnail ?? s.picture;
+  const imageCandidate =
+    s.imageUrl ??
+    s.image ??
+    s.photo ??
+    s.thumbnail ??
+    s.picture ??
+    (Array.isArray(s.gallery) ? s.gallery[0] : undefined) ??
+    (Array.isArray(s.images) ? s.images[0] : undefined) ??
+    (Array.isArray(s.additionalImages) ? s.additionalImages[0] : undefined);
+  const catalogImages = resolveCatalogImages(s);
 
   return {
     ...customData,
@@ -1136,6 +1155,13 @@ export function normalizeServiceItem(s: unknown): ServiceItem {
     title: titleCandidate as string | undefined,
     ...(descCandidate !== undefined ? { description: descCandidate as string, desc: descCandidate as string, details: descCandidate as string } : {}),
     ...(imageCandidate !== undefined ? { imageUrl: imageCandidate as string, image: imageCandidate as string, photo: imageCandidate as string } : {}),
+    ...(catalogImages.length > 0
+      ? {
+          gallery: catalogImages,
+          images: catalogImages,
+          additionalImages: catalogImages.slice(1),
+        }
+      : {}),
   } as ServiceItem;
 }
 
