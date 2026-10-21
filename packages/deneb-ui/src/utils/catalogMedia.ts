@@ -53,7 +53,9 @@ export function resolveCatalogImages(
   appendImageList(images, seen, source.gallery);
   appendImageList(images, seen, source.images);
   appendImageList(images, seen, source.additionalImages);
-  appendImage(images, seen, fallbackImage);
+  if (images.length === 0) {
+    appendImage(images, seen, fallbackImage);
+  }
 
   return images;
 }

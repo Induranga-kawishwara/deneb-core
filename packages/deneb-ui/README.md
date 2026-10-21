@@ -637,6 +637,12 @@ export function PromoSection() {
 
 DENEB UI commerce components natively support both **Single Fixed Prices** and **Dynamic Price Ranges**, as well as apparel clothing options (color swatches with image swapping and size chips).
 
+Fivora uses one canonical catalog contract: `ProductCard` is the commerce
+renderer, `ServiceCard` is the service/quote renderer, and `UniversalCard` is
+reserved for other generic entity listings. Keep `imageUrl` as the primary
+image and `additionalImages` as the ordered gallery; DENEB normalizes them to
+`images`/`gallery` for detail and quick-view components.
+
 Keep `price`, `compareAtPrice`, `minPrice`, `maxPrice`, and variant prices as
 JSON numbers. Keep `currency` or a currency symbol as separate text. A formatted
 `priceRange` string is display-only; numeric filters and sorting must use the
@@ -653,7 +659,8 @@ import { ProductCard } from "@deneb-ui/ui";
     price: 3500,
     compareAtPrice: 4500,
     currency: "LKR",
-    imageUrl: "/images/shirt.jpg"
+    imageUrl: "/images/shirt.jpg",
+    additionalImages: ["/images/shirt-back.jpg", "/images/shirt-detail.jpg"]
   }}
   itemPath="products[0]"
 />
@@ -673,6 +680,7 @@ import { ProductCard } from "@deneb-ui/ui";
     isPriceRange: true,
     currency: "LKR",
     imageUrl: "/images/tunic-navy.jpg",
+    additionalImages: ["/images/tunic-back.jpg", "/images/tunic-detail.jpg"],
     colors: [
       { name: "Navy Blue", hex: "#1e3a8a", imageUrl: "/images/tunic-navy.jpg" },
       { name: "Olive Green", hex: "#3f6212", imageUrl: "/images/tunic-olive.jpg" },
