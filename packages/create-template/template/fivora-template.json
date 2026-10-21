@@ -5,11 +5,10 @@
     "contractVersion": 1,
     "mode": "strict",
     "controlOnlyPaths": [
+      "common.newsletterDescription",
       "products[*].id",
-      "products[*].isAvailable",
       "services[*].id",
       "products[*].currency",
-      "about.collageImages[*].id",
       "contact.whatsapp"
     ]
   },
