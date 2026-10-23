@@ -592,11 +592,32 @@
             "minItems": 0,
             "maxItems": 12,
             "fields": [
-              { "key": "text", "type": "text", "label": "Text", "required": true },
-              { "key": "badge", "type": "text", "label": "Badge" },
-              { "key": "icon", "type": "text", "label": "Icon (text or emoji)" },
-              { "key": "linkLabel", "type": "text", "label": "Link label" },
-              { "key": "linkUrl", "type": "url", "label": "Link URL" }
+              {
+                "key": "text",
+                "type": "text",
+                "label": "Text",
+                "required": true
+              },
+              {
+                "key": "badge",
+                "type": "text",
+                "label": "Badge"
+              },
+              {
+                "key": "icon",
+                "type": "text",
+                "label": "Icon (text or emoji)"
+              },
+              {
+                "key": "linkLabel",
+                "type": "text",
+                "label": "Link label"
+              },
+              {
+                "key": "linkUrl",
+                "type": "url",
+                "label": "Link URL"
+              }
             ]
           }
         ]
